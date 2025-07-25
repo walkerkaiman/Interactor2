@@ -1,0 +1,63 @@
+{
+  "id": "example-interaction",
+  "name": "OSC to Audio Example",
+  "description": "Simple example that plays audio when OSC messages are received",
+  "enabled": true,
+  "modules": [
+    {
+      "id": "osc-input-1",
+      "moduleName": "osc_input_trigger",
+      "config": {
+        "port": 8000,
+        "host": "0.0.0.0",
+        "addressPatterns": ["/trigger/*"],
+        "enableLogging": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "audio-output-1",
+      "moduleName": "audio_output_trigger",
+      "config": {
+        "audioFiles": [
+          {
+            "name": "notification",
+            "path": "notification.wav",
+            "volume": 0.8,
+            "loop": false
+          }
+        ],
+        "defaultVolume": 0.8,
+        "fadeInTime": 0,
+        "fadeOutTime": 0
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "routes": [
+    {
+      "id": "route-1",
+      "source": "osc-input-1",
+      "target": "audio-output-1",
+      "event": "osc_message",
+      "conditions": [
+        {
+          "field": "address",
+          "operator": "contains",
+          "value": "/trigger"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "created": "2024-01-01T00:00:00Z",
+    "version": "1.0.0",
+    "tags": ["example", "osc", "audio"]
+  }
+} 
