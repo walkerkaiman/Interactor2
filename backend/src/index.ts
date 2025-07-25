@@ -44,12 +44,25 @@ export class InteractorServer {
   }
 
   /**
+   * Set configuration (useful for testing)
+   */
+  public setConfig(config: {
+    server: { port: number; host: string };
+    logging: { level: string; file: string };
+    modules: { autoLoad: boolean; hotReload: boolean };
+  }): void {
+    this.config = config;
+  }
+
+  /**
    * Initialize the server
    */
   public async init(): Promise<void> {
     try {
-      // Load configuration
-      await this.loadConfig();
+      // Load configuration only if not already set
+      if (!this.config) {
+        await this.loadConfig();
+      }
       
       // Initialize core services
       await this.initializeServices();
@@ -129,7 +142,7 @@ export class InteractorServer {
     try {
       await this.moduleLoader.init();
     } catch (error) {
-      this.logger.error('Failed to initialize ModuleLoader:', error);
+      this.logger.error('Failed to initialize ModuleLoader:', String(error));
       throw error;
     }
     await this.stateManager.init();
@@ -162,6 +175,17 @@ export class InteractorServer {
     // JSON parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
+    
+    // JSON parsing error handler
+    this.app.use((err: any, req: any, res: any, next: any) => {
+      if (err instanceof SyntaxError && 'body' in err) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid JSON in request body' 
+        });
+      }
+      next(err);
+    });
     
     // Request logging
     this.app.use((req, res, next) => {
@@ -211,7 +235,7 @@ export class InteractorServer {
     });
 
     this.app.get('/api/modules/:name', (req, res) => {
-      const manifest = this.moduleLoader.getManifest(req.params.name);
+      const manifest = this.moduleLoader.getManifest(req.params.name as string);
       if (manifest) {
         res.json({ success: true, data: manifest });
       } else {
@@ -248,7 +272,7 @@ export class InteractorServer {
 
     this.app.delete('/api/interactions/:id', async (req, res) => {
       try {
-        const removed = await this.stateManager.removeInteraction(req.params.id);
+        const removed = await this.stateManager.removeInteraction(req.params.id as string);
         if (removed) {
           res.json({ success: true });
         } else {
@@ -276,6 +300,123 @@ export class InteractorServer {
       }
     });
 
+    this.app.delete('/api/routes/:id', async (req, res) => {
+      try {
+        const removed = this.messageRouter.removeRoute(req.params.id as string);
+        if (removed) {
+          res.json({ success: true });
+        } else {
+          res.status(404).json({ success: false, error: 'Route not found' });
+        }
+      } catch (error) {
+        res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    // Module instance management
+    this.app.get('/api/module-instances', (req, res) => {
+      const instances = this.stateManager.getModuleInstances();
+      res.json({ success: true, data: instances });
+    });
+
+    this.app.get('/api/module-instances/:id', (req, res) => {
+      const instance = this.stateManager.getModuleInstance(req.params.id as string);
+      if (instance) {
+        res.json({ success: true, data: instance });
+      } else {
+        res.status(404).json({ success: false, error: 'Module instance not found' });
+      }
+    });
+
+    this.app.post('/api/module-instances', async (req, res) => {
+      try {
+        const { moduleName, config } = req.body;
+        // Create the module instance using ModuleLoader
+        const moduleInstance = await this.moduleLoader.createInstance(moduleName, config);
+        
+        // Add it to state management
+        const instanceData: ModuleInstance = {
+          id: moduleInstance.id,
+          moduleName,
+          config,
+          position: req.body.position
+        };
+        
+        await this.stateManager.addModuleInstance(instanceData);
+        res.json({ success: true, data: instanceData });
+      } catch (error) {
+        res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    this.app.delete('/api/module-instances/:id', async (req, res) => {
+      try {
+        const removed = await this.stateManager.removeModuleInstance(req.params.id as string);
+        if (removed) {
+          res.json({ success: true });
+        } else {
+          res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+      } catch (error) {
+        res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    // Module control
+    this.app.post('/api/module-instances/:id/start', async (req, res) => {
+      try {
+        const instanceData = this.stateManager.getModuleInstance(req.params.id as string);
+        if (!instanceData) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Get the actual module instance from ModuleLoader
+        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        await moduleInstance.start();
+        return res.json({ success: true });
+      } catch (error) {
+        return res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    this.app.post('/api/module-instances/:id/stop', async (req, res) => {
+      try {
+        const instanceData = this.stateManager.getModuleInstance(req.params.id as string);
+        if (!instanceData) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Get the actual module instance from ModuleLoader
+        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        await moduleInstance.stop();
+        return res.json({ success: true });
+      } catch (error) {
+        return res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    this.app.post('/api/module-instances/:id/trigger', async (req, res) => {
+      try {
+        const instanceData = this.stateManager.getModuleInstance(req.params.id as string);
+        if (!instanceData) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Get the actual module instance from ModuleLoader
+        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        
+        // Check if the module has a manual trigger method (only output modules have this)
+        if ('onManualTrigger' in moduleInstance && typeof moduleInstance.onManualTrigger === 'function') {
+          await moduleInstance.onManualTrigger();
+          return res.json({ success: true });
+        } else {
+          return res.status(400).json({ success: false, error: 'Module does not support manual triggering' });
+        }
+      } catch (error) {
+        return res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
     // Logs
     this.app.get('/api/logs', (req, res) => {
       const count = parseInt(req.query.count as string) || 100;
@@ -291,7 +432,7 @@ export class InteractorServer {
 
     this.app.put('/api/settings/:key', async (req, res) => {
       try {
-        await this.stateManager.setSetting(req.params.key, req.body.value);
+        await this.stateManager.setSetting(req.params.key as string, req.body.value);
         res.json({ success: true });
       } catch (error) {
         res.status(400).json({ success: false, error: String(error) });

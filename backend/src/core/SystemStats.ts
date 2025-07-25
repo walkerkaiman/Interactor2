@@ -320,24 +320,24 @@ export class SystemStats extends EventEmitter {
     platform: string;
     arch: string;
     nodeVersion: string;
+    version: string;
     processId: number;
     uptime: string;
     memory: any;
     cpu: any;
   } {
     const os = require('os');
-    
     return {
       platform: os.platform(),
       arch: os.arch(),
       nodeVersion: process.version,
+      version: '2.0.0', // Add version property
       processId: process.pid,
       uptime: this.getUptimeFormatted(),
       memory: this.getMemoryUsageFormatted(),
       cpu: {
-        usage: Math.round(this.stats.cpu.usage * 100) / 100,
-        cores: this.stats.cpu.cores,
-        model: os.cpus()[0]?.model || 'Unknown'
+        usage: this.stats.cpu.usage,
+        cores: this.stats.cpu.cores
       }
     };
   }

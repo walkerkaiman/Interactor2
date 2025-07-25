@@ -8,7 +8,6 @@ import {
 
 export abstract class InputModuleBase extends ModuleBase implements InputModule {
   public readonly type = 'input' as const;
-  public category: 'trigger' | 'streaming';
 
   protected mode: 'trigger' | 'streaming' = 'trigger';
   protected inputHandlers: EventHandler[] = [];
@@ -18,11 +17,9 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   constructor(
     name: string, 
     config: ModuleConfig, 
-    manifest: ModuleManifest,
-    category: 'trigger' | 'streaming' = 'trigger'
+    manifest: ModuleManifest
   ) {
     super(name, config, manifest);
-    this.category = category;
   }
 
   /**

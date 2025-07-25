@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { SystemStats } from '@/core/SystemStats';
-import { SystemMetrics, PerformanceMetrics } from '@interactor/shared';
+import { SystemStats } from '../../backend/src/core/SystemStats';
+import { SystemStats as ISystemStats } from '@interactor/shared';
 
 describe('SystemStats', () => {
   let systemStats: SystemStats;
@@ -403,9 +403,9 @@ describe('SystemStats', () => {
       
       // Simulate high-frequency operations
       for (let i = 0; i < 10000; i++) {
-        systemStats.recordEvent('perf-test');
+        systemStats.incrementMessageSent();
         if (i % 1000 === 0) {
-          systemStats.recordResponseTime('perf-operation', Math.random() * 100);
+          systemStats.incrementMessageReceived();
         }
       }
       
@@ -414,8 +414,8 @@ describe('SystemStats', () => {
       // Should complete within reasonable time
       expect(endTime - startTime).toBeLessThan(5000);
       
-      const metrics = systemStats.getMetrics();
-      expect(metrics.events.total).toBeGreaterThanOrEqual(10000);
+      const stats = systemStats.getStats();
+      expect(stats.messages.sent).toBeGreaterThanOrEqual(10000);
     });
 
     it('should maintain performance under load', async () => {
@@ -427,7 +427,7 @@ describe('SystemStats', () => {
         loadPromises.push(
           new Promise<void>(async (resolve) => {
             for (let j = 0; j < 100; j++) {
-              systemStats.recordEvent(`load-event-${i}-${j}`);
+              systemStats.incrementMessageSent();
             }
             resolve();
           })
@@ -436,8 +436,8 @@ describe('SystemStats', () => {
       
       await Promise.all(loadPromises);
       
-      const metrics = systemStats.getMetrics();
-      expect(metrics.events.total).toBeGreaterThanOrEqual(10000);
+      const stats = systemStats.getStats();
+      expect(stats.messages.sent).toBeGreaterThanOrEqual(10000);
     });
   });
 

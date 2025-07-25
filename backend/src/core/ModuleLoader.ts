@@ -305,7 +305,7 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
             protected async onStopListening(): Promise<void> {
               // Stop listening for input
             }
-          })(manifest.name, config, manifest, manifest.category);
+          })(manifest.name, config, manifest);
         } else {
           return new (class extends OutputModuleBase {
             protected async onInit(): Promise<void> {
@@ -335,7 +335,7 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
             protected async onManualTrigger(): Promise<void> {
               // Handle manual trigger
             }
-          })(manifest.name, config, manifest, manifest.category);
+          })(manifest.name, config, manifest);
         }
       },
       getManifest: () => manifest
@@ -358,9 +358,7 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
       errors.push({ field: 'type', message: 'Module type must be "input" or "output"', code: 'INVALID_TYPE' });
     }
     
-    if (!manifest.category || !['trigger', 'streaming'].includes(manifest.category)) {
-      errors.push({ field: 'category', message: 'Module category must be "trigger" or "streaming"', code: 'INVALID_CATEGORY' });
-    }
+
     
     if (!manifest.version) {
       errors.push({ field: 'version', message: 'Module version is required', code: 'REQUIRED' });

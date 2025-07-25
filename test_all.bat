@@ -80,6 +80,7 @@ echo.
 
 cd Tests
 echo [%time%] Running Core System Tests...
+echo Running all tests in watch mode...
 npm run test:watch
 
 echo.

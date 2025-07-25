@@ -181,7 +181,7 @@ src/modules/input/my_input/
 {
   "name": "My Input Module",
   "type": "input",
-  "category": "trigger",
+
   "version": "1.0.0",
   "description": "Description of the module",
   "author": "Your Name",
@@ -213,7 +213,7 @@ import { ModuleConfig } from '@interactor/shared';
 
 export class MyInputModule extends InputModuleBase {
   constructor(config: ModuleConfig) {
-    super('my_input', config, manifest, 'trigger');
+    super('my_input', config, manifest);
   }
 
   protected async onInit(): Promise<void> {

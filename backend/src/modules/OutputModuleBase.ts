@@ -8,7 +8,6 @@ import {
 
 export abstract class OutputModuleBase extends ModuleBase implements OutputModule {
   public readonly type = 'output' as const;
-  public category: 'trigger' | 'streaming';
 
   protected outputHandlers: EventHandler[] = [];
   protected lastSentValue: any = null;
@@ -17,11 +16,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   constructor(
     name: string, 
     config: ModuleConfig, 
-    manifest: ModuleManifest,
-    category: 'trigger' | 'streaming' = 'trigger'
+    manifest: ModuleManifest
   ) {
     super(name, config, manifest);
-    this.category = category;
   }
 
   /**

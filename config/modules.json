@@ -4,7 +4,6 @@
       "name": "osc_input",
       "displayName": "OSC Input",
       "type": "input",
-      "category": "trigger/streaming",
       "description": "Receives OSC messages and triggers/streams events.",
       "icon": "waveform"
     },
@@ -12,7 +11,6 @@
       "name": "audio_output",
       "displayName": "Audio Output",
       "type": "output",
-      "category": "trigger",
       "description": "Plays audio files in response to triggers.",
       "icon": "volume"
     }

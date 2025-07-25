@@ -6,7 +6,6 @@ export interface ModuleConfig {
 export interface ModuleManifest {
   name: string;
   type: 'input' | 'output';
-  category: 'trigger' | 'streaming';
   version: string;
   description: string;
   author: string;

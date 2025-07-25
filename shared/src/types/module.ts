@@ -4,7 +4,6 @@ import { ModuleBase, ModuleConfig, ModuleManifest } from './index';
 // Module-specific types
 export interface InputModule extends ModuleBase {
   type: 'input';
-  category: 'trigger' | 'streaming';
   
   // Input-specific methods
   onInput(handler: (data: any) => void): void;
@@ -14,7 +13,6 @@ export interface InputModule extends ModuleBase {
 
 export interface OutputModule extends ModuleBase {
   type: 'output';
-  category: 'trigger' | 'streaming';
   
   // Output-specific methods
   onOutput(handler: (data: any) => void): void;

@@ -1,0 +1,56 @@
+{
+  "name": "OSC Input",
+  "type": "input",
+  "version": "1.0.0",
+  "description": "Receives OSC messages and triggers/streams events",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "port": {
+        "type": "number",
+        "description": "UDP port to listen for OSC messages",
+        "minimum": 1024,
+        "maximum": 65535,
+        "default": 8000,
+        "uiType": "number"
+      },
+      "host": {
+        "type": "string",
+        "description": "Host address to bind to",
+        "default": "0.0.0.0",
+        "uiType": "text"
+      },
+      "addressPattern": {
+        "type": "string",
+        "description": "OSC address pattern to match (e.g., /trigger/*)",
+        "default": "/trigger",
+        "uiType": "text"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the OSC listener",
+        "default": true,
+        "uiType": "toggle"
+      }
+    },
+    "required": ["port", "host", "addressPattern"]
+  },
+  "events": [
+    {
+      "name": "oscMessage",
+      "type": "output",
+      "description": "Emitted when any OSC message is received"
+    },
+    {
+      "name": "oscTrigger",
+      "type": "output",
+      "description": "Emitted when OSC message matches address pattern (trigger mode)"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

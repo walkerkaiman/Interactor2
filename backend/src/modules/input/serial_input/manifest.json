@@ -1,0 +1,63 @@
+{
+  "name": "Serial Input",
+  "type": "input",
+  "version": "1.0.0",
+  "description": "Monitors serial data from hardware sensors with threshold triggering",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "port": {
+        "type": "string",
+        "description": "Serial port to monitor (e.g., COM1, /dev/ttyUSB0)",
+        "default": "COM1",
+        "uiType": "text"
+      },
+      "baudRate": {
+        "type": "number",
+        "description": "Baud rate for serial communication",
+        "minimum": 9600,
+        "maximum": 115200,
+        "default": 9600,
+        "uiType": "number"
+      },
+      "logicOperator": {
+        "type": "string",
+        "description": "Logic operator for threshold comparison",
+        "enum": [">", "<", "="],
+        "default": ">",
+        "uiType": "select"
+      },
+      "threshold": {
+        "type": "number",
+        "description": "Threshold value for trigger mode",
+        "default": 100,
+        "uiType": "number"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the serial listener",
+        "default": true,
+        "uiType": "toggle"
+      }
+    },
+    "required": ["port", "baudRate", "logicOperator", "threshold"]
+  },
+  "events": [
+    {
+      "name": "serialData",
+      "type": "output",
+      "description": "Emitted when serial data is received"
+    },
+    {
+      "name": "thresholdTrigger",
+      "type": "output",
+      "description": "Emitted when value crosses threshold (trigger mode)"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

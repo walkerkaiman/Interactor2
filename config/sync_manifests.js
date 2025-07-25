@@ -41,7 +41,7 @@ function syncManifests() {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         
         // Validate manifest structure
-        if (!manifest.name || !manifest.type || !manifest.category) {
+        if (!manifest.name || !manifest.type) {
           console.warn(`⚠️  Invalid manifest for ${moduleDir}: missing required fields`);
           continue;
         }

@@ -1,0 +1,77 @@
+{
+  "name": "HTTP Input",
+  "type": "input",
+  "version": "1.0.0",
+  "description": "Receives HTTP requests and triggers/streams events with parsed numeric data",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "port": {
+        "type": "number",
+        "description": "HTTP server port to listen on",
+        "minimum": 1024,
+        "maximum": 65535,
+        "default": 3000,
+        "uiType": "number"
+      },
+      "host": {
+        "type": "string",
+        "description": "Host address to bind to",
+        "default": "0.0.0.0",
+        "uiType": "text"
+      },
+      "endpoint": {
+        "type": "string",
+        "description": "HTTP endpoint to listen on (e.g., /webhook)",
+        "default": "/webhook",
+        "uiType": "text"
+      },
+      "methods": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "HTTP methods to accept",
+        "default": ["POST"],
+        "uiType": "multiselect"
+      },
+      "rateLimit": {
+        "type": "number",
+        "description": "Maximum requests per minute",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 60,
+        "uiType": "number"
+      },
+      "contentType": {
+        "type": "string",
+        "description": "Expected content type for requests",
+        "default": "application/json",
+        "uiType": "text"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the HTTP server",
+        "default": true,
+        "uiType": "toggle"
+      }
+    },
+    "required": ["port", "host", "endpoint", "methods", "rateLimit"]
+  },
+  "events": [
+    {
+      "name": "httpRequest",
+      "type": "output",
+      "description": "Emitted when HTTP request is received"
+    },
+    {
+      "name": "httpTrigger",
+      "type": "output",
+      "description": "Emitted when HTTP request contains valid numeric data (trigger mode)"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

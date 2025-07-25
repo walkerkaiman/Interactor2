@@ -1,0 +1,44 @@
+{
+  "name": "Frames Input",
+  "type": "input",
+  "version": "1.0.0",
+  "description": "Monitors sACN frame numbers on Universe 999 using channels 1 and 2 as MSB/LSB",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "universe": {
+        "type": "number",
+        "description": "sACN universe to monitor for frame data",
+        "minimum": 1,
+        "maximum": 63999,
+        "default": 999,
+        "uiType": "number"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the sACN listener",
+        "default": true,
+        "uiType": "toggle"
+      }
+    },
+    "required": ["universe"]
+  },
+  "events": [
+    {
+      "name": "frameChange",
+      "type": "output",
+      "description": "Emitted when frame number changes (trigger mode)"
+    },
+    {
+      "name": "frameData",
+      "type": "output",
+      "description": "Emitted when frame data is received"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

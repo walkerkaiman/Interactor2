@@ -1,7 +1,6 @@
 {
   "name": "Time Input",
   "type": "input",
-  "category": "trigger",
   "version": "1.0.0",
   "description": "Triggers events at a specific time of day",
   "author": "Interactor Team",
@@ -10,8 +9,9 @@
     "properties": {
       "targetTime": {
         "type": "string",
-        "description": "Target time in HH:MM format",
-        "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+        "description": "Target time in 12-hour format (e.g., 2:30 PM)",
+        "pattern": "^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$",
+        "uiType": "time12Hour"
       },
       "enabled": {
         "type": "boolean",

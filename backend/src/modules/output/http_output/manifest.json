@@ -1,7 +1,6 @@
 {
   "name": "HTTP Output",
   "type": "output",
-  "category": "trigger",
   "version": "1.0.0",
   "description": "Sends HTTP requests to external endpoints",
   "author": "Interactor Team",
@@ -11,25 +10,35 @@
       "url": {
         "type": "string",
         "description": "Target URL for HTTP requests",
-        "pattern": "^https?://.+"
+        "pattern": "^https?://.+",
+        "uiType": "url"
       },
       "method": {
         "type": "string",
         "description": "HTTP method to use",
         "enum": ["GET", "POST", "PUT", "DELETE"],
-        "default": "POST"
+        "default": "POST",
+        "uiType": "select"
       },
       "headers": {
         "type": "object",
         "description": "Additional HTTP headers",
-        "default": {}
+        "default": {},
+        "uiType": "keyValue"
       },
       "timeout": {
         "type": "number",
         "description": "Request timeout in milliseconds",
         "minimum": 1000,
         "maximum": 30000,
-        "default": 5000
+        "default": 5000,
+        "uiType": "number"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the module",
+        "default": true,
+        "uiType": "toggle"
       }
     },
     "required": ["url"]
@@ -39,6 +48,21 @@
       "name": "httpRequest",
       "type": "input",
       "description": "Triggers an HTTP request"
+    },
+    {
+      "name": "httpResponse",
+      "type": "output",
+      "description": "Emitted when an HTTP request is completed"
+    },
+    {
+      "name": "httpError",
+      "type": "output",
+      "description": "Emitted when an HTTP request fails"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
     }
   ]
 } 
