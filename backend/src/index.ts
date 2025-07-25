@@ -126,7 +126,12 @@ export class InteractorServer {
 
     // Initialize services
     // Logger doesn't have an init method, it's ready to use
-    await this.moduleLoader.init();
+    try {
+      await this.moduleLoader.init();
+    } catch (error) {
+      this.logger.error('Failed to initialize ModuleLoader:', error);
+      throw error;
+    }
     await this.stateManager.init();
     await this.systemStats.init();
 

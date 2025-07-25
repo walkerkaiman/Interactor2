@@ -28,6 +28,10 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
     private logger?: any
   ) {
     super();
+    
+    // In development mode with ts-node-dev, __dirname points to src, not dist
+    // So we don't need to convert the path
+    this.logger?.debug(`ModuleLoader initialized with modules directory: ${this.modulesDir}`);
   }
 
   /**
@@ -234,16 +238,33 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
    * Get module directories
    */
   private async getModuleDirectories(): Promise<string[]> {
-    const entries = await fs.readdir(this.modulesDir, { withFileTypes: true });
     const moduleDirs: string[] = [];
     
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const moduleDir = path.join(this.modulesDir, entry.name);
-        moduleDirs.push(moduleDir);
+    // Recursively search for module directories (those containing manifest.json)
+    const searchForModules = async (dir: string): Promise<void> => {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            const subDir = path.join(dir, entry.name);
+            
+            // Check if this directory contains a manifest.json (it's a module)
+            const manifestPath = path.join(subDir, 'manifest.json');
+            if (await fs.pathExists(manifestPath)) {
+              moduleDirs.push(subDir);
+            } else {
+              // Recursively search subdirectories
+              await searchForModules(subDir);
+            }
+          }
+        }
+      } catch (error) {
+        this.logger?.warn(`Error reading directory ${dir}:`, error);
       }
-    }
+    };
     
+    await searchForModules(this.modulesDir);
     return moduleDirs;
   }
 
