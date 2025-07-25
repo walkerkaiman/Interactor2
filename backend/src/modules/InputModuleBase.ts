@@ -1,0 +1,196 @@
+import { ModuleBase } from '../core/ModuleBase';
+import {
+  ModuleConfig,
+  ModuleManifest,
+  InputModule,
+  EventHandler
+} from '@interactor/shared';
+
+export abstract class InputModuleBase extends ModuleBase implements InputModule {
+  public readonly type = 'input' as const;
+  public category: 'trigger' | 'streaming';
+
+  protected mode: 'trigger' | 'streaming' = 'trigger';
+  protected inputHandlers: EventHandler[] = [];
+  protected lastValue: any = null;
+  protected isListening = false;
+
+  constructor(
+    name: string, 
+    config: ModuleConfig, 
+    manifest: ModuleManifest,
+    category: 'trigger' | 'streaming' = 'trigger'
+  ) {
+    super(name, config, manifest);
+    this.category = category;
+  }
+
+  /**
+   * Set the input mode (trigger or streaming)
+   */
+  public setMode(mode: 'trigger' | 'streaming'): void {
+    if (this.mode !== mode) {
+      this.logger?.info(`Changing mode for ${this.name} from ${this.mode} to ${mode}`);
+      this.mode = mode;
+      this.emit('modeChanged', { moduleId: this.id, moduleName: this.name, mode });
+    }
+  }
+
+  /**
+   * Get current input mode
+   */
+  public getMode(): 'trigger' | 'streaming' {
+    return this.mode;
+  }
+
+  /**
+   * Register an input handler
+   */
+  public onInput(handler: EventHandler): void {
+    this.inputHandlers.push(handler);
+  }
+
+  /**
+   * Start listening for input
+   */
+  public async startListening(): Promise<void> {
+    if (this.isListening) {
+      return; // Already listening
+    }
+
+    try {
+      this.logger?.info(`Starting input listening for ${this.name}`);
+      await this.onStartListening();
+      this.isListening = true;
+      this.logger?.info(`Input listening started for ${this.name}`);
+    } catch (error) {
+      this.logger?.error(`Failed to start input listening for ${this.name}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stop listening for input
+   */
+  public async stopListening(): Promise<void> {
+    if (!this.isListening) {
+      return; // Not listening
+    }
+
+    try {
+      this.logger?.info(`Stopping input listening for ${this.name}`);
+      await this.onStopListening();
+      this.isListening = false;
+      this.logger?.info(`Input listening stopped for ${this.name}`);
+    } catch (error) {
+      this.logger?.error(`Failed to stop input listening for ${this.name}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the last received value
+   */
+  public getLastValue(): any {
+    return this.lastValue;
+  }
+
+  /**
+   * Emit a trigger event
+   */
+  protected emitTrigger(event: string, payload?: any): void {
+    this.incrementMessageCount();
+    this.logger?.debug(`Emitting trigger event from ${this.name}: ${event}`, payload);
+    
+    this.emit('trigger', {
+      moduleId: this.id,
+      moduleName: this.name,
+      event,
+      payload,
+      timestamp: Date.now()
+    });
+
+    // Notify input handlers
+    for (const handler of this.inputHandlers) {
+      try {
+        handler({
+          type: 'trigger',
+          event,
+          payload,
+          source: this.name,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        this.logger?.error(`Error in input handler for ${this.name}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Emit a streaming event
+   */
+  protected emitStream(value: any): void {
+    this.incrementMessageCount();
+    this.lastValue = value;
+    this.logger?.debug(`Emitting stream value from ${this.name}:`, value);
+    
+    this.emit('stream', {
+      moduleId: this.id,
+      moduleName: this.name,
+      value,
+      timestamp: Date.now()
+    });
+
+    // Notify input handlers
+    for (const handler of this.inputHandlers) {
+      try {
+        handler({
+          type: 'stream',
+          value,
+          source: this.name,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        this.logger?.error(`Error in input handler for ${this.name}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Handle incoming data - to be implemented by subclasses
+   */
+  protected abstract handleInput(data: any): void;
+
+  /**
+   * Start listening for input - to be implemented by subclasses
+   */
+  protected abstract onStartListening(): Promise<void>;
+
+  /**
+   * Stop listening for input - to be implemented by subclasses
+   */
+  protected abstract onStopListening(): Promise<void>;
+
+  /**
+   * Override onStart to also start listening
+   */
+  protected async onStart(): Promise<void> {
+    await this.startListening();
+  }
+
+  /**
+   * Override onStop to also stop listening
+   */
+  protected async onStop(): Promise<void> {
+    await this.stopListening();
+  }
+
+  /**
+   * Override onDestroy to clean up input handlers
+   */
+  protected async onDestroy(): Promise<void> {
+    this.inputHandlers = [];
+    this.lastValue = null;
+    this.isListening = false;
+  }
+}

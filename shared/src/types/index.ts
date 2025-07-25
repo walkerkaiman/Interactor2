@@ -148,6 +148,25 @@ export interface LogEntry {
   metadata?: Record<string, any>;
 }
 
+// Validation types
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
+export interface ValidationWarning {
+  field: string;
+  message: string;
+  code: string;
+}
+
 // Frontend types
 export interface NodeData {
   id: string;
@@ -188,5 +207,4 @@ export interface InteractionListResponse {
 }
 
 // Export all types
-export * from './module';
-export * from './events'; 
+// Note: module.ts and events.ts are imported separately to avoid circular dependencies 

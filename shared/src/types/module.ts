@@ -1,3 +1,6 @@
+// Import types from index.ts
+import { ModuleBase, ModuleConfig, ModuleManifest } from './index';
+
 // Module-specific types
 export interface InputModule extends ModuleBase {
   type: 'input';
@@ -43,21 +46,4 @@ export interface ModuleState {
   config: ModuleConfig;
 }
 
-// Module validation types
-export interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-}
-
-export interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-}
-
-export interface ValidationWarning {
-  field: string;
-  message: string;
-  code: string;
-} 
+// Module validation types - now imported from index.ts 

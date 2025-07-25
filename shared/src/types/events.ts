@@ -1,3 +1,6 @@
+// Import types from index.ts
+import { EventHandler, Message, PayloadSchema, ValidationResult } from './index';
+
 // Event system types
 export interface EventEmitter {
   on(event: string, handler: EventHandler): void;

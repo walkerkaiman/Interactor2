@@ -1,0 +1,31 @@
+{
+  "name": "Time Input",
+  "type": "input",
+  "category": "trigger",
+  "version": "1.0.0",
+  "description": "Triggers events at a specific time of day",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "targetTime": {
+        "type": "string",
+        "description": "Target time in HH:MM format",
+        "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the time trigger",
+        "default": true
+      }
+    },
+    "required": ["targetTime"]
+  },
+  "events": [
+    {
+      "name": "timeTrigger",
+      "type": "output",
+      "description": "Emitted when target time is reached"
+    }
+  ]
+} 
