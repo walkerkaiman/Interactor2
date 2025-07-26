@@ -1,0 +1,57 @@
+{
+  "name": "OSC Output",
+  "type": "output",
+  "version": "1.0.0",
+  "description": "Sends OSC messages to external endpoints",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "host": {
+        "type": "string",
+        "description": "Target host address for OSC messages",
+        "default": "127.0.0.1"
+      },
+      "port": {
+        "type": "number",
+        "description": "Target UDP port for OSC messages",
+        "minimum": 1024,
+        "maximum": 65535,
+        "default": 8000
+      },
+      "addressPattern": {
+        "type": "string",
+        "description": "Default OSC address pattern to send to",
+        "default": "/trigger"
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the module",
+        "default": true
+      }
+    },
+    "required": ["host", "port", "addressPattern"]
+  },
+  "events": [
+    {
+      "name": "oscMessage",
+      "type": "input",
+      "description": "Triggers an OSC message"
+    },
+    {
+      "name": "oscSent",
+      "type": "output",
+      "description": "Emitted when an OSC message is sent successfully"
+    },
+    {
+      "name": "oscError",
+      "type": "output",
+      "description": "Emitted when an OSC message fails to send"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

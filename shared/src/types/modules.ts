@@ -328,6 +328,68 @@ export interface FrameStreamPayload {
 // OUTPUT MODULE TYPES
 // ============================================================================
 
+// OSC Output Module
+/**
+ * Configuration for OSC output module
+ * @interface OscOutputConfig
+ * @extends {ModuleConfig}
+ */
+export interface OscOutputConfig extends ModuleConfig {
+  /** Target host address for OSC messages */
+  host: string;
+  /** Target UDP port for OSC messages (1024-65535) */
+  port: number;
+  /** Default OSC address pattern to send to */
+  addressPattern: string;
+  /** Enable/disable the module */
+  enabled?: boolean;
+}
+
+/**
+ * Represents an OSC message sent by the output module
+ * @interface OscOutputMessage
+ */
+export interface OscOutputMessage {
+  /** OSC address (e.g., '/trigger/button1') */
+  address: string;
+  /** OSC message arguments */
+  args: any[];
+  /** Timestamp when message was sent */
+  timestamp: number;
+}
+
+/**
+ * Payload for OSC output events
+ * @interface OscOutputPayload
+ */
+export interface OscOutputPayload {
+  /** OSC address that was sent */
+  address: string;
+  /** OSC message arguments */
+  args: any[];
+  /** Timestamp when message was sent */
+  timestamp: number;
+  /** Total number of messages sent since module start */
+  messageCount: number;
+}
+
+/**
+ * Error data for OSC output failures
+ * @interface OscOutputErrorData
+ */
+export interface OscOutputErrorData {
+  /** Target host */
+  host: string;
+  /** Target port */
+  port: number;
+  /** OSC address that failed to send */
+  address: string;
+  /** Error message */
+  error: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
 // HTTP Output Module
 /**
  * Configuration for HTTP output module
@@ -718,6 +780,15 @@ export function isTimeConfig(config: ModuleConfig): config is TimeInputConfig {
  */
 export function isFramesConfig(config: ModuleConfig): config is FramesInputConfig {
   return 'universe' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is an OscOutputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is OscOutputConfig
+ */
+export function isOscOutputConfig(config: ModuleConfig): config is OscOutputConfig {
+  return 'host' in config && 'port' in config && 'addressPattern' in config;
 }
 
 /**
