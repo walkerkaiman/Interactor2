@@ -209,4 +209,7 @@ export interface InteractionListResponse {
 }
 
 // Export all types
-// Note: module.ts and events.ts are imported separately to avoid circular dependencies 
+// Note: module.ts and events.ts are imported separately to avoid circular dependencies
+
+// Export module-specific types
+export * from './modules'; 

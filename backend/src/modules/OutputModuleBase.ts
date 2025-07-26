@@ -3,14 +3,16 @@ import {
   ModuleConfig,
   ModuleManifest,
   OutputModule,
-  EventHandler
+  EventHandler,
+  TriggerEvent,
+  StreamEvent
 } from '@interactor/shared';
 
 export abstract class OutputModuleBase extends ModuleBase implements OutputModule {
   public readonly type = 'output' as const;
 
   protected outputHandlers: EventHandler[] = [];
-  protected lastSentValue: any = null;
+  protected lastSentValue: unknown = null;
   protected isConnected = false;
 
   constructor(
@@ -29,9 +31,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Send data to the output
+   * Send data to the output with typed parameter
    */
-  public async send(data: any): Promise<void> {
+  public async send<T = unknown>(data: T): Promise<void> {
     try {
       this.logger?.debug(`Sending data from ${this.name}:`, data);
       await this.onSend(data);
@@ -46,9 +48,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Handle trigger events
+   * Handle trigger events with typed event parameter
    */
-  public async onTriggerEvent(event: any): Promise<void> {
+  public async onTriggerEvent(event: TriggerEvent): Promise<void> {
     try {
       this.logger?.debug(`Handling trigger event in ${this.name}:`, event);
       await this.handleTriggerEvent(event);
@@ -60,9 +62,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Handle streaming events
+   * Handle streaming events with typed event parameter
    */
-  public async onStreamingEvent(event: any): Promise<void> {
+  public async onStreamingEvent(event: StreamEvent): Promise<void> {
     try {
       this.logger?.debug(`Handling streaming event in ${this.name}:`, event);
       await this.handleStreamingEvent(event);
@@ -90,7 +92,7 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   /**
    * Get the last sent value
    */
-  public getLastSentValue(): any {
+  public getLastSentValue(): unknown {
     return this.lastSentValue;
   }
 
@@ -116,9 +118,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Emit output event
+   * Emit output event with typed payload
    */
-  protected emitOutput(event: string, payload?: any): void {
+  protected emitOutput<T = unknown>(event: string, payload?: T): void {
     this.logger?.debug(`Emitting output event from ${this.name}: ${event}`, payload);
     
     this.emit('output', {
@@ -146,7 +148,7 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Emit error event
+   * Emit error event with typed error parameter
    */
   protected emitError(error: Error, context?: string): void {
     this.logger?.error(`Error in ${this.name}${context ? ` (${context})` : ''}:`, error);
@@ -161,9 +163,9 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Emit status update
+   * Emit status update with typed details
    */
-  protected emitStatus(status: string, details?: any): void {
+  protected emitStatus<T = unknown>(status: string, details?: T): void {
     this.logger?.debug(`Status update for ${this.name}: ${status}`, details);
     
     this.emit('status', {
@@ -178,19 +180,19 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   // Abstract methods that must be implemented by subclasses
 
   /**
-   * Send data to the output device/system
+   * Send data to the output device/system with typed parameter
    */
-  protected abstract onSend(data: any): Promise<void>;
+  protected abstract onSend<T = unknown>(data: T): Promise<void>;
 
   /**
-   * Handle trigger events
+   * Handle trigger events with typed event parameter
    */
-  protected abstract handleTriggerEvent(event: any): Promise<void>;
+  protected abstract handleTriggerEvent(event: TriggerEvent): Promise<void>;
 
   /**
-   * Handle streaming events
+   * Handle streaming events with typed event parameter
    */
-  protected abstract handleStreamingEvent(event: any): Promise<void>;
+  protected abstract handleStreamingEvent(event: StreamEvent): Promise<void>;
 
   /**
    * Handle manual trigger

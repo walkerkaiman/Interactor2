@@ -1,20 +1,6 @@
 import { InputModuleBase } from '../../InputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
+import { ModuleConfig, SerialInputConfig, SerialData, SerialTriggerPayload, SerialStreamPayload } from '@interactor/shared';
 import { SerialPort } from 'serialport';
-
-interface SerialInputConfig extends ModuleConfig {
-  port: string;
-  baudRate: number;
-  logicOperator: '>' | '<' | '=';
-  threshold: number;
-  enabled: boolean;
-}
-
-interface SerialData {
-  value: number;
-  rawData: string;
-  timestamp: number;
-}
 
 export class SerialInputModule extends InputModuleBase {
   private serialPort?: SerialPort;

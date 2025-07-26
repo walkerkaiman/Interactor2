@@ -3,7 +3,9 @@ import {
   ModuleConfig,
   ModuleManifest,
   InputModule,
-  EventHandler
+  EventHandler,
+  TriggerEvent,
+  StreamEvent
 } from '@interactor/shared';
 
 export abstract class InputModuleBase extends ModuleBase implements InputModule {
@@ -11,7 +13,7 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
 
   protected mode: 'trigger' | 'streaming' = 'trigger';
   protected inputHandlers: EventHandler[] = [];
-  protected lastValue: any = null;
+  protected lastValue: unknown = null;
   protected isListening = false;
 
   constructor(
@@ -88,24 +90,33 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   /**
    * Get the last received value
    */
-  public getLastValue(): any {
+  public getLastValue(): unknown {
     return this.lastValue;
   }
 
   /**
-   * Emit a trigger event
+   * Check if the module is currently listening
    */
-  protected emitTrigger(event: string, payload?: any): void {
+  public isInputListening(): boolean {
+    return this.isListening;
+  }
+
+  /**
+   * Emit a trigger event with typed payload
+   */
+  protected emitTrigger<T = unknown>(event: string, payload?: T): void {
     this.incrementMessageCount();
     this.logger?.debug(`Emitting trigger event from ${this.name}: ${event}`, payload);
     
-    this.emit('trigger', {
+    const triggerEvent: TriggerEvent = {
       moduleId: this.id,
       moduleName: this.name,
       event,
       payload,
       timestamp: Date.now()
-    });
+    };
+    
+    this.emit('trigger', triggerEvent);
 
     // Notify input handlers
     for (const handler of this.inputHandlers) {
@@ -124,19 +135,21 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   }
 
   /**
-   * Emit a streaming event
+   * Emit a streaming event with typed value
    */
-  protected emitStream(value: any): void {
+  protected emitStream<T = unknown>(value: T): void {
     this.incrementMessageCount();
     this.lastValue = value;
     this.logger?.debug(`Emitting stream value from ${this.name}:`, value);
     
-    this.emit('stream', {
+    const streamEvent: StreamEvent = {
       moduleId: this.id,
       moduleName: this.name,
       value,
       timestamp: Date.now()
-    });
+    };
+    
+    this.emit('stream', streamEvent);
 
     // Notify input handlers
     for (const handler of this.inputHandlers) {
@@ -156,7 +169,7 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   /**
    * Handle incoming data - to be implemented by subclasses
    */
-  protected abstract handleInput(data: any): void;
+  protected abstract handleInput(data: unknown): void;
 
   /**
    * Start listening for input - to be implemented by subclasses

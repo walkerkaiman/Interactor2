@@ -1,10 +1,5 @@
 import { InputModuleBase } from '../../InputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
-
-interface TimeInputConfig extends ModuleConfig {
-  targetTime: string; // HH:MM format (24-hour for internal storage)
-  enabled: boolean;
-}
+import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
 
 export class TimeInputModule extends InputModuleBase {
   private intervalId?: NodeJS.Timeout;

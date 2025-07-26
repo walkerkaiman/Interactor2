@@ -1,18 +1,6 @@
 import { InputModuleBase } from '../../InputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
+import { ModuleConfig, FramesInputConfig, FrameData, FrameTriggerPayload, FrameStreamPayload } from '@interactor/shared';
 import * as sacn from 'sacn';
-
-interface FramesInputConfig extends ModuleConfig {
-  universe: number;
-  enabled: boolean;
-}
-
-interface FrameData {
-  frameNumber: number;
-  msb: number;
-  lsb: number;
-  timestamp: number;
-}
 
 export class FramesInputModule extends InputModuleBase {
   private receiver?: sacn.Receiver;

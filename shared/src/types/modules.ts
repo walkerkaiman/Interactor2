@@ -1,0 +1,730 @@
+// Module-specific type definitions
+import { ModuleConfig, ModuleManifest } from './index';
+
+// ============================================================================
+// INPUT MODULE TYPES
+// ============================================================================
+
+// OSC Input Module
+/**
+ * Configuration for OSC input module
+ * @interface OscInputConfig
+ * @extends {ModuleConfig}
+ */
+export interface OscInputConfig extends ModuleConfig {
+  /** UDP port to listen for OSC messages (1024-65535) */
+  port: number;
+  /** Host address to bind to (e.g., '0.0.0.0', 'localhost') */
+  host: string;
+  /** OSC address pattern to match (e.g., '/trigger/*') */
+  addressPattern: string;
+  /** Enable/disable the OSC listener */
+  enabled: boolean;
+}
+
+/**
+ * Represents an OSC message received by the input module
+ * @interface OscMessage
+ */
+export interface OscMessage {
+  /** OSC address (e.g., '/trigger/button1') */
+  address: string;
+  /** OSC message arguments */
+  args: any[];
+  /** Timestamp when message was received */
+  timestamp: number;
+}
+
+/**
+ * Payload for OSC trigger events
+ * @interface OscTriggerPayload
+ */
+export interface OscTriggerPayload {
+  /** OSC address that triggered the event */
+  address: string;
+  /** OSC message arguments */
+  args: any[];
+  /** Timestamp when message was received */
+  timestamp: number;
+  /** Total number of messages received since module start */
+  messageCount: number;
+}
+
+/**
+ * Payload for OSC streaming events
+ * @interface OscStreamPayload
+ */
+export interface OscStreamPayload {
+  /** OSC address that triggered the event */
+  address: string;
+  /** Numeric value extracted from first argument */
+  value: number;
+  /** OSC message arguments */
+  args: any[];
+  /** Timestamp when message was received */
+  timestamp: number;
+}
+
+// HTTP Input Module
+/**
+ * Configuration for HTTP input module
+ * @interface HttpInputConfig
+ * @extends {ModuleConfig}
+ */
+export interface HttpInputConfig extends ModuleConfig {
+  /** HTTP server port to listen on (1024-65535) */
+  port: number;
+  /** Host address to bind to */
+  host: string;
+  /** HTTP endpoint to listen on (e.g., '/webhook') */
+  endpoint: string;
+  /** HTTP methods to accept (e.g., ['POST', 'GET']) */
+  methods: string[];
+  /** Enable/disable the HTTP server */
+  enabled: boolean;
+  /** Maximum requests per minute */
+  rateLimit: number;
+  /** Expected content type for requests */
+  contentType: string;
+}
+
+/**
+ * Represents HTTP request data received by the input module
+ * @interface HttpRequestData
+ */
+export interface HttpRequestData {
+  /** HTTP method (GET, POST, etc.) */
+  method: string;
+  /** Request URL */
+  url: string;
+  /** HTTP headers */
+  headers: Record<string, string>;
+  /** Request body */
+  body: any;
+  /** Query parameters */
+  query: Record<string, string>;
+  /** Timestamp when request was received */
+  timestamp: number;
+  /** Unique request identifier */
+  requestId: string;
+  /** Remaining rate limit requests */
+  rateLimitRemaining: number;
+}
+
+/**
+ * Payload for HTTP trigger events
+ * @interface HttpTriggerPayload
+ */
+export interface HttpTriggerPayload {
+  /** Numeric value extracted from request */
+  value: number;
+  /** HTTP method */
+  method: string;
+  /** Request URL */
+  url: string;
+  /** HTTP headers */
+  headers: Record<string, string>;
+  /** Request body */
+  body: any;
+  /** Query parameters */
+  query: Record<string, string>;
+  /** Timestamp when request was received */
+  timestamp: number;
+  /** Unique request identifier */
+  requestId: string;
+  /** Remaining rate limit requests */
+  rateLimitRemaining: number;
+  /** Total number of requests received since module start */
+  requestCount: number;
+}
+
+/**
+ * Payload for HTTP streaming events
+ * @interface HttpStreamPayload
+ */
+export interface HttpStreamPayload {
+  /** Numeric value extracted from request */
+  value: number;
+  /** HTTP method */
+  method: string;
+  /** Request URL */
+  url: string;
+  /** Request data */
+  data: any;
+  /** Timestamp when request was received */
+  timestamp: number;
+  /** Remaining rate limit requests */
+  rateLimitRemaining: number;
+}
+
+// Serial Input Module
+/**
+ * Configuration for serial input module
+ * @interface SerialInputConfig
+ * @extends {ModuleConfig}
+ */
+export interface SerialInputConfig extends ModuleConfig {
+  /** Serial port name (e.g., 'COM1', '/dev/ttyUSB0') */
+  port: string;
+  /** Baud rate for serial communication */
+  baudRate: number;
+  /** Logic operator for threshold comparison */
+  logicOperator: '>' | '<' | '=';
+  /** Threshold value for triggering events */
+  threshold: number;
+  /** Enable/disable the serial listener */
+  enabled: boolean;
+}
+
+/**
+ * Represents serial data received by the input module
+ * @interface SerialData
+ */
+export interface SerialData {
+  /** Numeric value extracted from serial data */
+  value: number;
+  /** Raw serial data string */
+  rawData: string;
+  /** Timestamp when data was received */
+  timestamp: number;
+}
+
+/**
+ * Payload for serial trigger events
+ * @interface SerialTriggerPayload
+ */
+export interface SerialTriggerPayload {
+  /** Numeric value extracted from serial data */
+  value: number;
+  /** Raw serial data string */
+  rawData: string;
+  /** Threshold value for comparison */
+  threshold: number;
+  /** Logic operator used for comparison */
+  operator: '>' | '<' | '=';
+  /** Timestamp when data was received */
+  timestamp: number;
+  /** Total number of data points received since module start */
+  dataCount: number;
+}
+
+/**
+ * Payload for serial streaming events
+ * @interface SerialStreamPayload
+ */
+export interface SerialStreamPayload {
+  /** Numeric value extracted from serial data */
+  value: number;
+  /** Raw serial data string */
+  rawData: string;
+  /** Threshold value for comparison */
+  threshold: number;
+  /** Logic operator used for comparison */
+  operator: '>' | '<' | '=';
+  /** Timestamp when data was received */
+  timestamp: number;
+}
+
+// Time Input Module
+/**
+ * Configuration for time input module
+ * @interface TimeInputConfig
+ * @extends {ModuleConfig}
+ */
+export interface TimeInputConfig extends ModuleConfig {
+  /** Target time in HH:MM format (24-hour) */
+  targetTime: string;
+  /** Enable/disable the time trigger */
+  enabled: boolean;
+}
+
+/**
+ * Payload for time trigger events
+ * @interface TimeTriggerPayload
+ */
+export interface TimeTriggerPayload {
+  /** Target time in HH:MM format */
+  targetTime: string;
+  /** Current time in HH:MM format */
+  currentTime: string;
+  /** Timestamp when trigger occurred */
+  timestamp: number;
+}
+
+/**
+ * State information for time module
+ * @interface TimeState
+ */
+export interface TimeState {
+  /** Current time in HH:MM format */
+  currentTime: string;
+  /** Countdown string (e.g., "2h 30m") */
+  countdown: string;
+  /** Target time in 12-hour format for display */
+  targetTime12Hour: string;
+}
+
+// Frames Input Module
+/**
+ * Configuration for frames input module
+ * @interface FramesInputConfig
+ * @extends {ModuleConfig}
+ */
+export interface FramesInputConfig extends ModuleConfig {
+  /** DMX universe number */
+  universe: number;
+  /** Enable/disable the frames listener */
+  enabled: boolean;
+}
+
+/**
+ * Represents frame data received by the input module
+ * @interface FrameData
+ */
+export interface FrameData {
+  /** Frame number */
+  frameNumber: number;
+  /** Most significant byte */
+  msb: number;
+  /** Least significant byte */
+  lsb: number;
+  /** Timestamp when frame was received */
+  timestamp: number;
+}
+
+/**
+ * Payload for frame trigger events
+ * @interface FrameTriggerPayload
+ */
+export interface FrameTriggerPayload {
+  /** Frame number */
+  frameNumber: number;
+  /** Most significant byte */
+  msb: number;
+  /** Least significant byte */
+  lsb: number;
+  /** Timestamp when frame was received */
+  timestamp: number;
+  /** Total number of frames received since module start */
+  frameCount: number;
+}
+
+/**
+ * Payload for frame streaming events
+ * @interface FrameStreamPayload
+ */
+export interface FrameStreamPayload {
+  /** Frame number */
+  frameNumber: number;
+  /** Most significant byte */
+  msb: number;
+  /** Least significant byte */
+  lsb: number;
+  /** Timestamp when frame was received */
+  timestamp: number;
+}
+
+// ============================================================================
+// OUTPUT MODULE TYPES
+// ============================================================================
+
+// HTTP Output Module
+/**
+ * Configuration for HTTP output module
+ * @interface HttpOutputConfig
+ * @extends {ModuleConfig}
+ */
+export interface HttpOutputConfig extends ModuleConfig {
+  /** Target URL for HTTP requests */
+  url: string;
+  /** HTTP method to use */
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  /** Additional HTTP headers */
+  headers?: Record<string, string>;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+  /** Enable/disable the module */
+  enabled?: boolean;
+}
+
+/**
+ * Represents HTTP request data for output module
+ * @interface HttpOutputRequestData
+ */
+export interface HttpOutputRequestData {
+  /** Target URL */
+  url: string;
+  /** HTTP method used */
+  method: string;
+  /** HTTP response status code */
+  status: number;
+  /** HTTP response body */
+  response: string;
+  /** Timestamp when request was made */
+  timestamp: number;
+}
+
+/**
+ * Represents HTTP error data for output module
+ * @interface HttpErrorData
+ */
+export interface HttpErrorData {
+  /** Target URL */
+  url: string;
+  /** HTTP method used */
+  method: string;
+  /** Error message */
+  error: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
+/**
+ * Payload for HTTP response events
+ * @interface HttpResponsePayload
+ */
+export interface HttpResponsePayload {
+  /** Target URL */
+  url: string;
+  /** HTTP method used */
+  method: string;
+  /** HTTP response status code */
+  status: number;
+  /** HTTP response body */
+  response: string;
+  /** Timestamp when response was received */
+  timestamp: number;
+}
+
+/**
+ * Payload for HTTP error events
+ * @interface HttpErrorPayload
+ */
+export interface HttpErrorPayload {
+  /** Target URL */
+  url: string;
+  /** HTTP method used */
+  method: string;
+  /** Error message */
+  error: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
+// ============================================================================
+// MODULE STATE TYPES
+// ============================================================================
+
+/**
+ * State information for OSC module
+ * @interface OscModuleState
+ */
+export interface OscModuleState {
+  /** Current module status */
+  status: 'listening' | 'stopped' | 'error';
+  /** UDP port being listened on */
+  port: number;
+  /** Host address bound to */
+  host: string;
+  /** OSC address pattern being matched */
+  addressPattern: string;
+  /** Last OSC message received */
+  lastMessage?: OscMessage;
+  /** Total number of messages received */
+  messageCount: number;
+  /** Current input mode (trigger/streaming) */
+  mode: string;
+  /** Error message if status is 'error' */
+  error?: string;
+}
+
+/**
+ * State information for HTTP input module
+ * @interface HttpInputModuleState
+ */
+export interface HttpInputModuleState {
+  /** Current module status */
+  status: 'listening' | 'stopped' | 'error';
+  /** HTTP server port */
+  port: number;
+  /** Host address bound to */
+  host: string;
+  /** HTTP endpoint being listened on */
+  endpoint: string;
+  /** Current numeric value from last request */
+  currentValue: number | null;
+  /** Total number of requests received */
+  requestCount: number;
+  /** Rate limit configuration */
+  rateLimit: number;
+  /** Remaining rate limit requests */
+  rateLimitRemaining: number;
+  /** Current input mode (trigger/streaming) */
+  mode: string;
+  /** Timestamp of last update */
+  lastUpdate: number;
+  /** Error message if status is 'error' */
+  error?: string;
+}
+
+/**
+ * State information for serial module
+ * @interface SerialModuleState
+ */
+export interface SerialModuleState {
+  /** Current module status */
+  status: 'listening' | 'stopped' | 'error';
+  /** Serial port name */
+  port: string;
+  /** Baud rate */
+  baudRate: number;
+  /** Current numeric value from last data */
+  currentValue: number;
+  /** Threshold value for comparison */
+  threshold: number;
+  /** Logic operator for comparison */
+  operator: '>' | '<' | '=';
+  /** Total number of data points received */
+  dataCount: number;
+  /** Current input mode (trigger/streaming) */
+  mode: string;
+  /** Timestamp of last update */
+  lastUpdate: number;
+  /** Error message if status is 'error' */
+  error?: string;
+}
+
+/**
+ * State information for time module
+ * @interface TimeModuleState
+ */
+export interface TimeModuleState {
+  /** Current time in HH:MM format */
+  currentTime: string;
+  /** Countdown string */
+  countdown: string;
+  /** Target time in 12-hour format */
+  targetTime12Hour: string;
+  /** Whether module is enabled */
+  enabled: boolean;
+}
+
+/**
+ * State information for frames module
+ * @interface FramesModuleState
+ */
+export interface FramesModuleState {
+  /** Current module status */
+  status: 'listening' | 'stopped' | 'error';
+  /** DMX universe number */
+  universe: number;
+  /** Current frame number */
+  currentFrame: number;
+  /** Total number of frames received */
+  frameCount: number;
+  /** Current input mode (trigger/streaming) */
+  mode: string;
+  /** Timestamp of last update */
+  lastUpdate: number;
+  /** Error message if status is 'error' */
+  error?: string;
+}
+
+/**
+ * State information for HTTP output module
+ * @interface HttpOutputModuleState
+ */
+export interface HttpOutputModuleState {
+  /** Target URL */
+  url: string;
+  /** HTTP method */
+  method: string;
+  /** Whether module is enabled */
+  enabled: boolean;
+  /** Whether module is connected/ready */
+  isConnected: boolean;
+  /** Last HTTP request made */
+  lastRequest?: HttpOutputRequestData;
+  /** Last HTTP error encountered */
+  lastError?: HttpErrorData;
+  /** Total number of requests made */
+  requestCount: number;
+  /** Total number of errors encountered */
+  errorCount: number;
+  /** Current module status */
+  status: 'ready' | 'stopped' | 'error';
+}
+
+// ============================================================================
+// COMMON TYPES
+// ============================================================================
+
+/**
+ * Generic module state update
+ * @interface ModuleStateUpdate
+ */
+export interface ModuleStateUpdate {
+  /** Status string */
+  status: string;
+  /** Additional state properties */
+  [key: string]: any;
+}
+
+/**
+ * Generic trigger event
+ * @interface TriggerEvent
+ */
+export interface TriggerEvent {
+  /** Event type */
+  type: 'trigger';
+  /** Event payload */
+  payload: any;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Source module name */
+  source: string;
+}
+
+/**
+ * Generic stream event
+ * @interface StreamEvent
+ */
+export interface StreamEvent {
+  /** Event type */
+  type: 'stream';
+  /** Streamed value */
+  value: number;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Source module name */
+  source: string;
+  /** Additional metadata */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Generic error event
+ * @interface ErrorEvent
+ */
+export interface ErrorEvent {
+  /** Event type */
+  type: 'error';
+  /** Error message */
+  error: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+  /** Source module name */
+  source: string;
+  /** Additional error details */
+  details?: any;
+}
+
+// ============================================================================
+// VALIDATION TYPES
+// ============================================================================
+
+/**
+ * Result of configuration validation
+ * @interface ConfigValidationResult
+ */
+export interface ConfigValidationResult {
+  /** Whether configuration is valid */
+  valid: boolean;
+  /** List of validation errors */
+  errors: string[];
+  /** List of validation warnings */
+  warnings: string[];
+}
+
+/**
+ * Result of module validation
+ * @interface ModuleValidationResult
+ */
+export interface ModuleValidationResult {
+  /** Configuration validation result */
+  config: ConfigValidationResult;
+  /** Whether manifest is valid */
+  manifest: boolean;
+  /** List of required dependencies */
+  dependencies: string[];
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Type alias for module configuration types
+ * @template T - Module configuration type
+ */
+export type ModuleConfigType<T extends ModuleConfig> = T;
+
+/**
+ * Type alias for module state types
+ * @template T - Module state type
+ */
+export type ModuleStateType<T> = T;
+
+/**
+ * Type alias for event payload types
+ * @template T - Event payload type
+ */
+export type EventPayloadType<T> = T;
+
+// ============================================================================
+// TYPE GUARDS
+// ============================================================================
+
+/**
+ * Type guard to check if a ModuleConfig is an OscInputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is OscInputConfig
+ */
+export function isOscConfig(config: ModuleConfig): config is OscInputConfig {
+  return 'port' in config && 'host' in config && 'addressPattern' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is an HttpInputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is HttpInputConfig
+ */
+export function isHttpInputConfig(config: ModuleConfig): config is HttpInputConfig {
+  return 'port' in config && 'endpoint' in config && 'methods' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is a SerialInputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is SerialInputConfig
+ */
+export function isSerialConfig(config: ModuleConfig): config is SerialInputConfig {
+  return 'port' in config && 'baudRate' in config && 'logicOperator' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is a TimeInputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is TimeInputConfig
+ */
+export function isTimeConfig(config: ModuleConfig): config is TimeInputConfig {
+  return 'targetTime' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is a FramesInputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is FramesInputConfig
+ */
+export function isFramesConfig(config: ModuleConfig): config is FramesInputConfig {
+  return 'universe' in config;
+}
+
+/**
+ * Type guard to check if a ModuleConfig is an HttpOutputConfig
+ * @param config - Module configuration to check
+ * @returns True if config is HttpOutputConfig
+ */
+export function isHttpOutputConfig(config: ModuleConfig): config is HttpOutputConfig {
+  return 'url' in config && 'method' in config;
+} 

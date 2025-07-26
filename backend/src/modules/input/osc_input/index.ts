@@ -1,27 +1,23 @@
 import { InputModuleBase } from '../../InputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
+import { 
+  ModuleConfig, 
+  OscInputConfig, 
+  OscMessage, 
+  OscTriggerPayload, 
+  OscStreamPayload,
+  TriggerEvent,
+  StreamEvent,
+  isOscConfig
+} from '@interactor/shared';
 import * as osc from 'osc';
 
-interface OscInputConfig extends ModuleConfig {
-  port: number;
-  host: string;
-  addressPattern: string;
-  enabled: boolean;
-}
-
-interface OscMessage {
-  address: string;
-  args: any[];
-  timestamp: number;
-}
-
 export class OscInputModule extends InputModuleBase {
-  private udpPort?: osc.UDPPort;
+  private udpPort: osc.UDPPort | undefined = undefined;
   private port: number;
   private host: string;
   private addressPattern: string;
   private enabled: boolean;
-  private lastMessage?: OscMessage;
+  private lastMessage: OscMessage | undefined = undefined;
   private messageCount: number = 0;
 
   constructor(config: OscInputConfig) {
@@ -106,43 +102,54 @@ export class OscInputModule extends InputModuleBase {
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
-    const newOscConfig = newConfig as OscInputConfig;
+    // Use type guard to ensure we have OSC config
+    if (!isOscConfig(newConfig)) {
+      throw new Error('Invalid OSC configuration provided');
+    }
     
     let needsRestart = false;
     
-    if (newOscConfig.port !== this.port) {
-      this.port = newOscConfig.port;
+    if (newConfig.port !== this.port) {
+      this.port = newConfig.port;
       needsRestart = true;
     }
     
-    if (newOscConfig.host !== this.host) {
-      this.host = newOscConfig.host;
+    if (newConfig.host !== this.host) {
+      this.host = newConfig.host;
       needsRestart = true;
     }
     
-    if (newOscConfig.addressPattern !== this.addressPattern) {
-      this.addressPattern = newOscConfig.addressPattern;
+    if (newConfig.addressPattern !== this.addressPattern) {
+      this.addressPattern = newConfig.addressPattern;
     }
     
-    if (newOscConfig.enabled !== this.enabled) {
-      this.enabled = newOscConfig.enabled;
-      if (this.enabled && this.isRunning) {
-        await this.initOscListener();
-      } else {
-        this.stopOscListener();
+    if (newConfig.enabled !== this.enabled) {
+      this.enabled = newConfig.enabled;
+      if (this.enabled && !this.isListening) {
+        await this.startListening();
+      } else if (!this.enabled && this.isListening) {
+        await this.stopListening();
       }
-    } else if (needsRestart && this.enabled && this.isRunning) {
+    }
+    
+    if (needsRestart && this.isListening) {
       this.stopOscListener();
-      await this.initOscListener();
+      if (this.enabled) {
+        await this.initOscListener();
+      }
     }
   }
 
-  protected handleInput(data: any): void {
-    // This module doesn't handle external input
+  protected handleInput(data: unknown): void {
+    if (this.isValidOscMessage(data)) {
+      this.handleOscMessage(data);
+    }
   }
 
   protected async onStartListening(): Promise<void> {
-    await this.initOscListener();
+    if (this.enabled) {
+      await this.initOscListener();
+    }
   }
 
   protected async onStopListening(): Promise<void> {
@@ -150,11 +157,11 @@ export class OscInputModule extends InputModuleBase {
   }
 
   /**
-   * Initialize OSC listener
+   * Initialize OSC listener with proper error handling
    */
   private async initOscListener(): Promise<void> {
     if (this.udpPort) {
-      this.stopOscListener();
+      return; // Already initialized
     }
 
     try {
@@ -165,24 +172,26 @@ export class OscInputModule extends InputModuleBase {
       });
 
       this.udpPort.on('ready', () => {
-        this.logger?.info(`OSC listener started on ${this.host}:${this.port}`);
-        this.emit('stateUpdate', {
+        this.logger?.info(`OSC listener ready on ${this.host}:${this.port}`);
+        this.emit('status', {
+          moduleId: this.id,
+          moduleName: this.name,
           status: 'listening',
-          port: this.port,
-          host: this.host,
-          addressPattern: this.addressPattern
+          details: { host: this.host, port: this.port }
         });
       });
 
-      this.udpPort.on('message', (oscMsg: any) => {
+      this.udpPort.on('message', (oscMsg: osc.OscMessage) => {
         this.handleOscMessage(oscMsg);
       });
 
       this.udpPort.on('error', (error: Error) => {
         this.logger?.error(`OSC listener error:`, error);
-        this.emit('stateUpdate', {
-          status: 'error',
-          error: error.message
+        this.emit('error', {
+          moduleId: this.id,
+          moduleName: this.name,
+          error: error.message,
+          context: 'osc_listener'
         });
       });
 
@@ -199,18 +208,25 @@ export class OscInputModule extends InputModuleBase {
   private stopOscListener(): void {
     if (this.udpPort) {
       this.udpPort.close();
-      this.udpPort = undefined as any;
-      this.logger?.info('OSC listener stopped');
-      this.emit('stateUpdate', {
+      this.udpPort = undefined;
+      this.logger?.info(`OSC listener stopped`);
+      this.emit('status', {
+        moduleId: this.id,
+        moduleName: this.name,
         status: 'stopped'
       });
     }
   }
 
   /**
-   * Handle incoming OSC message
+   * Handle incoming OSC message with proper typing
    */
-  private handleOscMessage(oscMsg: any): void {
+  private handleOscMessage(oscMsg: osc.OscMessage): void {
+    if (!oscMsg.address) {
+      this.logger?.warn('Received OSC message without address');
+      return;
+    }
+
     const message: OscMessage = {
       address: oscMsg.address,
       args: oscMsg.args || [],
@@ -220,33 +236,41 @@ export class OscInputModule extends InputModuleBase {
     this.lastMessage = message;
     this.messageCount++;
 
-    // Emit general OSC message event
-    this.emit('oscMessage', message);
+    this.logger?.debug(`Received OSC message: ${message.address}`, message.args);
+
+    // Emit oscMessage event for all received messages
+    this.emit('oscMessage', {
+      address: message.address,
+      args: message.args,
+      timestamp: message.timestamp
+    });
 
     // Check if message matches address pattern
     if (this.matchesAddressPattern(message.address)) {
       if (this.mode === 'trigger') {
-        // Trigger mode: emit trigger event
-        this.emitTrigger('oscTrigger', {
+        // Trigger mode: emit trigger event with typed payload
+        const triggerPayload: OscTriggerPayload = {
           address: message.address,
           args: message.args,
           timestamp: message.timestamp,
           messageCount: this.messageCount
-        });
+        };
+        this.emitTrigger<OscTriggerPayload>('oscTrigger', triggerPayload);
       } else {
-        // Streaming mode: emit stream with message data
-        this.emitStream({
+        // Streaming mode: emit stream with typed payload
+        const streamPayload: OscStreamPayload = {
           address: message.address,
           value: message.args[0] || 1, // Use first argument as value, default to 1
           args: message.args,
           timestamp: message.timestamp
-        });
+        };
+        this.emitStream<OscStreamPayload>(streamPayload);
       }
     }
 
     // Emit state update
     this.emit('stateUpdate', {
-      status: 'listening',
+      status: this.enabled ? 'listening' : 'stopped',
       lastMessage: message,
       messageCount: this.messageCount,
       mode: this.mode
@@ -285,7 +309,19 @@ export class OscInputModule extends InputModuleBase {
   }
 
   /**
-   * Get OSC listener parameters for UI display
+   * Type guard to validate OSC message structure
+   */
+  private isValidOscMessage(data: unknown): data is osc.OscMessage {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'address' in data &&
+      typeof (data as osc.OscMessage).address === 'string'
+    );
+  }
+
+  /**
+   * Get OSC listener parameters for UI display with proper return type
    */
   public getOscParameters(): {
     port: number;
@@ -293,7 +329,7 @@ export class OscInputModule extends InputModuleBase {
     addressPattern: string;
     enabled: boolean;
     status: string;
-    lastMessage?: OscMessage | undefined;
+    lastMessage: OscMessage | undefined;
     messageCount: number;
     mode: string;
   } {
@@ -302,7 +338,7 @@ export class OscInputModule extends InputModuleBase {
       host: this.host,
       addressPattern: this.addressPattern,
       enabled: this.enabled,
-      status: this.udpPort ? 'listening' : 'stopped',
+      status: this.enabled && this.udpPort ? 'listening' : 'stopped',
       lastMessage: this.lastMessage,
       messageCount: this.messageCount,
       mode: this.mode
@@ -314,7 +350,7 @@ export class OscInputModule extends InputModuleBase {
    */
   public reset(): void {
     this.messageCount = 0;
-    this.lastMessage = undefined as any;
+    this.lastMessage = undefined;
     this.emit('stateUpdate', {
       status: this.udpPort ? 'listening' : 'stopped',
       messageCount: this.messageCount,

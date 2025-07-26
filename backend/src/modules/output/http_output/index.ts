@@ -1,28 +1,15 @@
 import { OutputModuleBase } from '../../OutputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
-
-interface HttpOutputConfig extends ModuleConfig {
-  url: string;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  headers?: Record<string, string>;
-  timeout?: number;
-  enabled?: boolean;
-}
-
-interface HttpRequestData {
-  url: string;
-  method: string;
-  status: number;
-  response: string;
-  timestamp: number;
-}
-
-interface HttpErrorData {
-  url: string;
-  method: string;
-  error: string;
-  timestamp: number;
-}
+import {
+  ModuleConfig,
+  HttpOutputConfig,
+  HttpOutputRequestData,
+  HttpErrorData,
+  HttpResponsePayload,
+  HttpErrorPayload,
+  TriggerEvent,
+  StreamEvent,
+  isHttpOutputConfig
+} from '@interactor/shared';
 
 export class HttpOutputModule extends OutputModuleBase {
   private url: string;
@@ -30,8 +17,8 @@ export class HttpOutputModule extends OutputModuleBase {
   private headers: Record<string, string>;
   private timeout: number;
   private enabled: boolean;
-  private lastRequest?: HttpRequestData;
-  private lastError?: HttpErrorData;
+  private lastRequest: HttpOutputRequestData | undefined = undefined;
+  private lastError: HttpErrorData | undefined = undefined;
   private requestCount = 0;
   private errorCount = 0;
 
@@ -123,100 +110,114 @@ export class HttpOutputModule extends OutputModuleBase {
       throw new Error(`Invalid URL format: ${this.url}`);
     }
 
-    this.logger?.info(`HTTP Output module initialized: ${this.method} ${this.url}`);
+    // Validate timeout range
+    if (this.timeout < 1000 || this.timeout > 30000) {
+      throw new Error(`Invalid timeout: ${this.timeout}. Must be between 1000 and 30000 ms.`);
+    }
+
+    // Validate method
+    if (!['GET', 'POST', 'PUT', 'DELETE'].includes(this.method)) {
+      throw new Error(`Invalid HTTP method: ${this.method}`);
+    }
   }
 
   protected async onStart(): Promise<void> {
+    // HTTP output module doesn't need to start anything
     this.setConnectionStatus(true);
-    this.emitStatus('ready', { url: this.url, method: this.method });
-    this.logger?.info(`HTTP Output module started: ${this.method} ${this.url}`);
   }
 
   protected async onStop(): Promise<void> {
+    // HTTP output module doesn't need to stop anything
     this.setConnectionStatus(false);
-    this.emitStatus('stopped');
-    this.logger?.info(`HTTP Output module stopped`);
   }
 
   protected async onDestroy(): Promise<void> {
-    this.logger?.info(`HTTP Output module destroyed`);
+    // Clean up any pending requests if needed
+    this.setConnectionStatus(false);
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
-    // Always sync private properties from the base class config
-    const cfg = this.config as HttpOutputConfig;
-    
-    this.url = cfg.url;
-    this.method = cfg.method ?? this.method;
-    this.headers = cfg.headers ?? this.headers;
-    this.timeout = cfg.timeout ?? this.timeout;
-    this.enabled = cfg.enabled !== false;
-
-    // Validate URL after updating
-    if (!this.isValidUrl(this.url)) {
-      throw new Error(`Invalid URL format: ${this.url}`);
+    // Use type guard to ensure we have HTTP output config
+    if (!isHttpOutputConfig(newConfig)) {
+      throw new Error('Invalid HTTP output configuration provided');
     }
-
-    this.logger?.info(`HTTP Output module configuration updated: ${this.method} ${this.url}`);
-    this.emitStatus('configUpdated', { url: this.url, method: this.method });
+    
+    // Validate URL format
+    if (!this.isValidUrl(newConfig.url)) {
+      throw new Error(`Invalid URL format: ${newConfig.url}`);
+    }
+    
+    this.url = newConfig.url;
+    this.method = newConfig.method || 'POST';
+    this.headers = newConfig.headers || {};
+    this.timeout = newConfig.timeout || 5000;
+    this.enabled = newConfig.enabled !== false;
   }
 
-  protected async onSend(data: any): Promise<void> {
+  /**
+   * Send data with proper typing
+   */
+  protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      this.logger?.warn(`HTTP Output module is disabled, ignoring send request`);
-      return;
+      throw new Error('HTTP output module is disabled');
     }
     await this.sendHttpRequest(data);
   }
 
-  protected async handleTriggerEvent(event: any): Promise<void> {
+  /**
+   * Handle trigger events with proper typing
+   */
+  protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      this.logger?.warn(`HTTP Output module is disabled, ignoring trigger event`);
-      return;
+      throw new Error('HTTP output module is disabled');
     }
-    // For trigger events, send the event payload
-    await this.sendHttpRequest(event.payload || event);
-  }
-
-  protected async handleStreamingEvent(event: any): Promise<void> {
-    if (!this.enabled) {
-      this.logger?.warn(`HTTP Output module is disabled, ignoring streaming event`);
-      return;
-    }
-    // For streaming events, send the streamed value
-    await this.sendHttpRequest({ value: event.value });
-  }
-
-  protected async onManualTrigger(): Promise<void> {
-    if (!this.enabled) {
-      this.logger?.warn(`HTTP Output module is disabled, ignoring manual trigger`);
-      return;
-    }
-    // Send a test request
-    await this.sendHttpRequest({
-      type: 'manualTrigger',
-      timestamp: Date.now(),
-      message: 'Manual trigger from Interactor'
-    });
+    await this.sendHttpRequest(event.payload);
   }
 
   /**
-   * Send HTTP request to the configured endpoint
+   * Handle streaming events with proper typing
    */
-  private async sendHttpRequest(data: any): Promise<void> {
+  protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
+    if (!this.enabled) {
+      throw new Error('HTTP output module is disabled');
+    }
+    await this.sendHttpRequest(event.value);
+  }
+
+  /**
+   * Handle manual trigger with proper typing
+   */
+  protected async onManualTrigger(): Promise<void> {
+    if (!this.enabled) {
+      throw new Error('HTTP output module is disabled');
+    }
+    
+    const testData = {
+      message: 'Manual trigger from HTTP output module',
+      timestamp: Date.now(),
+      moduleId: this.id
+    };
+    
+    await this.sendHttpRequest(testData);
+  }
+
+  /**
+   * Send HTTP request with proper typing and error handling
+   */
+  private async sendHttpRequest<T = unknown>(data: T): Promise<void> {
+    const timestamp = Date.now();
+    
     try {
-      this.logger?.debug(`Sending HTTP request: ${this.method} ${this.url}`, data);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
+      this.logger?.debug(`Sending HTTP ${this.method} request to ${this.url}`, data);
+      
+      // Prepare request options
       const requestOptions: RequestInit = {
         method: this.method,
         headers: {
           'Content-Type': 'application/json',
           ...this.headers
         },
-        signal: controller.signal
+        signal: AbortSignal.timeout(this.timeout)
       };
 
       // Add body for non-GET requests
@@ -224,76 +225,161 @@ export class HttpOutputModule extends OutputModuleBase {
         requestOptions.body = JSON.stringify(data);
       }
 
+      // Send the request
       const response = await fetch(this.url, requestOptions);
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
+      const responseText = await response.text();
+      
+      // Create request data object
+      const requestData: HttpOutputRequestData = {
+        url: this.url,
+        method: this.method,
+        status: response.status,
+        response: responseText,
+        timestamp
+      };
+      
+      this.lastRequest = requestData;
+      this.lastSentValue = data;
+      
+      if (response.ok) {
+        // Success response
+        const responsePayload: HttpResponsePayload = {
+          url: this.url,
+          method: this.method,
+          status: response.status,
+          response: responseText,
+          timestamp
+        };
+        
+        this.requestCount++;
+        this.emitOutput<HttpResponsePayload>('httpResponse', responsePayload);
+        this.emitStatus('success', { status: response.status, responseLength: responseText.length });
+        
+        this.logger?.info(`HTTP request successful: ${response.status} ${response.statusText}`);
+      } else {
+        // Error response
+        const errorData: HttpErrorData = {
+          url: this.url,
+          method: this.method,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          timestamp
+        };
+        
+        const errorPayload: HttpErrorPayload = {
+          url: this.url,
+          method: this.method,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          timestamp
+        };
+        
+        this.lastError = errorData;
+        
+        this.emitError(new Error(errorData.error), 'http_request');
+        this.emitOutput<HttpErrorPayload>('httpError', errorPayload);
+        
+        this.logger?.error(`HTTP request failed: ${response.status} ${response.statusText}`, responseText);
+        
+        // Throw error for the calling method to handle
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
-      const responseData = await response.text();
       
-      this.lastRequest = {
-        url: this.url,
-        method: this.method,
-        status: response.status,
-        response: responseData,
-        timestamp: Date.now()
-      };
-
-      this.requestCount++;
-      
-      this.emitOutput('httpResponse', this.lastRequest);
-      this.emitStatus('requestCompleted', {
-        status: response.status,
-        responseSize: responseData.length
-      });
-
-      this.logger?.debug(`HTTP request successful: ${this.method} ${this.url}`, {
-        status: response.status,
-        responseSize: responseData.length
-      });
-
     } catch (error) {
-      this.lastError = {
-        url: this.url,
-        method: this.method,
-        error: (error as Error).message,
-        timestamp: Date.now()
-      };
-
       this.errorCount++;
       
-      this.emitError(error as Error, 'HTTP request failed');
-      this.emitStatus('requestFailed', { error: (error as Error).message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorData: HttpErrorData = {
+        url: this.url,
+        method: this.method,
+        error: errorMessage,
+        timestamp
+      };
+      
+      const errorPayload: HttpErrorPayload = {
+        url: this.url,
+        method: this.method,
+        error: errorMessage,
+        timestamp
+      };
+      
+      this.lastError = errorData;
+      
+      this.emitError(error instanceof Error ? error : new Error(errorMessage), 'http_request');
+      this.emitOutput<HttpErrorPayload>('httpError', errorPayload);
+      
+      this.logger?.error(`HTTP request error:`, error);
+      
+      // Re-throw the error for the calling method to handle
       throw error;
     }
+    
+    // Emit state update
+    this.emit('stateUpdate', {
+      status: this.isConnected ? 'ready' : 'stopped',
+      requestCount: this.requestCount,
+      errorCount: this.errorCount,
+      lastRequest: this.lastRequest,
+      lastError: this.lastError
+    });
   }
 
   /**
-   * Validate URL format
+   * Validate URL format with proper return type
    */
   private isValidUrl(url: string): boolean {
     try {
-      const parsedUrl = new URL(url);
-      // Only allow HTTP and HTTPS protocols
-      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+      new URL(url);
+      return url.startsWith('http://') || url.startsWith('https://');
     } catch {
       return false;
     }
   }
 
   /**
-   * Get current configuration
+   * Get configuration with proper return type
    */
   public getConfig(): HttpOutputConfig {
-    return this.config as HttpOutputConfig;
+    return {
+      url: this.url,
+      method: this.method,
+      headers: this.headers,
+      timeout: this.timeout,
+      enabled: this.enabled
+    };
   }
 
   /**
-   * Get module state
+   * Get module state with proper return type
    */
-  public getState(): any {
+  public getState(): {
+    id: string;
+    status: 'initializing' | 'running' | 'stopped' | 'error';
+    lastError?: string;
+    startTime?: number;
+    messageCount: number;
+    config: ModuleConfig;
+  } {
+    return {
+      id: this.id,
+      status: this.isConnected ? 'running' : 'stopped',
+      messageCount: this.requestCount,
+      config: this.config
+    };
+  }
+
+  /**
+   * Get detailed state for testing purposes
+   */
+  public getDetailedState(): {
+    url: string;
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    enabled: boolean;
+    isConnected: boolean;
+    lastRequest: HttpOutputRequestData | undefined;
+    lastError: HttpErrorData | undefined;
+    requestCount: number;
+    errorCount: number;
+    status: string;
+  } {
     return {
       url: this.url,
       method: this.method,
@@ -308,25 +394,34 @@ export class HttpOutputModule extends OutputModuleBase {
   }
 
   /**
-   * Reset module statistics
+   * Reset counters
    */
   public reset(): void {
     this.requestCount = 0;
     this.errorCount = 0;
-    this.lastRequest = undefined as any;
-    this.lastError = undefined as any;
-    this.logger?.info(`HTTP Output module statistics reset`);
+    this.lastRequest = undefined;
+    this.lastError = undefined;
+    this.emit('stateUpdate', {
+      status: this.isConnected ? 'ready' : 'stopped',
+      requestCount: this.requestCount,
+      errorCount: this.errorCount
+    });
   }
 
   /**
-   * Test the HTTP connection
+   * Test connection with proper return type
    */
   public async testConnection(): Promise<boolean> {
+    if (!this.enabled) {
+      return false;
+    }
+    
     try {
-      await this.onManualTrigger();
+      const testData = { test: true, timestamp: Date.now() };
+      await this.sendHttpRequest(testData);
       return true;
     } catch (error) {
-      this.logger?.error(`Connection test failed:`, error);
+      this.logger?.error('Connection test failed:', error);
       return false;
     }
   }

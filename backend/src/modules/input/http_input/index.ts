@@ -1,31 +1,19 @@
 import { InputModuleBase } from '../../InputModuleBase';
-import { ModuleConfig } from '@interactor/shared';
+import { 
+  ModuleConfig, 
+  HttpInputConfig, 
+  HttpRequestData, 
+  HttpTriggerPayload, 
+  HttpStreamPayload,
+  TriggerEvent,
+  StreamEvent,
+  isHttpInputConfig
+} from '@interactor/shared';
 import express, { Request, Response } from 'express';
 import { Server } from 'http';
 
-interface HttpInputConfig extends ModuleConfig {
-  port: number;
-  host: string;
-  endpoint: string;
-  methods: string[];
-  enabled: boolean;
-  rateLimit: number;
-  contentType: string;
-}
-
-interface HttpRequestData {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body: any;
-  query: Record<string, string>;
-  timestamp: number;
-  requestId: string;
-  rateLimitRemaining: number;
-}
-
 export class HttpInputModule extends InputModuleBase {
-  private server?: Server;
+  private server: Server | undefined = undefined;
   private app: express.Application;
   private port: number;
   private host: string;
@@ -37,7 +25,8 @@ export class HttpInputModule extends InputModuleBase {
   private requestCount: number = 0;
   private lastRequestTime: number = 0;
   private requestTimestamps: number[] = [];
-  private lastRequestData?: HttpRequestData;
+  private lastRequestData: HttpRequestData | undefined = undefined;
+  private currentValue: number | null = null;
 
   constructor(config: HttpInputConfig) {
     super('http_input', config, {
@@ -119,17 +108,12 @@ export class HttpInputModule extends InputModuleBase {
     this.contentType = config.contentType || 'application/json';
     this.enabled = config.enabled !== false;
 
-    // Initialize Express app
     this.app = express();
     this.setupMiddleware();
     this.setupRoutes();
   }
 
   protected async onInit(): Promise<void> {
-    if (this.logger) {
-      this.logger.info(`Initializing HTTP Input Module on ${this.host}:${this.port}${this.endpoint}`);
-    }
-    
     // Validate port range
     if (this.port < 1024 || this.port > 65535) {
       throw new Error(`Invalid port number: ${this.port}. Must be between 1024 and 65535.`);
@@ -149,6 +133,11 @@ export class HttpInputModule extends InputModuleBase {
     if (this.rateLimit < 1 || this.rateLimit > 1000) {
       throw new Error(`Invalid rate limit: ${this.rateLimit}. Must be between 1 and 1000 requests per minute.`);
     }
+
+    // Validate methods
+    if (!Array.isArray(this.methods) || this.methods.length === 0) {
+      throw new Error('At least one HTTP method must be specified.');
+    }
   }
 
   protected async onStart(): Promise<void> {
@@ -165,22 +154,52 @@ export class HttpInputModule extends InputModuleBase {
     await this.stopHttpServer();
   }
 
-  protected async onConfigUpdate(oldConfig: HttpInputConfig, newConfig: HttpInputConfig): Promise<void> {
-    const oldPort = this.port;
-    const oldHost = this.host;
-    const oldEndpoint = this.endpoint;
-    const oldEnabled = this.enabled;
-
-    this.port = newConfig.port || 3000;
-    this.host = newConfig.host || '0.0.0.0';
-    this.endpoint = newConfig.endpoint || '/webhook';
-    this.methods = newConfig.methods || ['POST'];
-    this.rateLimit = newConfig.rateLimit ?? 60;
-    this.contentType = newConfig.contentType || 'application/json';
-    this.enabled = newConfig.enabled !== false;
-
-    // Restart server if port, host, endpoint, or enabled state changed
-    if (oldPort !== this.port || oldHost !== this.host || oldEndpoint !== this.endpoint || oldEnabled !== this.enabled) {
+  protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
+    // Use type guard to ensure we have HTTP input config
+    if (!isHttpInputConfig(newConfig)) {
+      throw new Error('Invalid HTTP input configuration provided');
+    }
+    
+    let needsRestart = false;
+    
+    if (newConfig.port !== this.port) {
+      this.port = newConfig.port;
+      needsRestart = true;
+    }
+    
+    if (newConfig.host !== this.host) {
+      this.host = newConfig.host;
+      needsRestart = true;
+    }
+    
+    if (newConfig.endpoint !== this.endpoint) {
+      this.endpoint = newConfig.endpoint;
+      needsRestart = true;
+    }
+    
+    if (JSON.stringify(newConfig.methods) !== JSON.stringify(this.methods)) {
+      this.methods = newConfig.methods;
+      needsRestart = true;
+    }
+    
+    if (newConfig.rateLimit !== this.rateLimit) {
+      this.rateLimit = newConfig.rateLimit;
+    }
+    
+    if (newConfig.contentType !== this.contentType) {
+      this.contentType = newConfig.contentType;
+    }
+    
+    if (newConfig.enabled !== this.enabled) {
+      this.enabled = newConfig.enabled;
+      if (this.enabled && !this.isListening) {
+        await this.startListening();
+      } else if (!this.enabled && this.isListening) {
+        await this.stopListening();
+      }
+    }
+    
+    if (needsRestart && this.isListening) {
       await this.stopHttpServer();
       if (this.enabled) {
         await this.initHttpServer();
@@ -189,7 +208,7 @@ export class HttpInputModule extends InputModuleBase {
   }
 
   protected async onStartListening(): Promise<void> {
-    if (!this.server && this.enabled) {
+    if (this.enabled) {
       await this.initHttpServer();
     }
   }
@@ -202,64 +221,70 @@ export class HttpInputModule extends InputModuleBase {
    * Setup Express middleware
    */
   private setupMiddleware(): void {
-    // Parse JSON bodies
-    this.app.use(express.json({ limit: '1mb' }));
-    
-    // Parse URL-encoded bodies
-    this.app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-    
-    // Add request logging
-    this.app.use((req: Request, res: Response, next) => {
-      if (this.logger) {
-        this.logger.info(`${req.method} ${req.url} - ${req.ip}`);
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    this.app.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+      if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+      } else {
+        next();
       }
-      next();
     });
   }
 
   /**
-   * Setup Express routes
+   * Setup HTTP routes
    */
   private setupRoutes(): void {
     // Handle all methods for the configured endpoint
     this.methods.forEach(method => {
-      this.app[method.toLowerCase() as keyof typeof this.app](this.endpoint, (req: Request, res: Response) => {
-        this.handleHttpRequest(req, res);
-      });
+      const methodLower = method.toLowerCase() as keyof typeof this.app;
+      if (typeof this.app[methodLower] === 'function') {
+        (this.app as any)[methodLower](this.endpoint, (req: Request, res: Response) => {
+          this.handleHttpRequest(req, res);
+        });
+      }
     });
 
     // Health check endpoint
     this.app.get('/health', (req: Request, res: Response) => {
-      res.status(200).json({ status: 'ok', module: 'http_input' });
-    });
-
-    // 404 handler
-    this.app.use('*', (req: Request, res: Response) => {
-      res.status(404).json({ error: 'Endpoint not found' });
+      res.json({ status: 'ok', module: this.name, timestamp: Date.now() });
     });
   }
 
   /**
-   * Initialize HTTP server
+   * Initialize HTTP server with proper error handling
    */
   private async initHttpServer(): Promise<void> {
+    if (this.server) {
+      return; // Already initialized
+    }
+
     try {
       this.server = this.app.listen(this.port, this.host, () => {
-        if (this.logger) {
-          this.logger.info(`HTTP Input Module listening on ${this.host}:${this.port}${this.endpoint}`);
-        }
+        this.logger?.info(`HTTP server listening on ${this.host}:${this.port}`);
+        this.emit('status', {
+          moduleId: this.id,
+          moduleName: this.name,
+          status: 'listening',
+          details: { host: this.host, port: this.port, endpoint: this.endpoint }
+        });
       });
 
       this.server.on('error', (error: Error) => {
-        if (this.logger) {
-          this.logger.error(`HTTP server error: ${error.message}`);
-        }
+        this.logger?.error(`HTTP server error:`, error);
+        this.emit('error', {
+          moduleId: this.id,
+          moduleName: this.name,
+          error: error.message,
+          context: 'http_server'
+        });
       });
-
     } catch (error) {
-      if (this.logger) {
-        this.logger.error(`Failed to initialize HTTP server: ${error}`);
-      }
+      this.logger?.error(`Failed to initialize HTTP server:`, error);
       throw error;
     }
   }
@@ -269,187 +294,165 @@ export class HttpInputModule extends InputModuleBase {
    */
   private async stopHttpServer(): Promise<void> {
     if (this.server) {
-      this.server.close();
-      this.server = undefined as any;
-      if (this.logger) {
-        this.logger.info(`HTTP server stopped for ${this.host}:${this.port}${this.endpoint}`);
-      }
+      return new Promise<void>((resolve) => {
+        this.server!.close(() => {
+          this.server = undefined;
+          this.logger?.info(`HTTP server stopped`);
+          this.emit('status', {
+            moduleId: this.id,
+            moduleName: this.name,
+            status: 'stopped'
+          });
+          resolve();
+        });
+      });
     }
   }
 
   /**
-   * Handle incoming HTTP request
+   * Handle HTTP request with proper typing
    */
   public handleHttpRequest(req: Request, res: Response): void {
-    try {
-      // Check rate limit
-      if (!this.checkRateLimit()) {
-        res.status(429).json({ error: 'Rate limit exceeded' });
-        if (this.logger) {
-          this.logger.warn(`Rate limit exceeded for ${req.ip}`);
-        }
-        return;
-      }
+    const requestId = this.generateRequestId();
+    const timestamp = Date.now();
 
-      // Validate content type if specified
-      if (this.contentType && req.get('content-type') !== this.contentType) {
-        res.status(400).json({ error: `Expected content-type: ${this.contentType}` });
-        if (this.logger) {
-          this.logger.warn(`Invalid content-type: ${req.get('content-type')} from ${req.ip}`);
-        }
-        return;
-      }
-
-      // Parse numeric value from request
-      const numericValue = this.parseNumericValue(req);
-      
-      if (numericValue === null) {
-        res.status(400).json({ error: 'No valid numeric value found in request' });
-        if (this.logger) {
-          this.logger.warn(`No numeric value found in request from ${req.ip}`);
-        }
-        return;
-      }
-
-      // Create request data
-      const requestData: HttpRequestData = {
-        method: req.method,
-        url: req.url,
-        headers: req.headers as Record<string, string>,
-        body: req.body,
-        query: req.query as Record<string, string>,
-        timestamp: Date.now(),
-        requestId: this.generateRequestId(),
-        rateLimitRemaining: this.getRateLimitRemaining()
-      };
-
-      this.lastRequestData = requestData;
-      this.requestCount++;
-      this.lastRequestTime = Date.now();
-
-      // Emit HTTP request event
-      this.emit('httpRequest', requestData);
-
-      // Emit trigger or stream based on mode
-      if (this.mode === 'trigger') {
-        this.emitTrigger('httpTrigger', {
-          value: numericValue,
-          method: req.method,
-          url: req.url,
-          headers: req.headers,
-          body: req.body,
-          query: req.query,
-          timestamp: requestData.timestamp,
-          requestId: requestData.requestId,
-          rateLimitRemaining: requestData.rateLimitRemaining,
-          requestCount: this.requestCount
-        });
-      } else {
-        // Streaming mode: emit stream with numeric value
-        this.emitStream({
-          value: numericValue,
-          method: req.method,
-          url: req.url,
-          data: req.body,
-          timestamp: requestData.timestamp,
-          rateLimitRemaining: requestData.rateLimitRemaining
-        });
-      }
-
-      // Emit state update
-      this.emit('stateUpdate', {
-        status: this.server ? 'listening' : 'stopped',
-        port: this.port,
-        host: this.host,
-        endpoint: this.endpoint,
-        currentValue: numericValue,
-        requestCount: this.requestCount,
-        rateLimit: this.rateLimit,
-        rateLimitRemaining: requestData.rateLimitRemaining,
-        mode: this.mode,
-        lastUpdate: requestData.timestamp
+    // Check rate limit
+    if (!this.checkRateLimit()) {
+      res.status(429).json({
+        error: 'Rate limit exceeded',
+        requestId,
+        timestamp
       });
-
-      // Send success response
-      res.status(200).json({ 
-        success: true, 
-        value: numericValue,
-        rateLimitRemaining: requestData.rateLimitRemaining 
-      });
-
-    } catch (error) {
-      if (this.logger) {
-        this.logger.error(`Error processing HTTP request: ${error}`);
-      }
-      res.status(500).json({ error: 'Internal server error' });
+      return;
     }
+
+    // Parse numeric value from request
+    const numericValue = this.parseNumericValue(req);
+    
+         // Create request data object with all required fields
+     const requestData: HttpRequestData = {
+       method: req.method,
+       url: req.url,
+       headers: req.headers as Record<string, string>,
+       body: req.body,
+       query: req.query as Record<string, string>,
+       timestamp,
+       requestId,
+       rateLimitRemaining: this.getRateLimitRemaining()
+     };
+
+    this.lastRequestData = requestData;
+    this.requestCount++;
+    this.lastRequestTime = timestamp;
+    this.currentValue = numericValue;
+
+    this.logger?.debug(`HTTP request received: ${req.method} ${req.url}`, {
+      requestId,
+      numericValue,
+      rateLimitRemaining: requestData.rateLimitRemaining
+    });
+
+    // Emit httpRequest event
+    this.emit('httpRequest', {
+      method: req.method,
+      url: req.url,
+      headers: req.headers as Record<string, string>,
+      body: req.body,
+      query: req.query as Record<string, string>,
+      timestamp,
+      requestId,
+      rateLimitRemaining: requestData.rateLimitRemaining
+    });
+
+    // Send response
+    res.status(200).json({
+      success: true,
+      requestId,
+      timestamp,
+      numericValue,
+      rateLimitRemaining: requestData.rateLimitRemaining
+    });
+
+    // Emit events based on mode
+    if (this.mode === 'trigger' && numericValue !== null) {
+           // Trigger mode: emit trigger event with typed payload
+     const triggerPayload: HttpTriggerPayload = {
+       method: req.method,
+       url: req.url,
+       value: numericValue,
+       headers: req.headers as Record<string, string>,
+       body: req.body,
+       query: req.query as Record<string, string>,
+       timestamp,
+       requestId,
+       rateLimitRemaining: requestData.rateLimitRemaining,
+       requestCount: this.requestCount
+     };
+     this.emitTrigger<HttpTriggerPayload>('httpTrigger', triggerPayload);
+   } else if (this.mode === 'streaming') {
+     // Streaming mode: emit stream with typed payload
+     const streamPayload: HttpStreamPayload = {
+       method: req.method,
+       url: req.url,
+       value: numericValue || 0,
+       data: req.body,
+       timestamp,
+       rateLimitRemaining: requestData.rateLimitRemaining
+     };
+     this.emitStream<HttpStreamPayload>(streamPayload);
+    }
+
+    // Emit state update
+    this.emit('stateUpdate', {
+      status: 'listening',
+      lastRequest: requestData,
+      requestCount: this.requestCount,
+      rateLimitRemaining: requestData.rateLimitRemaining,
+      mode: this.mode
+    });
   }
 
   /**
-   * Parse numeric value from HTTP request
+   * Parse numeric value from HTTP request with proper typing
    */
   private parseNumericValue(req: Request): number | null {
-    try {
-      // Try to extract from request body first
-      if (req.body) {
-        const bodyValue = this.extractNumericFromObject(req.body);
-        if (bodyValue !== null) {
-          return bodyValue;
-        }
-      }
-
-      // Try to extract from query parameters
-      if (req.query) {
-        const queryValue = this.extractNumericFromObject(req.query);
-        if (queryValue !== null) {
-          return queryValue;
-        }
-      }
-
-      // Try to extract from URL path parameters
-      if (req.params) {
-        const paramValue = this.extractNumericFromObject(req.params);
-        if (paramValue !== null) {
-          return paramValue;
-        }
-      }
-
-      return null;
-    } catch (error) {
-      if (this.logger) {
-        this.logger.error(`Error parsing numeric value: ${error}`);
-      }
-      return null;
-    }
-  }
-
-  /**
-   * Extract numeric value from object (recursively searches for numbers)
-   */
-  private extractNumericFromObject(obj: any): number | null {
-    if (typeof obj === 'number') {
-      return obj;
-    }
-
-    if (typeof obj === 'string') {
-      const num = parseFloat(obj);
-      return isNaN(num) ? null : num;
-    }
-
-    if (Array.isArray(obj)) {
-      for (const item of obj) {
-        const result = this.extractNumericFromObject(item);
-        if (result !== null) {
-          return result;
+    // Try to extract from path parameters first
+    for (const key in req.params) {
+      const value = req.params[key];
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          return num;
         }
       }
     }
 
-    if (typeof obj === 'object' && obj !== null) {
-      for (const key in obj) {
-        const result = this.extractNumericFromObject(obj[key]);
-        if (result !== null) {
-          return result;
+    // Try to extract from query parameters
+    for (const key in req.query) {
+      const value = req.query[key];
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          return num;
+        }
+      }
+    }
+
+    // Try to extract from body
+    if (req.body && typeof req.body === 'object') {
+      const bodyValue = this.extractNumericFromObject(req.body);
+      if (bodyValue !== null) {
+        return bodyValue;
+      }
+    }
+
+    // Try to extract from headers
+    for (const key in req.headers) {
+      const value = req.headers[key];
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          return num;
         }
       }
     }
@@ -458,128 +461,181 @@ export class HttpInputModule extends InputModuleBase {
   }
 
   /**
-   * Check rate limit
+   * Extract numeric value from object recursively with proper typing
+   */
+  private extractNumericFromObject(obj: Record<string, unknown>): number | null {
+    for (const key in obj) {
+      const value = obj[key];
+      
+      if (typeof value === 'number') {
+        return value;
+      }
+      
+      if (typeof value === 'string') {
+        const num = parseFloat(value);
+        if (!isNaN(num)) {
+          return num;
+        }
+      }
+      
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        const nestedValue = this.extractNumericFromObject(value as Record<string, unknown>);
+        if (nestedValue !== null) {
+          return nestedValue;
+        }
+      }
+      
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === 'number') {
+            return item;
+          }
+          if (typeof item === 'string') {
+            const num = parseFloat(item);
+            if (!isNaN(num)) {
+              return num;
+            }
+          }
+          if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+            const nestedValue = this.extractNumericFromObject(item as Record<string, unknown>);
+            if (nestedValue !== null) {
+              return nestedValue;
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check rate limit with proper return type
    */
   private checkRateLimit(): boolean {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
-
+    
     // Remove old timestamps
     this.requestTimestamps = this.requestTimestamps.filter(timestamp => timestamp > oneMinuteAgo);
-
+    
     // Check if we're under the limit
     if (this.requestTimestamps.length >= this.rateLimit) {
       return false;
     }
-
+    
     // Add current timestamp
     this.requestTimestamps.push(now);
     return true;
   }
 
   /**
-   * Get remaining rate limit
+   * Get remaining rate limit with proper return type
    */
   private getRateLimitRemaining(): number {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
-    const recentRequests = this.requestTimestamps.filter(timestamp => timestamp > oneMinuteAgo);
-    return Math.max(0, this.rateLimit - recentRequests.length);
+    
+    // Remove old timestamps
+    this.requestTimestamps = this.requestTimestamps.filter(timestamp => timestamp > oneMinuteAgo);
+    
+    return Math.max(0, this.rateLimit - this.requestTimestamps.length);
   }
 
   /**
-   * Generate unique request ID
+   * Generate unique request ID with proper return type
    */
   private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `${this.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * Validate host format
+   * Validate host address format with proper return type
    */
   private isValidHost(host: string): boolean {
-    // Basic validation - could be enhanced
-    return host === '0.0.0.0' || host === 'localhost' || host === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+    if (host === '0.0.0.0' || host === 'localhost' || host === '127.0.0.1') {
+      return true;
+    }
+    
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipRegex.test(host);
   }
 
   /**
-   * Get current HTTP parameters
+   * Get HTTP server parameters for UI display with proper return type
    */
-  public getHttpParameters() {
+  public getHttpParameters(): {
+    port: number;
+    host: string;
+    endpoint: string;
+    methods: string[];
+    enabled: boolean;
+    rateLimit: number;
+    contentType: string;
+    status: string;
+    requestCount: number;
+    rateLimitRemaining: number;
+    mode: string;
+    currentValue: number | null;
+    lastRequestData: HttpRequestData | undefined;
+  } {
     return {
       port: this.port,
       host: this.host,
       endpoint: this.endpoint,
       methods: this.methods,
+      enabled: this.enabled,
       rateLimit: this.rateLimit,
       contentType: this.contentType,
-      enabled: this.enabled,
       status: this.server ? 'listening' : 'stopped',
-      currentValue: this.lastRequestData ? this.parseNumericValue({ 
-        method: this.lastRequestData.method,
-        url: this.lastRequestData.url,
-        body: this.lastRequestData.body,
-        query: this.lastRequestData.query,
-        headers: this.lastRequestData.headers,
-        params: {}
-      } as Request) : null,
       requestCount: this.requestCount,
       rateLimitRemaining: this.getRateLimitRemaining(),
       mode: this.mode,
+      currentValue: this.currentValue,
       lastRequestData: this.lastRequestData
     };
   }
 
   /**
-   * Reset request counter and last request data
+   * Reset request counter
    */
   public reset(): void {
     this.requestCount = 0;
-    this.lastRequestData = undefined as any;
+    this.lastRequestTime = 0;
     this.requestTimestamps = [];
-    if (this.logger) {
-      this.logger.info('HTTP request counter and data reset');
-    }
-  }
-
-  /**
-   * Handle incoming HTTP data
-   */
-  protected handleInput(data: any): void {
-    // This method is called by the base class when data is received
-    // The actual processing is done in handleHttpRequest
-    this.logger?.debug('handleInput called with data:', data);
-  }
-
-  /**
-   * Get current state for UI display
-   */
-  public getState() {
-    return {
-      id: this.id,
-      moduleName: this.name,
-      port: this.port,
-      host: this.host,
-      endpoint: this.endpoint,
-      methods: this.methods,
-      rateLimit: this.rateLimit,
-      contentType: this.contentType,
-      enabled: this.enabled,
-      status: this.state.status,
-      currentValue: this.lastRequestData ? this.parseNumericValue({ 
-        method: this.lastRequestData.method,
-        url: this.lastRequestData.url,
-        body: this.lastRequestData.body,
-        query: this.lastRequestData.query,
-        headers: this.lastRequestData.headers,
-        params: {}
-      } as Request) : null,
+    this.lastRequestData = undefined;
+    this.currentValue = null;
+    this.emit('stateUpdate', {
+      status: this.server ? 'listening' : 'stopped',
       requestCount: this.requestCount,
-      rateLimitRemaining: this.getRateLimitRemaining(),
-      mode: this.getMode(),
-      lastRequestData: this.lastRequestData,
-      messageCount: this.state.messageCount,
-      config: this.config
-    };
+      lastRequest: undefined
+    });
   }
+
+  /**
+   * Handle input data with proper typing
+   */
+  protected handleInput(data: unknown): void {
+    // This module doesn't handle external input - it only responds to HTTP requests
+    this.logger?.debug(`HTTP input module received external data:`, data);
+  }
+
+     /**
+    * Get module state with proper return type
+    */
+   public getState(): {
+     id: string;
+     status: 'initializing' | 'running' | 'stopped' | 'error';
+     lastError?: string;
+     startTime?: number;
+     messageCount: number;
+     config: ModuleConfig;
+   } {
+     return {
+       id: this.id,
+       status: this.server ? 'running' : 'stopped',
+       messageCount: this.requestCount,
+       config: this.config
+     };
+   }
 } 

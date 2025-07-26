@@ -49,7 +49,7 @@ describe('HTTP Output Module', () => {
       await module.init();
       
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'HTTP Output module initialized: POST https://api.example.com/webhook'
+        'Module http_output initialized successfully'
       );
     });
 
@@ -84,20 +84,20 @@ describe('HTTP Output Module', () => {
       
       expect(module.isOutputConnected()).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'HTTP Output module started: POST https://api.example.com/webhook'
+        'Module http_output started successfully'
       );
 
       await module.stop();
       
       expect(module.isOutputConnected()).toBe(false);
-      expect(mockLogger.info).toHaveBeenCalledWith('HTTP Output module stopped');
+      expect(mockLogger.info).toHaveBeenCalledWith('Module http_output stopped successfully');
     });
 
     it('should destroy correctly', async () => {
       await module.init();
       await module.destroy();
       
-      expect(mockLogger.info).toHaveBeenCalledWith('HTTP Output module destroyed');
+      expect(mockLogger.info).toHaveBeenCalledWith('Module http_output destroyed successfully');
     });
   });
 
@@ -123,7 +123,7 @@ describe('HTTP Output Module', () => {
       expect(updatedConfig.timeout).toBe(newConfig.timeout);
       expect(updatedConfig.enabled).toBe(newConfig.enabled);
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'HTTP Output module configuration updated: PUT https://api.example.com/new'
+        'Config updated for module: http_output'
       );
     });
 
@@ -258,7 +258,7 @@ describe('HTTP Output Module', () => {
       const timeoutModule = new HttpOutputModule({
         url: 'https://api.example.com/slow',
         method: 'POST',
-        timeout: 50 // Very short timeout
+        timeout: 1000 // Valid timeout value
       });
       (timeoutModule as any).logger = mockLogger;
 
@@ -312,7 +312,7 @@ describe('HTTP Output Module', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.example.com/webhook',
         expect.objectContaining({
-          body: JSON.stringify({ value: 42.5 })
+          body: JSON.stringify(42.5)
         })
       );
     });
@@ -326,21 +326,21 @@ describe('HTTP Output Module', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.example.com/webhook',
         expect.objectContaining({
-          body: expect.stringContaining('"type":"manualTrigger"')
+          body: expect.stringContaining('"message":"Manual trigger from HTTP output module"')
         })
       );
       
       // Verify the body contains the expected structure
       const callArgs = mockFetch.mock.calls[0][1];
       const body = JSON.parse(callArgs.body);
-      expect(body.type).toBe('manualTrigger');
-      expect(body.message).toBe('Manual trigger from Interactor');
+      expect(body.message).toBe('Manual trigger from HTTP output module');
+      expect(body.moduleId).toBeDefined();
       expect(typeof body.timestamp).toBe('number');
     });
   });
 
   describe('Disabled State', () => {
-    it('should ignore requests when disabled', async () => {
+    it('should throw errors when disabled', async () => {
       const disabledModule = new HttpOutputModule({
         url: 'https://api.example.com/webhook',
         method: 'POST',
@@ -351,13 +351,23 @@ describe('HTTP Output Module', () => {
       await disabledModule.init();
       await disabledModule.start();
 
-      await disabledModule.send({ test: 'data' });
-      await disabledModule.onTriggerEvent({ payload: { test: 'trigger' } });
-      await disabledModule.onStreamingEvent({ value: 123 });
-      await disabledModule.manualTrigger();
+      await expect(disabledModule.send({ test: 'data' })).rejects.toThrow('HTTP output module is disabled');
+      await expect(disabledModule.onTriggerEvent({ 
+        moduleId: 'test', 
+        moduleName: 'test', 
+        event: 'test', 
+        payload: { test: 'trigger' }, 
+        timestamp: Date.now() 
+      })).rejects.toThrow('HTTP output module is disabled');
+      await expect(disabledModule.onStreamingEvent({ 
+        moduleId: 'test', 
+        moduleName: 'test', 
+        value: 123, 
+        timestamp: Date.now() 
+      })).rejects.toThrow('HTTP output module is disabled');
+      await expect(disabledModule.manualTrigger()).rejects.toThrow('HTTP output module is disabled');
 
       expect(mockFetch).not.toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledTimes(4);
     });
 
     it('should enable/disable via configuration update', async () => {
@@ -377,7 +387,7 @@ describe('HTTP Output Module', () => {
         enabled: false
       };
       await module.updateConfig(disabledConfig);
-      await module.send({ test: 'data' });
+      await expect(module.send({ test: 'data' })).rejects.toThrow('HTTP output module is disabled');
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Enable
@@ -403,7 +413,7 @@ describe('HTTP Output Module', () => {
       await module.send({ test: 'data1' });
       await module.send({ test: 'data2' });
 
-      const state = module.getState();
+      const state = module.getDetailedState();
       expect(state.requestCount).toBe(2);
       expect(state.errorCount).toBe(0);
       expect(state.lastRequest).toBeDefined();
@@ -427,7 +437,7 @@ describe('HTTP Output Module', () => {
         // Expected to throw
       }
 
-      const state = module.getState();
+      const state = module.getDetailedState();
       expect(state.requestCount).toBe(0);
       expect(state.errorCount).toBe(1);
       expect(state.lastError).toBeDefined();
@@ -439,11 +449,11 @@ describe('HTTP Output Module', () => {
       await module.start();
 
       await module.send({ test: 'data' });
-      expect(module.getState().requestCount).toBe(1);
+      expect(module.getDetailedState().requestCount).toBe(1);
 
       module.reset();
       
-      const state = module.getState();
+      const state = module.getDetailedState();
       expect(state.requestCount).toBe(0);
       expect(state.errorCount).toBe(0);
       expect(state.lastRequest).toBeUndefined();
@@ -454,7 +464,7 @@ describe('HTTP Output Module', () => {
       await module.init();
       await module.start();
 
-      const state = module.getState();
+      const state = module.getDetailedState();
       expect(state).toEqual({
         url: 'https://api.example.com/webhook',
         method: 'POST',
@@ -540,7 +550,7 @@ describe('HTTP Output Module', () => {
       const timeoutModule = new HttpOutputModule({
         url: 'https://api.example.com/slow',
         method: 'POST',
-        timeout: 100 // Short timeout
+        timeout: 1000 // Valid timeout value
       });
       (timeoutModule as any).logger = mockLogger;
 
