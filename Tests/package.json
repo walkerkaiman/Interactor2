@@ -7,7 +7,29 @@
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:verbose": "VITEST_VERBOSE=true vitest run",
+    
+    "integration": "vitest run integration/",
+    "integration:watch": "vitest --watch integration/",
+    "integration:coverage": "vitest --coverage integration/",
+    "integration:verbose": "VITEST_VERBOSE=true vitest run integration/",
+    "integration:runner": "ts-node --esm integration/run-integration-tests.ts",
+    
+    "test:unit": "vitest run unit/",
+    "test:unit:watch": "vitest --watch unit/",
+    "test:unit:coverage": "vitest --coverage unit/",
+    
+    "test:all": "npm run test:unit && npm run integration",
+    "test:all:coverage": "npm run test:unit:coverage && npm run integration:coverage",
+    
+    "test:backend": "vitest run BackendIntegration.test.ts",
+    "test:routing": "vitest run MessageRouting.test.ts",
+    "test:modules": "vitest run ModuleLifecycle.test.ts",
+    "test:api": "vitest run APIWebSocket.test.ts",
+    
+    "test:report": "npm run test:all:coverage && open coverage/index.html",
+    "test:clean": "rm -rf coverage test-results.json test-*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -15,6 +37,7 @@
     "@vitest/coverage-v8": "^1.0.0",
     "@vitest/ui": "^1.0.0",
     "supertest": "^6.3.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.2",
     "vitest": "^1.0.0"
   },

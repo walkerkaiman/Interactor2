@@ -71,7 +71,7 @@ The application uses a tab-based interface with four main sections:
 3. **Ports** (input ⇢ left, output ⇢ right) appear on the node edge based on module manifest events. Ports that are not used by a module will be hidden by default.
 4. **Connections** are created by *click-drag* from an input port to a compatible output port.
 5. Node selections open the **Inspector Panel** for module-specific configuration.
-6. All changes to the interations will only exist in the GUI until a "Publish" button is pressed. The new interaction map will then be sent to the backend who will update all connected GUI web clients. 
+6. All changes to the interactions will only exist in the GUI until a "Publish" button is pressed. The new interaction map will then be sent to the backend who will update all connected GUI web clients. 
 
 ### 4.2 Tab Navigation
 - **Tab Switching**: Smooth transitions between tabs with state preservation
@@ -135,7 +135,7 @@ App (Provider)
 | State Mgmt | **Zustand** + **Immer** | Lightweight, selector-based updates |
 | Animations | **Framer Motion** | Declarative, layout transitions |
 | Styling | **Tailwind CSS** w/ CSS Variables | Rapid prototyping, themeable |
-| Real-time | **Socket.io client** | Mirrors backend event bus |
+| Real-time | **Native WebSocket (browser)** | Directly connects to backend WS server |
 | HTTP Client | **Axios** | Type-safe API calls with interceptors |
 | Markdown | **React Markdown** | Wiki documentation rendering |
 | Charts | **Recharts** | Performance dashboard visualizations |
@@ -315,6 +315,7 @@ interface AppState {
 | GET | `/api/modules` | Fetch all available module manifests | - | `{ success: boolean, data: ModuleListResponse }` |
 | GET | `/api/modules/:name` | Fetch specific module manifest | - | `{ success: boolean, data: ModuleManifest }` |
 | GET | `/api/module-instances` | Get all module instances | - | `{ success: boolean, data: ModuleInstance[] }` |
+| GET | `/api/module-instances/:id` | Get specific module instance | - | `{ success: boolean, data: ModuleInstance }` |
 | POST | `/api/module-instances` | Create new module instance | `{ moduleName, config, position }` | `{ success: boolean, data: ModuleInstance }` |
 | DELETE | `/api/module-instances/:id` | Remove module instance | - | `{ success: boolean }` |
 | POST | `/api/module-instances/:id/start` | Start module instance | - | `{ success: boolean }` |
@@ -328,15 +329,23 @@ interface AppState {
 | POST | `/api/routes` | Create new route | `MessageRoute` | `{ success: boolean, data: MessageRoute }` |
 | DELETE | `/api/routes/:id` | Delete route | - | `{ success: boolean }` |
 
-#### 9.1.3 System Monitoring
+#### 9.1.3 Interaction Management
+| Method | Path | Purpose | Request Body | Response |
+| ------ | ---- | ------- | ------------ | -------- |
+| GET | `/api/interactions` | Get all interactions | - | `{ success: boolean, data: InteractionConfig[] }` |
+| POST | `/api/interactions` | Create new interaction | `InteractionConfig` | `{ success: boolean, data: InteractionConfig }` |
+| PUT | `/api/interactions/:id` | Update interaction | `InteractionConfig` | `{ success: boolean, data: InteractionConfig }` |
+| DELETE | `/api/interactions/:id` | Remove interaction | - | `{ success: boolean }` |
+
+#### 9.1.4 System Monitoring
 | Method | Path | Purpose | Request Body | Response |
 | ------ | ---- | ------- | ------------ | -------- |
 | GET | `/api/stats` | Get system statistics | - | `{ success: boolean, data: SystemStats }` |
 | GET | `/api/system` | Get detailed system info | - | `{ success: boolean, data: DetailedSystemInfo }` |
-| GET | `/api/logs` | Get recent logs | `?count=100&level=info` | `{ success: boolean, data: LogEntry[] }` |
+| GET | `/api/logs` | Get recent logs | `?count=100` | `{ success: boolean, data: LogEntry[] }` |
 | GET | `/health` | Health check | - | `{ status: string, uptime: string, timestamp: number }` |
 
-#### 9.1.4 Settings Management
+#### 9.1.5 Settings Management
 | Method | Path | Purpose | Request Body | Response |
 | ------ | ---- | ------- | ------------ | -------- |
 | GET | `/api/settings` | Get all settings | - | `{ success: boolean, data: Record<string, any> }` |
@@ -357,7 +366,8 @@ interface AppState {
 | `stateChanged` | `{ interactions, routes }` | Graph updates after CRUD operations |
 | `moduleLoaded` | `ModuleManifest` | New module available |
 | `messageRouted` | `Message` | Debug overlay for message routing |
-| `logs` | `LogEntry[]` | Real-time log updates |
+| `log` | `LogEntry` | Real-time stream (single entry) |
+| `logs` | `LogEntry[]` | Bulk log list (response to `getLogs`) |
 | `manualTriggerResponse` | `{ moduleId, success, error? }` | Trigger confirmation |
 
 #### 9.2.3 Client → Server Events
@@ -572,6 +582,9 @@ export const useWebSocket = () => {
           break;
         case 'stats':
           updateStats(message.data);
+          break;
+        case 'log':
+          updateLogs([message.data]);
           break;
         case 'logs':
           updateLogs(message.data);
@@ -793,7 +806,6 @@ frontend/
     "immer": "^10.0.3",
     "framer-motion": "^10.16.16",
     "axios": "^1.6.2",
-    "socket.io-client": "^4.7.4",
     "react-markdown": "^9.0.1",
     "recharts": "^2.8.0",
     "react-window": "^1.8.8",
@@ -831,10 +843,6 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true
-      },
-      '/ws': {
-        target: 'ws://localhost:3001',
-        ws: true
       }
     }
   },
@@ -875,50 +883,3 @@ VITE_API_BASE_URL=https://api.interactor.com
 VITE_WS_URL=wss://api.interactor.com
 VITE_ENABLE_LOGGING=false
 ```
-
-## 18. Monitoring & Analytics
-
-### 18.1 Performance Monitoring
-- Core Web Vitals tracking
-- Custom performance metrics
-- Error tracking and reporting
-- User interaction analytics
-
-### 18.2 Debug Tools
-- Redux DevTools integration for Zustand
-- React Flow debug panel
-- WebSocket message inspector
-- Performance profiler
-
-## 19. Security Considerations
-
-### 19.1 Input Validation
-- All user inputs validated against schemas
-- XSS prevention with proper escaping
-- CSRF protection for state-changing operations
-
-### 19.2 Authentication (Future)
-- JWT token management
-- Role-based access control
-- Secure WebSocket connections
-
-## 20. Future Enhancements
-
-### 20.1 Planned Features
-- Module versioning and updates
-- Advanced routing with conditions and transforms
-- Plugin system for custom modules
-- Multi-user collaboration
-- Mobile-responsive design
-
-### 20.2 Scalability Improvements
-- GraphQL API for efficient data fetching
-- Service worker for offline capabilities
-- WebAssembly for performance-critical operations
-- Micro-frontend architecture for large deployments
-
----
-
-*Document version*: 2.0 – 2025-01-27  
-*Last updated*: Validated against backend v1.0.0  
-*Next review*: After frontend MVP completion

@@ -49,7 +49,7 @@ export class InteractorServer {
   public setConfig(config: {
     server: { port: number; host: string };
     logging: { level: string; file: string };
-    modules: { autoLoad: boolean; hotReload: boolean };
+    modules: { autoLoad: boolean; hotReload: boolean; modulesPath?: string };
   }): void {
     this.config = config;
   }
@@ -130,9 +130,12 @@ export class InteractorServer {
     });
 
     // Determine the correct modules directory path
-    // If we're running from Tests directory, we need to go up to backend/src/modules
     let modulesDir: string;
-    if (process.cwd().includes('Tests')) {
+    if (this.config.modules?.modulesPath) {
+      // Use custom modules path from config (for testing)
+      modulesDir = this.config.modules.modulesPath;
+    } else if (process.cwd().includes('Tests')) {
+      // If we're running from Tests directory, we need to go up to backend/src/modules
       modulesDir = path.join(process.cwd(), '..', 'backend', 'src', 'modules');
     } else {
       modulesDir = path.join(__dirname, 'modules');
@@ -428,7 +431,10 @@ export class InteractorServer {
         }
         
         // Get the actual module instance from ModuleLoader
-        const moduleInstance = this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        const moduleInstance = this.moduleLoader.getInstance(req.params.id as string);
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found in ModuleLoader' });
+        }
         
         // Check if the module has a manual trigger method (only output modules have this)
         if ('onManualTrigger' in moduleInstance && typeof moduleInstance.onManualTrigger === 'function') {
