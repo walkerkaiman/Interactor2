@@ -652,48 +652,72 @@ export default class RemovalTestModule extends ModuleBase {
     });
 
     it('should handle rapid file changes without corruption', async () => {
-      // Ensure file watcher is stopped before starting
-      await moduleLoader.stopWatching();
+      // Create a unique test directory for this specific test
+      const uniqueTestDir = path.join(__dirname, `rapid-changes-test-${Date.now()}`);
+      await fs.ensureDir(uniqueTestDir);
       
-      // Start watching for changes
-      await moduleLoader.startWatching();
+      // Create a separate server instance for this test
+      let testServer: InteractorServer | undefined;
+      let testModuleLoader: ModuleLoader | undefined;
       
-      // Create a unique module name for this test
-      const uniqueModuleName = `rapid_changes_${Date.now()}`;
-      const moduleDir = path.join(testModulesDir, uniqueModuleName);
-      await fs.ensureDir(moduleDir);
-      
-      // Ensure the test modules directory exists and is clean
-      await fs.ensureDir(testModulesDir);
-      
-      const manifest: ModuleManifest = {
-        name: uniqueModuleName,
-        type: 'input',
-        version: '1.0.0',
-        description: 'Rapid changes test module',
-        author: 'Test Author',
-        configSchema: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean', default: true }
+      try {
+        // Create a fresh server instance with the unique test directory
+        testServer = new InteractorServer();
+        
+        // Configure server to use the unique test directory
+        const testConfig = {
+          server: { port: 3003, host: 'localhost' }, // Use different port
+          logging: { level: 'debug', file: 'test.log' },
+          modules: { 
+            autoLoad: false, 
+            hotReload: true, // Enable hot reloading
+            modulesPath: uniqueTestDir
           }
-        },
-        events: [
-          { name: 'data', type: 'output', description: 'Test data event' }
-        ]
-      };
-      
-      await fs.writeJson(path.join(moduleDir, 'manifest.json'), manifest);
-      
-      // Verify the manifest file was written
-      const manifestPath = path.join(moduleDir, 'manifest.json');
-      const manifestExists = await fs.pathExists(manifestPath);
-      if (!manifestExists) {
-        throw new Error(`Manifest file was not created at ${manifestPath}`);
-      }
-      
-      // Create the module index.ts file
-      const indexContent = `
+        };
+        
+        testServer.setConfig(testConfig);
+        await testServer.init();
+        
+        // Get reference to the module loader
+        testModuleLoader = (testServer as any).moduleLoader;
+        
+        if (!testModuleLoader) {
+          throw new Error('Failed to get module loader from test server');
+        }
+        
+        // Create a unique module name for this test
+        const uniqueModuleName = `rapid_changes_${Date.now()}`;
+        const moduleDir = path.join(uniqueTestDir, uniqueModuleName);
+        await fs.ensureDir(moduleDir);
+        
+        const manifest: ModuleManifest = {
+          name: uniqueModuleName,
+          type: 'input',
+          version: '1.0.0',
+          description: 'Rapid changes test module',
+          author: 'Test Author',
+          configSchema: {
+            type: 'object',
+            properties: {
+              enabled: { type: 'boolean', default: true }
+            }
+          },
+          events: [
+            { name: 'data', type: 'output', description: 'Test data event' }
+          ]
+        };
+        
+        await fs.writeJson(path.join(moduleDir, 'manifest.json'), manifest);
+        
+        // Verify the manifest file was written
+        const manifestPath = path.join(moduleDir, 'manifest.json');
+        const manifestExists = await fs.pathExists(manifestPath);
+        if (!manifestExists) {
+          throw new Error(`Manifest file was not created at ${manifestPath}`);
+        }
+        
+        // Create the module index.ts file
+        const indexContent = `
 import { ModuleBase } from '../../../backend/src/core/ModuleBase';
 import { ModuleConfig } from '@interactor/shared';
 
@@ -738,37 +762,69 @@ export default class RapidChangesModule extends ModuleBase {
   }
 }
 `;
-      await fs.writeFile(path.join(moduleDir, 'index.ts'), indexContent);
-      
-      // Force initial discovery
-      await moduleLoader.discoverModules();
-      
-      // Make rapid changes to the manifest
-      for (let i = 1; i <= 10; i++) {
-        manifest.version = `1.${i}.0`;
-        manifest.description = `Rapid change ${i}`;
-        await fs.writeJson(path.join(moduleDir, 'manifest.json'), manifest);
-        await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay for better reliability
+        await fs.writeFile(path.join(moduleDir, 'index.ts'), indexContent);
+        
+        // Force initial discovery
+        await testModuleLoader.discoverModules();
+        
+        // Wait for initial discovery to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify module was initially discovered
+        let modules = testModuleLoader.list();
+        console.log('Initial modules:', modules);
+        console.log('Looking for module:', uniqueModuleName);
+        
+        if (!modules.includes(uniqueModuleName)) {
+          // Retry discovery if module not found initially
+          await testModuleLoader.discoverModules();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          modules = testModuleLoader.list();
+          console.log('After retry modules:', modules);
+        }
+        
+        expect(modules).toContain(uniqueModuleName);
+        
+        // Make rapid changes to the manifest
+        for (let i = 1; i <= 10; i++) {
+          manifest.version = `1.${i}.0`;
+          manifest.description = `Rapid change ${i}`;
+          await fs.writeJson(path.join(moduleDir, 'manifest.json'), manifest);
+          await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay for better reliability
+        }
+        
+        // Force final discovery to ensure all changes are processed
+        await testModuleLoader.discoverModules();
+        
+        // Wait for final processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Force discovery one more time to ensure latest changes are loaded
+        await testModuleLoader.discoverModules();
+        
+        // Wait a bit more for processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify module is still registered and has final version
+        modules = testModuleLoader.list();
+        console.log('Final modules:', modules);
+        console.log('Looking for module:', uniqueModuleName);
+        expect(modules).toContain(uniqueModuleName);
+        
+        const finalManifest = testModuleLoader.getManifest(uniqueModuleName);
+        console.log('Final manifest:', finalManifest);
+        expect(finalManifest?.version).toBe('1.10.0');
+        expect(finalManifest?.description).toBe('Rapid change 10');
+        
+      } finally {
+        // Clean up the test server
+        if (testServer) {
+          await testServer.stop();
+        }
+        
+        // Clean up the unique test directory
+        await fs.remove(uniqueTestDir);
       }
-      
-      // Force final discovery to ensure all changes are processed
-      await moduleLoader.discoverModules();
-      
-      // Wait for final processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Force discovery one more time to ensure latest changes are loaded
-      await moduleLoader.discoverModules();
-      
-      // Verify module is still registered and has final version
-      const modules = moduleLoader.list();
-      expect(modules).toContain(uniqueModuleName);
-      
-      const finalManifest = moduleLoader.getManifest(uniqueModuleName);
-      expect(finalManifest?.version).toBe('1.10.0');
-      expect(finalManifest?.description).toBe('Rapid change 10');
-      
-      await moduleLoader.stopWatching();
     });
   });
 

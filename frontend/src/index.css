@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* React Flow custom styles */
+.react-flow__node {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #374151;
+  background: #1a1a2e;
+}
+
+.react-flow__handle:hover {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
+.react-flow__handle.connectionindicator {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.trigger {
+  stroke: #10b981;
+}
+
+.react-flow__edge.stream {
+  stroke: #3b82f6;
+}
+
+/* Custom node styles */
+.custom-node {
+  background: #1a1a2e;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 150px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.custom-node.selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.custom-node.active {
+  border-color: #10b981;
+}
+
+.custom-node.error {
+  border-color: #ef4444;
+}
+
+.custom-node.inactive {
+  opacity: 0.6;
+}
+
+/* Port styles */
+.port-input {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.port-output {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+/* Animation utilities */
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+/* Focus styles for accessibility */
+.focus-visible:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+} 

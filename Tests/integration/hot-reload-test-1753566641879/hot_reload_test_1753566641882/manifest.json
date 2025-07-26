@@ -1,0 +1,1 @@
+{"name":"hot_reload_test_1753566641882","type":"input","version":"1.0.0","description":"Hot reload test module","author":"Test Author","configSchema":{"type":"object","properties":{"enabled":{"type":"boolean","default":true}}},"events":[{"name":"data","type":"output","description":"Test data event"}]}

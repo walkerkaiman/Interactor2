@@ -164,6 +164,81 @@ frontend/build/
 frontend/.next/
 frontend/out/
 
+# Vite specific
+.vite/
+vite.config.ts.timestamp-*
+vite.config.ts.mjs.timestamp-*
+
+# React/Vite development
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*
+frontend/vite.config.ts.mjs.timestamp-*
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Frontend testing
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright/.cache/
+
+# Frontend coverage
+frontend/coverage/
+frontend/.nyc_output/
+
+# Frontend cache and temp files
+frontend/.cache/
+frontend/temp/
+frontend/tmp/
+frontend/*.tmp
+frontend/*.temp
+
+# Frontend environment files
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Frontend IDE and editor files
+frontend/.vscode/
+frontend/.idea/
+frontend/*.swp
+frontend/*.swo
+frontend/*~
+
+# Frontend logs
+frontend/logs/
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Frontend dependency caches
+frontend/.eslintcache
+frontend/.stylelintcache
+frontend/.prettiercache
+
+# Frontend build artifacts
+frontend/public/build/
+frontend/public/static/
+frontend/src/**/*.css.map
+frontend/src/**/*.js.map
+frontend/src/**/*.ts.map
+
+# Frontend package manager files
+frontend/yarn.lock
+frontend/pnpm-lock.yaml
+frontend/.yarn/
+frontend/.pnp.*
+
+# Frontend development server files
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*
+frontend/vite.config.ts.mjs.timestamp-*
+
 # Shared package
 shared/dist/
 

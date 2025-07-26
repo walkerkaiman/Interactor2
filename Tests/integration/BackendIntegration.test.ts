@@ -236,22 +236,45 @@ export default class TestInputModule extends ModuleBase {
     });
 
     it('should handle hot reloading of modules', async () => {
-      // Ensure the test-modules directory exists
-      const testModulesDir = path.join(__dirname, 'test-modules');
-      await fs.ensureDir(testModulesDir);
+      // Create a unique test directory for this specific test
+      const uniqueTestDir = path.join(__dirname, `hot-reload-test-${Date.now()}`);
+      await fs.ensureDir(uniqueTestDir);
       
-      // Ensure file watcher is stopped before starting
-      await moduleLoader.stopWatching();
+      // Create a separate server instance for this test
+      let testServer: InteractorServer | undefined;
+      let testModuleLoader: ModuleLoader | undefined;
       
-      // Start watching for changes
-      await moduleLoader.startWatching();
-      
-      // Create a unique module name for this test
-      const uniqueModuleName = `hot_reload_test_${Date.now()}`;
-      const testModuleDir = path.join(testModulesDir, uniqueModuleName);
-      await fs.ensureDir(testModuleDir);
-      
-      const indexContent = `
+      try {
+        // Create a fresh server instance with the unique test directory
+        testServer = new InteractorServer();
+        
+        // Configure server to use the unique test directory
+        const testConfig = {
+          server: { port: 3002, host: 'localhost' }, // Use different port
+          logging: { level: 'debug', file: 'test.log' },
+          modules: { 
+            autoLoad: false, 
+            hotReload: true, // Enable hot reloading
+            modulesPath: uniqueTestDir
+          }
+        };
+        
+        testServer.setConfig(testConfig);
+        await testServer.init();
+        
+        // Get reference to the module loader
+        testModuleLoader = (testServer as any).moduleLoader;
+        
+        if (!testModuleLoader) {
+          throw new Error('Failed to get module loader from test server');
+        }
+        
+        // Create a unique module name for this test
+        const uniqueModuleName = `hot_reload_test_${Date.now()}`;
+        const testModuleDir = path.join(uniqueTestDir, uniqueModuleName);
+        await fs.ensureDir(testModuleDir);
+        
+        const indexContent = `
 import { ModuleBase } from '../../../backend/src/core/ModuleBase';
 import { ModuleConfig } from '@interactor/shared';
 
@@ -296,86 +319,111 @@ export default class HotReloadTestModule extends ModuleBase {
   }
 }
 `;
-      
-      const manifest = {
-        name: uniqueModuleName,
-        type: 'input',
-        version: '1.0.0',
-        description: 'Hot reload test module',
-        author: 'Test Author',
-        configSchema: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean', default: true }
-          }
-        },
-        events: [
-          { name: 'data', type: 'output', description: 'Test data event' }
-        ]
-      };
-      
-      await fs.writeFile(path.join(testModuleDir, 'index.ts'), indexContent);
-      await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
-      
-      // Wait for file watcher to detect the change and reload modules
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Force module discovery to pick up the new module
-      await moduleLoader.discoverModules();
-      
-      // Wait a bit more for processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Force module discovery again to ensure it's loaded
-      await moduleLoader.discoverModules();
-      
-      // Wait a bit more for processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check that module was discovered
-      const modules = moduleLoader.list();
-      console.log('Available modules:', modules); // Debug log
-      console.log('Looking for module:', uniqueModuleName); // Debug log
-      
-      // Retry logic for module discovery
-      let retryCount = 0;
-      while (!modules.includes(uniqueModuleName) && retryCount < 5) {
-        console.log(`Retry ${retryCount + 1}: Module not found, waiting and retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await moduleLoader.discoverModules();
-        const updatedModules = moduleLoader.list();
-        console.log('Updated modules:', updatedModules);
-        if (updatedModules.includes(uniqueModuleName)) {
-          console.log('Module found on retry!');
-          break;
+        
+        const manifest = {
+          name: uniqueModuleName,
+          type: 'input',
+          version: '1.0.0',
+          description: 'Hot reload test module',
+          author: 'Test Author',
+          configSchema: {
+            type: 'object',
+            properties: {
+              enabled: { type: 'boolean', default: true }
+            }
+          },
+          events: [
+            { name: 'data', type: 'output', description: 'Test data event' }
+          ]
+        };
+        
+        await fs.writeFile(path.join(testModuleDir, 'index.ts'), indexContent);
+        await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
+        
+        // Verify files were created
+        const fileExists = await fs.pathExists(path.join(testModuleDir, 'index.ts'));
+        const manifestExists = await fs.pathExists(path.join(testModuleDir, 'manifest.json'));
+        console.log(`Files created - index.ts: ${fileExists}, manifest.json: ${manifestExists}`);
+        
+        if (!fileExists || !manifestExists) {
+          throw new Error(`Failed to create test module files for ${uniqueModuleName}`);
         }
-        retryCount++;
+        
+        // Wait for file watcher to detect the change and reload modules
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Force module discovery to pick up the new module
+        await testModuleLoader.discoverModules();
+        
+        // Wait a bit more for processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Force module discovery again to ensure it's loaded
+        await testModuleLoader.discoverModules();
+        
+        // Wait a bit more for processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check that module was discovered
+        let modules = testModuleLoader.list();
+        console.log('Available modules:', modules); // Debug log
+        console.log('Looking for module:', uniqueModuleName); // Debug log
+        
+        // Retry logic for module discovery
+        let retryCount = 0;
+        const maxRetries = 10;
+        while (!modules.includes(uniqueModuleName) && retryCount < maxRetries) {
+          console.log(`Retry ${retryCount + 1}: Module not found, waiting and retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await testModuleLoader.discoverModules();
+          modules = testModuleLoader.list(); // Update the modules variable
+          console.log('Updated modules:', modules);
+          if (modules.includes(uniqueModuleName)) {
+            console.log('Module found on retry!');
+            break;
+          }
+          retryCount++;
+        }
+        
+        // If module still not found after retries, check if the file exists
+        if (!modules.includes(uniqueModuleName)) {
+          const fileExists = await fs.pathExists(path.join(testModuleDir, 'index.ts'));
+          const manifestExists = await fs.pathExists(path.join(testModuleDir, 'manifest.json'));
+          console.log(`File exists: ${fileExists}, Manifest exists: ${manifestExists}`);
+          throw new Error(`Module ${uniqueModuleName} not found after ${maxRetries} retries. Files exist: index.ts=${fileExists}, manifest.json=${manifestExists}`);
+        }
+        
+        expect(modules).toContain(uniqueModuleName);
+        
+        // Update the manifest
+        manifest.version = '1.1.0';
+        await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
+        
+        // Wait for file watcher to detect the change
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Force module discovery again to ensure the update is loaded
+        await testModuleLoader.discoverModules();
+        
+        // Wait a bit more for processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check that manifest was updated - do this before cleanup
+        const updatedManifest = testModuleLoader.getManifest(uniqueModuleName);
+        console.log('Updated manifest:', updatedManifest); // Debug log
+        console.log('Available modules after update:', testModuleLoader.list()); // Debug log
+        console.log('Looking for module in registry:', uniqueModuleName); // Debug log
+        expect(updatedManifest?.version).toBe('1.1.0');
+        
+      } finally {
+        // Clean up the test server
+        if (testServer) {
+          await testServer.stop();
+        }
+        
+        // Clean up the unique test directory
+        await fs.remove(uniqueTestDir);
       }
-      
-      expect(modules).toContain(uniqueModuleName);
-      
-      // Update the manifest
-      manifest.version = '1.1.0';
-      await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
-      
-      // Wait for file watcher to detect the change
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Force module discovery again to ensure the update is loaded
-      await moduleLoader.discoverModules();
-      
-      // Wait a bit more for processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check that manifest was updated
-      const updatedManifest = moduleLoader.getManifest(uniqueModuleName);
-      console.log('Updated manifest:', updatedManifest); // Debug log
-      expect(updatedManifest?.version).toBe('1.1.0');
-      
-      await moduleLoader.stopWatching();
-      
-      // Clean up - only remove the specific test module
-      await fs.remove(testModuleDir);
     });
   });
 
@@ -935,22 +983,45 @@ export default class HotReloadTestModule extends ModuleBase {
     });
 
     it('should handle module re-registration during runtime', async () => {
-      // Ensure the test-modules directory exists
-      const testModulesDir = path.join(__dirname, 'test-modules');
-      await fs.ensureDir(testModulesDir);
+      // Create a unique test directory for this specific test
+      const uniqueTestDir = path.join(__dirname, `runtime-registration-test-${Date.now()}`);
+      await fs.ensureDir(uniqueTestDir);
       
-      // Ensure file watcher is stopped before starting
-      await moduleLoader.stopWatching();
+      // Create a separate server instance for this test
+      let testServer: InteractorServer | undefined;
+      let testModuleLoader: ModuleLoader | undefined;
       
-      // Start watching for changes
-      await moduleLoader.startWatching();
-      
-      // Create a unique module name for this test
-      const uniqueModuleName = `runtime_test_${Date.now()}`;
-      const testModuleDir = path.join(testModulesDir, uniqueModuleName);
-      await fs.ensureDir(testModuleDir);
-      
-      const indexContent = `
+      try {
+        // Create a fresh server instance with the unique test directory
+        testServer = new InteractorServer();
+        
+        // Configure server to use the unique test directory
+        const testConfig = {
+          server: { port: 3006, host: 'localhost' }, // Use different port
+          logging: { level: 'debug', file: 'test.log' },
+          modules: { 
+            autoLoad: false, 
+            hotReload: true, // Enable hot reloading
+            modulesPath: uniqueTestDir
+          }
+        };
+        
+        testServer.setConfig(testConfig);
+        await testServer.init();
+        
+        // Get reference to the module loader
+        testModuleLoader = (testServer as any).moduleLoader;
+        
+        if (!testModuleLoader) {
+          throw new Error('Failed to get module loader from test server');
+        }
+        
+        // Create a unique module name for this test
+        const uniqueModuleName = `runtime_test_${Date.now()}`;
+        const testModuleDir = path.join(uniqueTestDir, uniqueModuleName);
+        await fs.ensureDir(testModuleDir);
+        
+        const indexContent = `
 import { ModuleBase } from '../../../backend/src/core/ModuleBase';
 import { ModuleConfig } from '@interactor/shared';
 
@@ -995,65 +1066,67 @@ export default class RuntimeTestModule extends ModuleBase {
   }
 }
 `;
-      
-      const manifest = {
-        name: uniqueModuleName,
-        type: 'input',
-        version: '1.0.0',
-        description: 'Runtime test module',
-        author: 'Test Author',
-        configSchema: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean', default: true }
+        
+        const manifest = {
+          name: uniqueModuleName,
+          type: 'input',
+          version: '1.0.0',
+          description: 'Runtime test module',
+          author: 'Test Author',
+          configSchema: {
+            type: 'object',
+            properties: {
+              enabled: { type: 'boolean', default: true }
+            }
+          },
+          events: [
+            { name: 'data', type: 'output', description: 'Test data event' }
+          ]
+        };
+        
+        await fs.writeFile(path.join(testModuleDir, 'index.ts'), indexContent);
+        await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
+        
+        // Wait for file watcher to detect the change and reload modules
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Force module discovery to pick up the new module
+        await testModuleLoader.discoverModules();
+        
+        // Wait a bit more for processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check that module was discovered
+        let modules = testModuleLoader.list();
+        console.log('Available modules:', modules); // Debug log
+        console.log('Looking for module:', uniqueModuleName); // Debug log
+        
+        // Retry logic for module discovery
+        let retryCount = 0;
+        while (!modules.includes(uniqueModuleName) && retryCount < 5) {
+          console.log(`Retry ${retryCount + 1}: Module not found, waiting and retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await testModuleLoader.discoverModules();
+          modules = testModuleLoader.list(); // Update the modules variable
+          console.log('Updated modules:', modules);
+          if (modules.includes(uniqueModuleName)) {
+            console.log('Module found on retry!');
+            break;
           }
-        },
-        events: [
-          { name: 'data', type: 'output', description: 'Test data event' }
-        ]
-      };
-      
-      await fs.writeFile(path.join(testModuleDir, 'index.ts'), indexContent);
-      await fs.writeJson(path.join(testModuleDir, 'manifest.json'), manifest);
-      
-      // Wait for file watcher to detect the change and reload modules
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Force module discovery to pick up the new module
-      await moduleLoader.discoverModules();
-      
-      // Wait a bit more for processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Check that module was discovered
-      let modules = moduleLoader.list();
-      console.log('Available modules:', modules); // Debug log
-      console.log('Looking for module:', uniqueModuleName); // Debug log
-      
-      // Retry logic for module discovery
-      let retryCount = 0;
-      let found = false;
-      while (!found && retryCount < 10) {
-        console.log(`Retry ${retryCount + 1}: Module not found, waiting and retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await moduleLoader.discoverModules();
-        modules = moduleLoader.list();
-        console.log('Updated modules:', modules);
-        if (modules.includes(uniqueModuleName)) {
-          console.log('Module found on retry!');
-          found = true;
-          break;
+          retryCount++;
         }
-        retryCount++;
+        
+        expect(modules).toContain(uniqueModuleName);
+        
+      } finally {
+        // Clean up the test server
+        if (testServer) {
+          await testServer.stop();
+        }
+        
+        // Clean up the unique test directory
+        await fs.remove(uniqueTestDir);
       }
-      
-      expect(found).toBe(true);
-      expect(modules).toContain(uniqueModuleName);
-      
-      await moduleLoader.stopWatching();
-      
-      // Clean up - only remove the specific test module
-      await fs.remove(testModuleDir);
     });
   });
 

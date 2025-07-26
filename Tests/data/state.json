@@ -1136,6 +1136,599 @@
       },
       "enabled": true,
       "createdAt": 1753555936435
+    },
+    {
+      "id": "test_state_module_1753556421077",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753556421078
+    },
+    {
+      "id": "test_state_module_1753556437471",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753556437472
+    },
+    {
+      "id": "DMX Output_1753556584217_az16l8ilf",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753556588962",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753556588963
+    },
+    {
+      "id": "DMX Output_1753564254962_jmd3dq3sw",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753564261882",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564261883
+    },
+    {
+      "id": "DMX Output_1753564514219_gg2135g57",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753564521144",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564521145
+    },
+    {
+      "id": "test_state_module_1753564666891",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564666892
+    },
+    {
+      "id": "test_state_module_1753564674115",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564674116
+    },
+    {
+      "id": "DMX Output_1753564694078_yybtzk2zn",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "DMX Output_1753564768106_mrnji1txm",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753564774940",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564774942
+    },
+    {
+      "id": "test_state_module_1753564898229",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564898230
+    },
+    {
+      "id": "test_state_module_1753564927031",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564927032
+    },
+    {
+      "id": "test_state_module_1753564951699",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564951699
+    },
+    {
+      "id": "test_state_module_1753564965178",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564965179
+    },
+    {
+      "id": "DMX Output_1753564977985_z3bpu60ko",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753564992313",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753564992314
+    },
+    {
+      "id": "test_state_module_1753565091939",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753565091940
+    },
+    {
+      "id": "test_state_module_1753565115269",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753565115271
+    },
+    {
+      "id": "DMX Output_1753565135032_66hrb754t",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753565149364",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753565149365
+    },
+    {
+      "id": "DMX Output_1753565212751_poeeco0rx",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753565220837",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753565220838
+    },
+    {
+      "id": "test_state_module_1753566656589",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566656590
+    },
+    {
+      "id": "test_state_module_1753566678486",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566678486
+    },
+    {
+      "id": "test_state_module_1753566720503",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566720504
+    },
+    {
+      "id": "test_state_module_1753566734119",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566734120
+    },
+    {
+      "id": "test_state_module_1753566747656",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566747656
+    },
+    {
+      "id": "DMX Output_1753566749870_s6fxtc2d1",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753566757136",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566757136
+    },
+    {
+      "id": "test_state_module_1753566801127",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566801128
+    },
+    {
+      "id": "test_state_module_1753566819476",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566819477
+    },
+    {
+      "id": "DMX Output_1753566919372_iwjcihrl5",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "DMX Output_1753566921013_s4w9wvs6z",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753566926781",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566926781
+    },
+    {
+      "id": "test_state_module_1753566928435",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753566928436
+    },
+    {
+      "id": "DMX Output_1753567018678_9cocfdto9",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753567021066",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753567021067
+    },
+    {
+      "id": "DMX Output_1753567158104_psrjjug3m",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753567159867",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753567159868
+    },
+    {
+      "id": "test_state_module_1753567165494",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753567165495
+    },
+    {
+      "id": "DMX Output_1753567221496_3he4rt76i",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753567225363",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753567225364
     }
   ],
   "routes": [
@@ -2653,6 +3246,270 @@
       "source": "test-source",
       "target": "test-target",
       "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
     }
   ],
   "settings": {
@@ -2812,6 +3669,6 @@
       "startTime": 1753549904859
     }
   },
-  "lastSaved": 1753555936437,
+  "lastSaved": 1753567225365,
   "version": "1.0.0"
 }

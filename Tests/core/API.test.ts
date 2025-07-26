@@ -14,7 +14,7 @@ describe('Backend API', () => {
     // Set configuration before initialization
     server.setConfig({
       server: {
-        port: 3002, // Use different port for testing
+        port: 3004, // Use different port for testing to avoid conflicts
         host: 'localhost'
       },
       logging: {

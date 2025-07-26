@@ -30,7 +30,7 @@ describe('AudioOutputModule File Upload', () => {
       fadeInDuration: 0,
       fadeOutDuration: 0,
       enableFileUpload: true,
-      uploadPort: 3002, // Use different port for testing
+      uploadPort: 3005, // Use different port for testing to avoid conflicts
       uploadHost: 'localhost',
       maxFileSize: 10 * 1024 * 1024, // 10MB for testing
       allowedExtensions: ['.wav', '.mp3', '.ogg']
@@ -70,7 +70,7 @@ describe('AudioOutputModule File Upload', () => {
       const uploadInfo = module.getFileUploadInfo();
       
       expect(uploadInfo.enabled).toBe(true);
-      expect(uploadInfo.port).toBe(3002);
+      expect(uploadInfo.port).toBe(3005);
       expect(uploadInfo.host).toBe('localhost');
       expect(uploadInfo.maxFileSize).toBe(10 * 1024 * 1024);
       expect(uploadInfo.allowedExtensions).toEqual(['.wav', '.mp3', '.ogg']);
@@ -354,7 +354,7 @@ describe('AudioOutputModule File Upload', () => {
       const state = module.getState();
       
       expect(state.fileUploadEnabled).toBe(true);
-      expect(state.uploadPort).toBe(3002);
+      expect(state.uploadPort).toBe(3005);
       expect(state.uploadCount).toBe(0);
       expect(state.lastUpload).toBeUndefined();
     });
