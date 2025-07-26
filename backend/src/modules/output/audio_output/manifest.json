@@ -1,0 +1,158 @@
+{
+  "name": "Audio Output",
+  "type": "output",
+  "version": "1.0.0",
+  "description": "Plays audio files and generates audio output",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "deviceId": {
+        "type": "string",
+        "description": "Audio device name or ID",
+        "default": "default"
+      },
+      "sampleRate": {
+        "type": "number",
+        "description": "Sample rate in Hz (8000-48000)",
+        "minimum": 8000,
+        "maximum": 48000,
+        "default": 44100
+      },
+      "channels": {
+        "type": "number",
+        "description": "Number of audio channels (1-2)",
+        "minimum": 1,
+        "maximum": 2,
+        "default": 2
+      },
+      "format": {
+        "type": "string",
+        "description": "Audio format",
+        "enum": ["wav", "mp3", "ogg"],
+        "default": "wav"
+      },
+      "volume": {
+        "type": "number",
+        "description": "Volume level (0.0-1.0)",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "default": 1.0
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the audio output",
+        "default": true
+      },
+      "bufferSize": {
+        "type": "number",
+        "description": "Audio buffer size in samples",
+        "minimum": 256,
+        "maximum": 16384,
+        "default": 4096
+      },
+      "loop": {
+        "type": "boolean",
+        "description": "Whether to loop audio playback",
+        "default": false
+      },
+      "fadeInDuration": {
+        "type": "number",
+        "description": "Fade in duration in milliseconds",
+        "minimum": 0,
+        "maximum": 10000,
+        "default": 0
+      },
+      "fadeOutDuration": {
+        "type": "number",
+        "description": "Fade out duration in milliseconds",
+        "minimum": 0,
+        "maximum": 10000,
+        "default": 0
+      },
+      "enableFileUpload": {
+        "type": "boolean",
+        "description": "Enable/disable file upload server",
+        "default": true
+      },
+      "uploadPort": {
+        "type": "number",
+        "description": "File upload server port",
+        "minimum": 1024,
+        "maximum": 65535,
+        "default": 3001
+      },
+      "uploadHost": {
+        "type": "string",
+        "description": "File upload server host address",
+        "default": "0.0.0.0"
+      },
+      "maxFileSize": {
+        "type": "number",
+        "description": "Maximum file size in bytes",
+        "minimum": 1024,
+        "maximum": 104857600,
+        "default": 52428800
+      },
+      "allowedExtensions": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Allowed audio file extensions",
+        "default": [".wav", ".mp3", ".ogg", ".m4a", ".flac"]
+      }
+    },
+    "required": ["sampleRate", "channels", "format", "volume", "enabled", "bufferSize", "loop", "fadeInDuration", "fadeOutDuration"]
+  },
+  "events": [
+    {
+      "name": "audioPlay",
+      "type": "input",
+      "description": "Triggers audio playback"
+    },
+    {
+      "name": "audioStop",
+      "type": "input",
+      "description": "Stops audio playback"
+    },
+    {
+      "name": "audioPause",
+      "type": "input",
+      "description": "Pauses audio playback"
+    },
+    {
+      "name": "audioResume",
+      "type": "input",
+      "description": "Resumes audio playback"
+    },
+    {
+      "name": "audioOutput",
+      "type": "output",
+      "description": "Emitted when audio playback state changes"
+    },
+    {
+      "name": "audioError",
+      "type": "output",
+      "description": "Emitted when an audio error occurs"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    },
+    {
+      "name": "fileUploaded",
+      "type": "output",
+      "description": "Emitted when an audio file is uploaded successfully"
+    },
+    {
+      "name": "fileListUpdated",
+      "type": "output",
+      "description": "Emitted when the list of available audio files changes"
+    },
+    {
+      "name": "uploadError",
+      "type": "output",
+      "description": "Emitted when a file upload fails"
+    }
+  ]
+} 

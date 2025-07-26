@@ -1,4 +1,4 @@
-# Frontend Development Specification – Interactor V2 Node-Based Interface
+# Frontend Development Specification – Interactor Node-Based Interface
 
 ## 1. Product Vision
 Create an intuitive, visually engaging, and highly-responsive web interface that enables end-users to orchestrate **modules** by visually connecting *input* nodes to *output* nodes in real time. The interface provides four main tabs for different aspects of system monitoring and control: **Wiki**, **Module Editor**, **Console**, and **Performance Dashboard**.
@@ -19,11 +19,10 @@ The application uses a tab-based interface with four main sections:
 #### 3.1.1 Wiki Tab
 - **Purpose**: Documentation and module reference
 - **Content**: 
-  - Module documentation from `manifest.json` files
-  - Configuration schemas and examples
+  - Module documentation grid
   - Usage tutorials and best practices
   - Searchable module library
-- **Data Source**: `/api/modules` endpoint for module manifests
+- **Data Source**: `backend/src/modules` endpoint for module manifests
 
 #### 3.1.2 Module Editor Tab (Node Editor)
 - **Purpose**: Visual node-based module configuration and connection
@@ -32,6 +31,8 @@ The application uses a tab-based interface with four main sections:
   - Visual connection management
   - Real-time configuration editing
   - Module state monitoring
+  - Publish Button to send updates to backend
+  - Updates with change to backend interactions
 - **Data Sources**: 
   - `/api/modules` for available modules
   - `/api/module-instances` for current instances
@@ -42,8 +43,8 @@ The application uses a tab-based interface with four main sections:
 - **Purpose**: Real-time log monitoring and system debugging
 - **Features**:
   - Live log streaming with filtering
-  - Log level filtering (debug, info, warn, error)
-  - Search and export capabilities
+  - Log level filtering 
+  - Search and copy capabilities
   - Module-specific log filtering
 - **Data Sources**:
   - `/api/logs` for historical logs

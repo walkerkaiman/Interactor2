@@ -1,6 +1,23 @@
 // Module-specific type definitions
 import { ModuleConfig, ModuleManifest } from './index';
 
+// Node.js Buffer type for file handling
+declare global {
+  interface Buffer extends Uint8Array {
+    toString(encoding?: string): string;
+  }
+  var Buffer: {
+    new (str: string, encoding?: string): Buffer;
+    new (size: number): Buffer;
+    new (array: Uint8Array): Buffer;
+    from(arrayBuffer: ArrayBuffer): Buffer;
+    from(array: Uint8Array): Buffer;
+    from(str: string, encoding?: string): Buffer;
+    alloc(size: number): Buffer;
+    allocUnsafe(size: number): Buffer;
+  };
+}
+
 // ============================================================================
 // INPUT MODULE TYPES
 // ============================================================================
@@ -798,4 +815,248 @@ export function isOscOutputConfig(config: ModuleConfig): config is OscOutputConf
  */
 export function isHttpOutputConfig(config: ModuleConfig): config is HttpOutputConfig {
   return 'url' in config && 'method' in config;
+}
+
+// ============================================================================
+// AUDIO OUTPUT MODULE TYPES
+// ============================================================================
+
+/**
+ * Configuration for audio output module
+ * @interface AudioOutputConfig
+ * @extends {ModuleConfig}
+ */
+export interface AudioOutputConfig extends ModuleConfig {
+  /** Audio device name or ID */
+  deviceId?: string;
+  /** Sample rate in Hz (8000-48000) */
+  sampleRate: number;
+  /** Number of audio channels (1-2) */
+  channels: number;
+  /** Audio format ('wav', 'mp3', 'ogg') */
+  format: 'wav' | 'mp3' | 'ogg';
+  /** Volume level (0.0-1.0) */
+  volume: number;
+  /** Enable/disable the audio output */
+  enabled: boolean;
+  /** Audio buffer size in samples */
+  bufferSize: number;
+  /** Whether to loop audio playback */
+  loop: boolean;
+  /** Fade in duration in milliseconds */
+  fadeInDuration: number;
+  /** Fade out duration in milliseconds */
+  fadeOutDuration: number;
+  /** Enable/disable file upload server */
+  enableFileUpload?: boolean;
+  /** File upload server port */
+  uploadPort?: number;
+  /** File upload server host */
+  uploadHost?: string;
+  /** Maximum file size in bytes */
+  maxFileSize?: number;
+  /** Allowed audio file extensions */
+  allowedExtensions?: string[];
+}
+
+/**
+ * Audio playback data
+ * @interface AudioPlaybackData
+ */
+export interface AudioPlaybackData {
+  /** Audio data (buffer, file path, or URL) */
+  audioData: string | Buffer | ArrayBuffer;
+  /** Playback volume (0.0-1.0) */
+  volume?: number;
+  /** Whether to loop playback */
+  loop?: boolean;
+  /** Fade in duration in milliseconds */
+  fadeInDuration?: number;
+  /** Fade out duration in milliseconds */
+  fadeOutDuration?: number;
+  /** Timestamp when playback started */
+  timestamp: number;
+}
+
+/**
+ * Payload for audio output events
+ * @interface AudioOutputPayload
+ */
+export interface AudioOutputPayload {
+  /** Audio device ID */
+  deviceId: string;
+  /** Sample rate used */
+  sampleRate: number;
+  /** Number of channels */
+  channels: number;
+  /** Audio format */
+  format: string;
+  /** Current volume level */
+  volume: number;
+  /** Whether audio is currently playing */
+  isPlaying: boolean;
+  /** Current playback position in seconds */
+  currentTime: number;
+  /** Total duration in seconds */
+  duration: number;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Total number of audio files played */
+  playCount: number;
+}
+
+/**
+ * Audio error data
+ * @interface AudioErrorData
+ */
+export interface AudioErrorData {
+  /** Audio device ID */
+  deviceId: string;
+  /** Error message */
+  error: string;
+  /** Error context */
+  context: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
+/**
+ * Audio error payload
+ * @interface AudioErrorPayload
+ */
+export interface AudioErrorPayload {
+  /** Audio device ID */
+  deviceId: string;
+  /** Error message */
+  error: string;
+  /** Error context */
+  context: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
+/**
+ * Audio file upload data
+ * @interface AudioFileUploadData
+ */
+export interface AudioFileUploadData {
+  /** Original filename */
+  originalName: string;
+  /** File size in bytes */
+  size: number;
+  /** File mimetype */
+  mimetype: string;
+  /** File buffer */
+  buffer: Buffer;
+  /** Timestamp when file was uploaded */
+  timestamp: number;
+}
+
+/**
+ * Audio file upload payload
+ * @interface AudioFileUploadPayload
+ */
+export interface AudioFileUploadPayload {
+  /** Saved filename */
+  filename: string;
+  /** Original filename */
+  originalName: string;
+  /** File size in bytes */
+  size: number;
+  /** File mimetype */
+  mimetype: string;
+  /** File path relative to assets folder */
+  filePath: string;
+  /** Timestamp when file was uploaded */
+  timestamp: number;
+  /** List of all available audio files */
+  availableFiles: string[];
+}
+
+/**
+ * Audio file list payload
+ * @interface AudioFileListPayload
+ */
+export interface AudioFileListPayload {
+  /** List of available audio files */
+  files: string[];
+  /** Total number of files */
+  totalFiles: number;
+  /** Total size of all files in bytes */
+  totalSize: number;
+  /** Timestamp when list was generated */
+  timestamp: number;
+}
+
+/**
+ * State information for audio output module
+ * @interface AudioOutputModuleState
+ */
+export interface AudioOutputModuleState {
+  /** Current module status */
+  status: 'ready' | 'playing' | 'stopped' | 'error';
+  /** Audio device ID */
+  deviceId: string;
+  /** Sample rate */
+  sampleRate: number;
+  /** Number of channels */
+  channels: number;
+  /** Audio format */
+  format: string;
+  /** Current volume level */
+  volume: number;
+  /** Whether audio is currently playing */
+  isPlaying: boolean;
+  /** Current playback position in seconds */
+  currentTime: number;
+  /** Total duration in seconds */
+  duration: number;
+  /** Whether audio is looping */
+  loop: boolean;
+  /** Total number of audio files played */
+  playCount: number;
+  /** Total number of errors encountered */
+  errorCount: number;
+  /** Last error encountered */
+  lastError?: AudioErrorData;
+  /** Timestamp of last update */
+  lastUpdate: number;
+  /** File upload server enabled */
+  fileUploadEnabled?: boolean;
+  /** File upload server port */
+  uploadPort?: number;
+  /** Number of files uploaded */
+  uploadCount?: number;
+  /** Last file uploaded */
+  lastUpload?: AudioFileUploadPayload;
+}
+
+/**
+ * Type guard for audio output configuration
+ * @param config - Configuration object to check
+ * @returns True if config is valid AudioOutputConfig
+ */
+export function isAudioOutputConfig(config: ModuleConfig): config is AudioOutputConfig {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'sampleRate' in config &&
+    'channels' in config &&
+    'format' in config &&
+    'volume' in config &&
+    'enabled' in config &&
+    'bufferSize' in config &&
+    'loop' in config &&
+    'fadeInDuration' in config &&
+    'fadeOutDuration' in config &&
+    typeof (config as AudioOutputConfig).sampleRate === 'number' &&
+    typeof (config as AudioOutputConfig).channels === 'number' &&
+    typeof (config as AudioOutputConfig).format === 'string' &&
+    typeof (config as AudioOutputConfig).volume === 'number' &&
+    typeof (config as AudioOutputConfig).enabled === 'boolean' &&
+    typeof (config as AudioOutputConfig).bufferSize === 'number' &&
+    typeof (config as AudioOutputConfig).loop === 'boolean' &&
+    typeof (config as AudioOutputConfig).fadeInDuration === 'number' &&
+    typeof (config as AudioOutputConfig).fadeOutDuration === 'number'
+  );
 } 
