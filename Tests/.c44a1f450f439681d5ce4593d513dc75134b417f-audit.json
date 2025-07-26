@@ -9,6 +9,11 @@
             "date": 1753490158853,
             "name": "test-exceptions.log.2025-07-25",
             "hash": "8e3ab913e69a2fb2ca0cd6ec5928e1e41c1fcd9d5a4b04f61a3d6aac48833c48"
+        },
+        {
+            "date": 1753543678750,
+            "name": "test-exceptions.log.2025-07-26",
+            "hash": "413b4d61bd39c5d7ead470b2323befba5bcc93609d5f748962f675be058e4ddf"
         }
     ],
     "hashType": "sha256"

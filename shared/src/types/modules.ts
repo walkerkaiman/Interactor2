@@ -818,6 +818,220 @@ export function isHttpOutputConfig(config: ModuleConfig): config is HttpOutputCo
 }
 
 // ============================================================================
+// DMX OUTPUT MODULE TYPES
+// ============================================================================
+
+/**
+ * Configuration for DMX output module
+ * @interface DmxOutputConfig
+ * @extends {ModuleConfig}
+ */
+export interface DmxOutputConfig extends ModuleConfig {
+  /** DMX universe number (1-512) */
+  universe: number;
+  /** Brightness level (0.0-1.0) */
+  brightness: number;
+  /** DMX protocol configuration */
+  protocol: {
+    /** Protocol type ('artnet', 'sACN', 'dmx512') */
+    type: 'artnet' | 'sACN' | 'dmx512';
+    /** Target IP address for network protocols */
+    host?: string;
+    /** Target port for network protocols */
+    port?: number;
+    /** Serial port for DMX512 */
+    serialPort?: string;
+    /** Baud rate for serial communication */
+    baudRate?: number;
+  };
+  /** Enable/disable the DMX output */
+  enabled: boolean;
+  /** Enable/disable file upload server */
+  enableFileUpload?: boolean;
+  /** File upload server port */
+  uploadPort?: number;
+  /** File upload server host */
+  uploadHost?: string;
+  /** Maximum file size in bytes */
+  maxFileSize?: number;
+  /** Allowed file extensions */
+  allowedExtensions?: string[];
+}
+
+/**
+ * DMX frame data
+ * @interface DmxFrame
+ */
+export interface DmxFrame {
+  /** Frame number */
+  frameNumber: number;
+  /** DMX channel values (0-255) */
+  channels: number[];
+  /** Timestamp when frame was created */
+  timestamp: number;
+}
+
+/**
+ * DMX output data
+ * @interface DmxOutputData
+ */
+export interface DmxOutputData {
+  /** DMX universe number */
+  universe: number;
+  /** DMX channel values (0-255) */
+  channels: number[];
+  /** Brightness multiplier (0.0-1.0) */
+  brightness: number;
+  /** Timestamp when data was sent */
+  timestamp: number;
+}
+
+/**
+ * Payload for DMX output events
+ * @interface DmxOutputPayload
+ */
+export interface DmxOutputPayload {
+  /** DMX universe number */
+  universe: number;
+  /** DMX channel values (0-255) */
+  channels: number[];
+  /** Brightness multiplier (0.0-1.0) */
+  brightness: number;
+  /** Current frame number */
+  frameNumber: number;
+  /** Total number of frames in sequence */
+  totalFrames: number;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Total number of frames sent */
+  frameCount: number;
+}
+
+/**
+ * DMX error data
+ * @interface DmxErrorData
+ */
+export interface DmxErrorData {
+  /** DMX universe number */
+  universe: number;
+  /** Error message */
+  error: string;
+  /** Error context */
+  context: string;
+  /** Timestamp when error occurred */
+  timestamp: number;
+}
+
+/**
+ * DMX file upload data
+ * @interface DmxFileUploadData
+ */
+export interface DmxFileUploadData {
+  /** Original filename */
+  originalName: string;
+  /** File size in bytes */
+  size: number;
+  /** File mimetype */
+  mimetype: string;
+  /** File buffer */
+  buffer: Buffer;
+  /** Timestamp when file was uploaded */
+  timestamp: number;
+}
+
+/**
+ * DMX file upload payload
+ * @interface DmxFileUploadPayload
+ */
+export interface DmxFileUploadPayload {
+  /** Saved filename */
+  filename: string;
+  /** Original filename */
+  originalName: string;
+  /** File size in bytes */
+  size: number;
+  /** File mimetype */
+  mimetype: string;
+  /** File path relative to assets folder */
+  filePath: string;
+  /** Number of frames in the sequence */
+  frameCount: number;
+  /** Number of channels per frame */
+  channelCount: number;
+  /** Timestamp when file was uploaded */
+  timestamp: number;
+  /** List of all available DMX files */
+  availableFiles: string[];
+}
+
+/**
+ * State information for DMX output module
+ * @interface DmxOutputModuleState
+ */
+export interface DmxOutputModuleState {
+  /** Current module status */
+  status: 'ready' | 'playing' | 'stopped' | 'error';
+  /** DMX universe number */
+  universe: number;
+  /** Current brightness level */
+  brightness: number;
+  /** Protocol configuration */
+  protocol: {
+    type: string;
+    host?: string;
+    port?: number;
+    serialPort?: string;
+    baudRate?: number;
+  };
+  /** Whether module is enabled */
+  enabled: boolean;
+  /** Whether module is connected/ready */
+  isConnected: boolean;
+  /** Current frame number */
+  currentFrame: number;
+  /** Total number of frames in sequence */
+  totalFrames: number;
+  /** Whether sequence is playing */
+  isPlaying: boolean;
+  /** Total number of frames sent */
+  frameCount: number;
+  /** Total number of errors encountered */
+  errorCount: number;
+  /** Last error encountered */
+  lastError?: DmxErrorData;
+  /** Timestamp of last update */
+  lastUpdate: number;
+  /** File upload server enabled */
+  fileUploadEnabled?: boolean;
+  /** File upload server port */
+  uploadPort?: number;
+  /** Number of files uploaded */
+  uploadCount?: number;
+  /** Last file uploaded */
+  lastUpload?: DmxFileUploadPayload;
+}
+
+/**
+ * Type guard for DMX output configuration
+ * @param config - Configuration object to check
+ * @returns True if config is valid DmxOutputConfig
+ */
+export function isDmxOutputConfig(config: ModuleConfig): config is DmxOutputConfig {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'universe' in config &&
+    'brightness' in config &&
+    'protocol' in config &&
+    'enabled' in config &&
+    typeof (config as DmxOutputConfig).universe === 'number' &&
+    typeof (config as DmxOutputConfig).brightness === 'number' &&
+    typeof (config as DmxOutputConfig).protocol === 'object' &&
+    typeof (config as DmxOutputConfig).enabled === 'boolean'
+  );
+}
+
+// ============================================================================
 // AUDIO OUTPUT MODULE TYPES
 // ============================================================================
 

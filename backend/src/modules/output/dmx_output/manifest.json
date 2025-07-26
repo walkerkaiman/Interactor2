@@ -1,0 +1,121 @@
+{
+  "name": "DMX Output",
+  "type": "output",
+  "version": "1.0.0",
+  "description": "DMX output module with CSV file upload and playback",
+  "author": "Interactor Team",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "universe": {
+        "type": "number",
+        "description": "DMX universe number (1-512)",
+        "minimum": 1,
+        "maximum": 512,
+        "default": 1
+      },
+      "brightness": {
+        "type": "number",
+        "description": "Brightness level (0.0-1.0)",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "default": 1.0
+      },
+      "protocol": {
+        "type": "object",
+        "description": "DMX protocol configuration",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["artnet", "sACN", "dmx512"],
+            "description": "Protocol type",
+            "default": "artnet"
+          },
+          "host": {
+            "type": "string",
+            "description": "Target IP address for network protocols",
+            "default": "127.0.0.1"
+          },
+          "port": {
+            "type": "number",
+            "description": "Target port for network protocols",
+            "minimum": 1024,
+            "maximum": 65535,
+            "default": 6454
+          },
+          "serialPort": {
+            "type": "string",
+            "description": "Serial port for DMX512"
+          },
+          "baudRate": {
+            "type": "number",
+            "description": "Baud rate for serial communication",
+            "default": 57600
+          }
+        },
+        "required": ["type"]
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable/disable the DMX output",
+        "default": true
+      },
+      "enableFileUpload": {
+        "type": "boolean",
+        "description": "Enable/disable file upload server",
+        "default": true
+      },
+      "uploadPort": {
+        "type": "number",
+        "description": "File upload server port",
+        "minimum": 1024,
+        "maximum": 65535,
+        "default": 3001
+      },
+      "uploadHost": {
+        "type": "string",
+        "description": "File upload server host",
+        "default": "localhost"
+      },
+      "maxFileSize": {
+        "type": "number",
+        "description": "Maximum file size in bytes",
+        "default": 10485760
+      },
+      "allowedExtensions": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Allowed file extensions",
+        "default": [".csv"]
+      }
+    },
+    "required": ["universe", "brightness", "protocol", "enabled"]
+  },
+  "events": [
+    {
+      "name": "dmxFrame",
+      "type": "input",
+      "description": "Triggers a DMX frame"
+    },
+    {
+      "name": "dmxSent",
+      "type": "output",
+      "description": "Emitted when a DMX frame is sent successfully"
+    },
+    {
+      "name": "dmxError",
+      "type": "output",
+      "description": "Emitted when a DMX frame fails to send"
+    },
+    {
+      "name": "fileUploaded",
+      "type": "output",
+      "description": "Emitted when a DMX file is uploaded successfully"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
+    }
+  ]
+} 

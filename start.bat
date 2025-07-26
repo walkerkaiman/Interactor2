@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo    Interactor V2 - Interactive Art
+echo    Interactor - Interactive Art
 echo    Installation System
 echo ========================================
 echo.
