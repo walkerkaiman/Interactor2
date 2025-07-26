@@ -4,6 +4,27 @@
 
 The OSC Input module listens for Open Sound Control (OSC) messages on a configurable UDP port and address. It supports both trigger and streaming modes, making it versatile for interactive art installations that need to respond to external OSC sources.
 
+### Quick Guide for Artists
+
+- Drag “OSC Input” into your patch.
+- Set the **Port** (e.g., `8000`); leave host `0.0.0.0` to accept from anywhere.
+- In your OSC app send numeric values to the configured address (default `/value`).
+- Wire the output to control lights, audio, or visuals.
+
+### Developer Deep Dive
+
+Directory: `backend/src/modules/input/osc_input/`
+
+| Component | Purpose |
+|-----------|---------|
+| `node-osc` | Listens for UDP OSC packets. |
+| `handleOscMessage()` | Splits trigger vs stream modes and extracts numeric data. |
+| Types | Uses `OscInputTriggerPayload` & `OscInputStreamPayload` defined in shared types. |
+
+Extend by adding bundle support or multi-argument parsing.
+
+---
+
 ## Configuration
 
 ### Parameters

@@ -4,6 +4,26 @@
 
 The Time Input module triggers events at a specific time of day. It's useful for scheduling automated actions in interactive art installations.
 
+### Quick Guide for Artists
+
+- Type a time such as **"3:45 PM"** in the inspector.
+- The module counts down and fires once every day at that time.
+- Connect the output to start shows, switch scenes, or trigger any other module on schedule.
+
+### Developer Deep Dive
+
+Location: `backend/src/modules/input/time_input/`
+
+| Function | Purpose |
+|----------|---------|
+| `calculateNextTrigger()` | Figures out milliseconds until next target time. |
+| `startTimer()` | Uses `setTimeout` and then a 24 h loop to schedule future triggers. |
+| `stateUpdate` | Broadcasts current time & countdown every second for UI display. |
+
+Support multiple daily triggers by storing an array of times and iterating over them in `tick()`.
+
+---
+
 ## Configuration
 
 ### Parameters

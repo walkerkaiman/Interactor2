@@ -4,6 +4,27 @@
 
 The HTTP Output module sends HTTP requests to external endpoints. It can be triggered by input modules or used for manual testing. The module supports all common HTTP methods, custom headers, timeout configuration, and comprehensive error handling.
 
+### Quick Guide for Artists
+
+- Drag “HTTP Output” onto the canvas.
+- Paste the **URL** you want to call and select the HTTP method.
+- Add headers or change timeout if needed.
+- Wire any event to this module – each event will send an HTTP request with the payload as JSON.
+
+### Developer Deep Dive
+
+Path: `backend/src/modules/output/http_output/`
+
+| Component | Purpose |
+|-----------|---------|
+| Networking | Uses `fetch` (with `AbortController`) to perform requests and enforce timeouts. |
+| `buildRequestOptions()` | Merges default & custom headers before every request. |
+| Metrics | Tracks `requestCount`, `errorCount`, `lastStatus` and publishes via `stateUpdate`. |
+
+Add retry logic or authentication headers by modifying `sendRequest()`.
+
+---
+
 ## Features
 
 - **Multiple HTTP Methods**: Support for GET, POST, PUT, and DELETE requests

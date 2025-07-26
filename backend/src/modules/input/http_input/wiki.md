@@ -4,6 +4,28 @@
 
 The HTTP Input module creates a webhook receiver that listens for HTTP requests and converts them into events that can trigger or stream to output modules. It automatically parses incoming request data to extract numeric values and passes only numbers to output modules, making it ideal for integrating web services, IoT devices, and external systems with your Interactor installation.
 
+### Quick Guide for Artists
+
+- Drag the “HTTP Input” module onto your canvas.
+- Keep the defaults (Port **3000**, Endpoint `/webhook`) or change them to match the service you use (IFTTT, Zapier, etc.).
+- Click the “Copy URL” button in the inspector and paste it into the external service.
+- Every incoming request becomes an event you can connect to lights, sound, or video.
+
+### Developer Deep Dive
+
+Folder: `backend/src/modules/input/http_input/`
+
+| Area | Description |
+|------|-------------|
+| Express server | Spun up in `onStart()` with configurable host/port/endpoint. |
+| Rate-limiting | Implemented via `express-rate-limit` – default `rateLimit` is 60 req/min. |
+| Parsing | `extractNumeric()` scans body & query for the first numeric value. |
+| Events | `httpRequest` (raw), `httpTrigger` (numeric), `stateUpdate` (stats). |
+
+Add auth middleware or custom payload parsing inside `handleRequest()`.
+
+---
+
 ## Key Features
 
 - **Webhook Receiver**: Creates an HTTP server to receive webhook requests
