@@ -87,6 +87,47 @@ The **store** keeps `{ nodes: Map<string,UINode>, edges: Map<string,UIEdge> }` w
 4. Clients reconcile via `mergeGraphDiff()` ensuring eventual consistency.
 Conflict resolution strategy: *last-writer-wins* timestamped events.
 
+### 8.1 Backend Endpoints
+
+#### 8.1.1 REST (HTTP)
+| Method | Path | Purpose | Body / Query | Notes |
+| ------ | ---- | ------- | ------------ | ----- |
+| GET | `/api/modules` | Fetch list of available module manifests | – | Used by Module Palette. |
+| GET | `/api/modules/:name` | Fetch a single module manifest | – | Detailed info in Inspector. |
+| GET | `/api/module-instances` | Retrieve current graph (all instantiated modules) | – | Populate Canvas on load. |
+| POST | `/api/module-instances` | Create a new module instance | `{ moduleName, config, position }` | Returns `{ id, ... }`. |
+| DELETE | `/api/module-instances/:id` | Remove a node from graph | – | Cascade removes edges. |
+| POST | `/api/module-instances/:id/start` | Start an instance (if stoppable) | – | UI shows running state. |
+| POST | `/api/module-instances/:id/stop` | Stop an instance | – | Grey-out node. |
+| POST | `/api/module-instances/:id/trigger` | Manually trigger output module | – | For buttons in Inspector. |
+| GET | `/api/routes` | Fetch current message routes | – | Edge reconstruction/fallback. |
+| POST | `/api/routes` | Add a route (edge) | `MessageRoute` JSON | Called by connecting ports. |
+| DELETE | `/api/routes/:id` | Delete a route | – | Called by edge deletion. |
+| GET | `/api/stats` | System health & performance | – | Fallback if WS unavailable. |
+| GET | `/api/logs?count=200` | Recent logs for Console panel | – | Streaming via WS preferred. |
+| GET | `/health` | Simple uptime/heartbeat | – | For monitoring.
+
+All requests return `{ success: boolean, data?: any, error?: string }` as per `ApiResponse`.
+
+#### 8.1.2 WebSocket Channel
+* **URL**: `ws://<host>:<port>` (same host/port as REST server). No sub-path required.
+* **Client → Server Messages**
+  * `{"type":"getStats"}` – request latest stats.
+  * `{"type":"getLogs", "count":100}` – stream recent logs.
+  * `{"type":"manualTrigger", "moduleId":"..."}` – trigger an output module.
+* **Server → Client Broadcasts**
+  | Event `type` | `data` payload | Usage |
+  | ------------ | -------------- | ----- |
+  | `init` | `{ stats, interactions, routes, modules }` | Sent immediately on connect to hydrate store. |
+  | `stats` | System stats snapshot | Update telemetry HUD. |
+  | `stateChanged` | `{ interactions, routes }` | Graph diff after CRUD ops. |
+  | `moduleLoaded` | Manifest details | Hot-reload palette. |
+  | `messageRouted` | Routed message info | Debug overlay. |
+  | `logs` | Array of recent log lines | Log viewer panel. |
+  | `manualTriggerResponse` | `{ moduleId, success, error? }` | Confirm trigger.
+
+Connection health: client sends `ping` every 30 s via WS; server responds with `pong` (handled automatically by WS library).
+
 ## 9. Performance & Scalability
 • **Virtualization**: React Flow handles view-port culling; only visible nodes render.  
 • **Batch Updates**: `requestAnimationFrame` batching for drag; websocket messages debounced 30 ms.  
@@ -117,4 +158,4 @@ CI runs `vitest`, `playwright test`, and `eslint --max-warnings 0`.
 3. Metrics & logging – integrate with backend stats?
 
 ---
-*Document version*: 1.0 – 2025-07-26
+*Document version*: 1.1 – 2025-07-26
