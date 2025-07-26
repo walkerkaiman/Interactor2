@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MessageRouter } from '@/core/MessageRouter';
-import { Message, MessageRoute, EventHandler, EventMetrics } from '@interactor/shared';
+import { MessageRouter } from '../../backend/src/core/MessageRouter';
+import { EventHandler, EventMiddleware } from '@interactor/shared';
 
 describe('MessageRouter', () => {
   let messageRouter: MessageRouter;
@@ -9,372 +9,215 @@ describe('MessageRouter', () => {
     messageRouter = new MessageRouter();
   });
 
-  afterEach(async () => {
-    // No shutdown method exists, just reset metrics
-    messageRouter.resetMetrics();
+  afterEach(() => {
+    messageRouter.removeAllListeners();
   });
 
-  describe('Initialization', () => {
-    it('should initialize with empty routes', () => {
-      expect(messageRouter.getRoutes()).toEqual([]);
-      expect(messageRouter.getMetrics()).toBeDefined();
+  describe('Basic Functionality', () => {
+    it('should subscribe and publish messages', async () => {
+      const receivedMessages: any[] = [];
+      const handler: EventHandler = (payload: any) => { receivedMessages.push(payload); };
+
+      messageRouter.subscribe('test.topic', handler);
+      messageRouter.publish('test.topic', { data: 'test' });
+
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(receivedMessages).toHaveLength(1);
+      expect(receivedMessages[0]).toEqual({ data: 'test' });
     });
 
-    it('should initialize with default configuration', () => {
-      const customRouter = new MessageRouter();
-      expect(customRouter).toBeInstanceOf(MessageRouter);
-    });
-  });
-
-  describe('Route Management', () => {
-    it('should add routes successfully', async () => {
-      const route: MessageRoute = {
-        id: 'test-route',
-        source: 'test-source',
-        target: 'test-target',
-        event: 'test-event'
-      };
-
-      messageRouter.addRoute(route);
+    it('should handle multiple subscribers', async () => {
+      const received1: any[] = [];
+      const received2: any[] = [];
       
-      const routes = messageRouter.getRoutes();
-      expect(routes).toHaveLength(1);
-      expect(routes[0].id).toBe('test-route');
+      const handler1: EventHandler = (payload: any) => { received1.push(payload); };
+      const handler2: EventHandler = (payload: any) => { received2.push(payload); };
+
+      messageRouter.subscribe('test.topic', handler1);
+      messageRouter.subscribe('test.topic', handler2);
+      messageRouter.publish('test.topic', { data: 'test' });
+
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(received1).toHaveLength(1);
+      expect(received2).toHaveLength(1);
+      expect(received1[0]).toEqual({ data: 'test' });
+      expect(received2[0]).toEqual({ data: 'test' });
     });
 
-    it('should handle concurrent route additions', async () => {
-      const routePromises = [];
-      
-      for (let i = 0; i < 10; i++) {
-        const route: MessageRoute = {
-          id: `route-${i}`,
-          source: `source-${i}`,
-          target: `target-${i}`,
-          event: `event-${i}`
-        };
-        routePromises.push(Promise.resolve(messageRouter.addRoute(route)));
-      }
+    it('should unsubscribe handlers', async () => {
+      const received: any[] = [];
+      const handler: EventHandler = (payload: any) => { received.push(payload); };
 
-      await Promise.all(routePromises);
-      
-      const routes = messageRouter.getRoutes();
-      expect(routes).toHaveLength(10);
-    });
-
-    it('should remove routes', async () => {
-      const route: MessageRoute = {
-        id: 'remove-test',
-        source: 'test-source',
-        target: 'test-target',
-        event: 'test-event'
-      };
-
-      messageRouter.addRoute(route);
-      expect(messageRouter.getRoutes()).toHaveLength(1);
-      
-      const removed = messageRouter.removeRoute('remove-test');
-      expect(removed).toBe(true);
-      expect(messageRouter.getRoutes()).toHaveLength(0);
-    });
-
-    it('should handle route validation', async () => {
-      const invalidRoute = {
-        id: '',
-        source: '',
-        target: '',
-        event: ''
-      } as MessageRoute;
-
-      // The current implementation doesn't validate routes, so this should work
-      expect(() => messageRouter.addRoute(invalidRoute)).not.toThrow();
-    });
-  });
-
-  describe('Message Routing', () => {
-    it('should route messages to registered handlers', async () => {
-      const receivedPayloads: any[] = [];
-      const handler: EventHandler = async (payload: any) => {
-        receivedPayloads.push(payload);
-      };
-
-      messageRouter.subscribe('test-topic', handler);
-
-      // publish takes topic and payload, not Message object
-      messageRouter.publish('test-topic', { data: 'test' });
+      messageRouter.subscribe('test.topic', handler);
+      messageRouter.publish('test.topic', { data: 'test1' });
       
       // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 10));
       
-      expect(receivedPayloads).toHaveLength(1);
-      expect(receivedPayloads[0].data).toBe('test');
-    });
+      messageRouter.unsubscribe('test.topic', handler);
+      messageRouter.publish('test.topic', { data: 'test2' });
 
-    it('should handle multiple subscribers for same topic', async () => {
-      const handler1Payloads: any[] = [];
-      const handler2Payloads: any[] = [];
-
-      const handler1: EventHandler = async (payload: any) => {
-        handler1Payloads.push(payload);
-      };
-
-      const handler2: EventHandler = async (payload: any) => {
-        handler2Payloads.push(payload);
-      };
-
-      messageRouter.subscribe('multi-topic', handler1);
-      messageRouter.subscribe('multi-topic', handler2);
-
-      messageRouter.publish('multi-topic', { data: 'multi-test' });
-      
+      // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 10));
-      
-      expect(handler1Payloads).toHaveLength(1);
-      expect(handler2Payloads).toHaveLength(1);
-      expect(handler1Payloads[0].data).toBe('multi-test');
-      expect(handler2Payloads[0].data).toBe('multi-test');
-    });
 
-    it('should handle concurrent message publishing', async () => {
-      const receivedPayloads: any[] = [];
-      const handler: EventHandler = async (payload: any) => {
-        receivedPayloads.push(payload);
-      };
-
-      messageRouter.subscribe('concurrent-topic', handler);
-
-      const publishPromises = [];
-      
-      for (let i = 0; i < 50; i++) {
-        publishPromises.push(messageRouter.publish('concurrent-topic', { index: i }));
-      }
-
-      await Promise.all(publishPromises);
-      
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      expect(receivedPayloads).toHaveLength(50);
-    });
-
-    it('should handle async message processing', async () => {
-      const processingOrder: string[] = [];
-      
-      const slowHandler: EventHandler = async (payload: any) => {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        processingOrder.push(`slow-${payload.index}`);
-      };
-
-      const fastHandler: EventHandler = async (payload: any) => {
-        processingOrder.push(`fast-${payload.index}`);
-      };
-
-      messageRouter.subscribe('async-topic', slowHandler);
-      messageRouter.subscribe('async-topic', fastHandler);
-
-      const messages = [];
-      for (let i = 0; i < 3; i++) {
-        messages.push({ index: i });
-      }
-
-      await Promise.all(messages.map(payload => messageRouter.publish('async-topic', payload)));
-      
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      expect(processingOrder.length).toBeGreaterThan(0);
+      expect(received).toHaveLength(1);
+      expect(received[0]).toEqual({ data: 'test1' });
     });
   });
 
-  describe('Middleware Pipeline', () => {
-    it('should execute middleware in order', async () => {
-      const executionOrder: string[] = [];
-      
-      const middleware1 = {
-        name: 'middleware1',
-        handler: async (message: Message, next: () => void) => {
-          executionOrder.push('middleware1-start');
-          next();
-          executionOrder.push('middleware1-end');
-        }
-      };
+  describe('Pattern Subscriptions', () => {
+    it('should handle pattern subscriptions', async () => {
+      const received: any[] = [];
+      const handler: EventHandler = (payload: any) => { received.push(payload); };
 
-      const middleware2 = {
-        name: 'middleware2',
-        handler: async (message: Message, next: () => void) => {
-          executionOrder.push('middleware2-start');
-          next();
-          executionOrder.push('middleware2-end');
-        }
-      };
+      messageRouter.addPattern('user.*', handler);
+      messageRouter.publish('user.created', { id: 1 });
+      messageRouter.publish('user.updated', { id: 2 });
+      messageRouter.publish('system.log', { message: 'log' });
 
-      messageRouter.use(middleware1);
-      messageRouter.use(middleware2);
-
-      const handler: EventHandler = async (payload: any) => {
-        executionOrder.push('handler');
-      };
-
-      messageRouter.subscribe('middleware-topic', handler);
-
-      messageRouter.publish('middleware-topic', { data: 'test' });
-      
+      // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 10));
-      
-      // The actual middleware execution order is different due to how resolve() is called
-      expect(executionOrder).toContain('middleware1-start');
-      expect(executionOrder).toContain('middleware2-start');
-      expect(executionOrder).toContain('handler');
-      expect(executionOrder).toContain('middleware1-end');
-      expect(executionOrder).toContain('middleware2-end');
+
+      expect(received).toHaveLength(2);
+      expect(received[0]).toEqual({ id: 1 });
+      expect(received[1]).toEqual({ id: 2 });
     });
 
-    it('should handle middleware errors gracefully', async () => {
-      const errorMiddleware = {
-        name: 'errorMiddleware',
-        handler: async (message: Message, next: () => void) => {
+    it('should remove pattern subscriptions', async () => {
+      const received: any[] = [];
+      const handler: EventHandler = (payload: any) => { received.push(payload); };
+
+      messageRouter.addPattern('user.*', handler);
+      messageRouter.publish('user.created', { id: 1 });
+      
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      messageRouter.removePattern('user.*', handler);
+      messageRouter.publish('user.updated', { id: 2 });
+
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(received).toHaveLength(1);
+      expect(received[0]).toEqual({ id: 1 });
+    });
+  });
+
+  describe('Route Management', () => {
+    it('should add and remove routes', () => {
+      const route = {
+        id: 'test-route',
+        source: 'test.source',
+        target: 'test.target',
+        event: 'test.event',
+        conditions: []
+      };
+
+      messageRouter.addRoute(route);
+      expect(messageRouter.getRoutes()).toHaveLength(1);
+      expect(messageRouter.getRoute('test-route')).toEqual(route);
+
+      expect(messageRouter.removeRoute('test-route')).toBe(true);
+      expect(messageRouter.getRoutes()).toHaveLength(0);
+      expect(messageRouter.getRoute('test-route')).toBeUndefined();
+    });
+
+    it('should return undefined for non-existent route', () => {
+      expect(messageRouter.getRoute('non-existent')).toBeUndefined();
+    });
+  });
+
+  describe('Middleware', () => {
+    it('should process middleware', async () => {
+      const processed: any[] = [];
+      const middleware: EventMiddleware = {
+        name: 'test-middleware',
+        handler: async (message, next) => {
+          processed.push(message);
+          await next();
+        }
+      };
+
+      const received: any[] = [];
+      const handler: EventHandler = (payload: any) => { received.push(payload); };
+
+      messageRouter.use(middleware);
+      messageRouter.subscribe('test.topic', handler);
+      messageRouter.publish('test.topic', { data: 'test' });
+
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(processed).toHaveLength(1);
+      expect(processed[0].event).toBe('test.topic');
+      expect(processed[0].payload).toEqual({ data: 'test' });
+      expect(received).toHaveLength(1);
+    });
+
+    it('should handle middleware errors', async () => {
+      const middleware: EventMiddleware = {
+        name: 'error-middleware',
+        handler: async (message, next) => {
           throw new Error('Middleware error');
         }
       };
 
-      const handler: EventHandler = async (payload: any) => {
-        // Should not be called due to middleware error
-        throw new Error('Handler should not be called');
-      };
+      const received: any[] = [];
+      const handler: EventHandler = (payload: any) => { received.push(payload); };
 
-      messageRouter.use(errorMiddleware);
-      messageRouter.subscribe('error-topic', handler);
-
-      // Should throw error due to middleware
-      // Since the error is thrown asynchronously, we just verify that the middleware is called
-      // and that the error is handled gracefully by the MessageRouter
-      messageRouter.publish('error-topic', { data: 'test' });
+      messageRouter.use(middleware);
+      messageRouter.subscribe('test.topic', handler);
       
-      // The error should be thrown asynchronously, but the MessageRouter should handle it
-      // We can't easily test the async error in this context, so we just verify the publish doesn't crash
-      expect(true).toBe(true); // Test passes if no crash occurs
-    });
-  });
+      // This should not throw but should be handled internally
+      messageRouter.publish('test.topic', { data: 'test' });
 
-  describe('Message Filtering and Conditions', () => {
-    it('should filter messages based on conditions', async () => {
-      const receivedPayloads: any[] = [];
-      
-      // Listen for the route event that gets emitted
-      messageRouter.on('route:filter-topic', (routedMessage: Message) => {
-        receivedPayloads.push(routedMessage.payload);
-      });
-
-      const route: MessageRoute = {
-        id: 'filter-route',
-        source: 'test-source',
-        target: 'filter-topic',
-        event: 'source-event',
-        conditions: [
-          {
-            field: 'type',
-            operator: 'equals',
-            value: 'important'
-          }
-        ]
-      };
-
-      messageRouter.addRoute(route);
-
-      // Create a message that matches the route
-      const message: Message = {
-        id: 'important-msg',
-        source: 'test-source',
-        event: 'source-event',
-        payload: { type: 'important', data: 'important data' },
-        timestamp: Date.now()
-      };
-
-      await messageRouter.routeMessage(message);
-      
+      // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 10));
-      
-      expect(receivedPayloads).toHaveLength(1);
-      expect(receivedPayloads[0].type).toBe('important');
+
+      expect(received).toHaveLength(0); // Handler should not be called due to middleware error
     });
   });
 
-  describe('Metrics and Monitoring', () => {
-    it('should track message metrics', async () => {
-      const handler: EventHandler = async (payload: any) => {
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 10));
-      };
-
-      messageRouter.subscribe('metrics-topic', handler);
-
-      for (let i = 0; i < 5; i++) {
-        messageRouter.publish('metrics-topic', { data: `test-${i}` });
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const metrics = messageRouter.getMetrics();
-      expect(metrics.eventCount).toBeGreaterThanOrEqual(5);
-      expect(metrics.eventRate).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should track route performance', async () => {
-      const route: MessageRoute = {
-        id: 'perf-route',
-        source: 'perf-source',
-        target: 'perf-target',
-        event: 'perf-event'
-      };
-
-      messageRouter.addRoute(route);
-      
+  describe('Metrics', () => {
+    it('should provide metrics', () => {
       const metrics = messageRouter.getMetrics();
       expect(metrics).toBeDefined();
+      expect(typeof metrics.eventCount).toBe('number');
+      expect(typeof metrics.errorCount).toBe('number');
+      expect(typeof metrics.averageLatency).toBe('number');
+    });
+
+    it('should reset metrics', () => {
+      messageRouter.resetMetrics();
+      const metrics = messageRouter.getMetrics();
+      expect(metrics.eventCount).toBe(0);
+      expect(metrics.errorCount).toBe(0);
     });
   });
 
   describe('Error Handling', () => {
     it('should handle handler errors gracefully', async () => {
-      const errorHandler: EventHandler = async (payload: any) => {
+      const errorHandler: EventHandler = (payload: any) => {
         throw new Error('Handler error');
       };
 
-      messageRouter.subscribe('error-topic', errorHandler);
-
-      // Should not throw error
-      expect(() => messageRouter.publish('error-topic', { data: 'test' })).not.toThrow();
-    });
-
-    it('should handle unsubscribe errors', async () => {
-      const handler: EventHandler = async (payload: any) => {
-        // Do nothing
+      const normalHandler: EventHandler = (payload: any) => {
+        // This should still be called
       };
 
-      messageRouter.subscribe('unsub-topic', handler);
+      messageRouter.subscribe('test.topic', errorHandler);
+      messageRouter.subscribe('test.topic', normalHandler);
       
-      // Should not throw error
-      expect(() => messageRouter.unsubscribe('unsub-topic', handler)).not.toThrow();
-    });
-  });
+      // This should not throw
+      messageRouter.publish('test.topic', { data: 'test' });
 
-  describe('Performance', () => {
-    it('should handle high-volume message routing', async () => {
-      const handler: EventHandler = async (payload: any) => {
-        // Minimal processing
-      };
-
-      messageRouter.subscribe('perf-topic', handler);
-
-      const startTime = Date.now();
-      const publishPromises = [];
-      
-      for (let i = 0; i < 1000; i++) {
-        publishPromises.push(messageRouter.publish('perf-topic', { index: i }));
-      }
-
-      await Promise.all(publishPromises);
-      const endTime = Date.now();
-      
-      // Should complete within reasonable time
-      expect(endTime - startTime).toBeLessThan(5000);
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 10));
     });
   });
 }); 

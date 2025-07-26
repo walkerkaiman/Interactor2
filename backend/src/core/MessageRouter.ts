@@ -118,29 +118,39 @@ export class MessageRouter extends EventEmitter implements EventBus {
         throw new Error(`Message validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
       }
 
-      // Process middleware
-      await this.processMiddleware(message);
+      // Process middleware (errors are handled internally)
+      let middlewareSuccess = true;
+      try {
+        await this.processMiddleware(message);
+      } catch (error) {
+        middlewareSuccess = false;
+        this.monitor.onError(message.event, error as Error);
+        this.emit('middlewareError', { message, error });
+      }
 
-      // Route to direct subscribers
-      await this.routeToSubscribers(message);
+      // Only route message if middleware processing was successful
+      if (middlewareSuccess) {
+        // Route to direct subscribers
+        await this.routeToSubscribers(message);
 
-      // Route to pattern subscribers
-      await this.routeToPatternSubscribers(message);
+        // Route to pattern subscribers
+        await this.routeToPatternSubscribers(message);
 
-      // Route through configured routes
-      await this.routeThroughRoutes(message);
+        // Route through configured routes
+        await this.routeThroughRoutes(message);
 
-      // Update metrics
-      const latency = Date.now() - startTime;
-      this.monitor.onEvent(message.event, latency);
+        // Update metrics
+        const latency = Date.now() - startTime;
+        this.monitor.onEvent(message.event, latency);
 
-      // Emit routed event
-      this.emit('messageRouted', message);
+        // Emit routed event
+        this.emit('messageRouted', message);
+      }
 
     } catch (error) {
       this.monitor.onError(message.event, error as Error);
       this.emit('messageError', { message, error });
-      throw error;
+      // Don't re-throw the error to prevent unhandled rejections
     } finally {
       this.isProcessing = false;
 
@@ -212,13 +222,28 @@ export class MessageRouter extends EventEmitter implements EventBus {
    */
   private async processMiddleware(message: Message): Promise<void> {
     for (const mw of this.middleware) {
-      await new Promise<void>((resolve, reject) => {
-        try {
-          mw.handler(message, resolve);
-        } catch (error) {
-          reject(error);
-        }
-      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          try {
+            // Handle both sync and async middleware
+            const result = mw.handler(message, resolve);
+            if (result && typeof result.then === 'function') {
+              // Async middleware
+              result.catch((error: any) => {
+                reject(error);
+              });
+            }
+          } catch (error) {
+            reject(error);
+          }
+        });
+      } catch (error) {
+        // Log the middleware error and throw it to stop message processing
+        this.monitor.onError(message.event, error as Error);
+        this.emit('middlewareError', { middleware: mw, message, error });
+        // Throw the error to stop message processing
+        throw error;
+      }
     }
   }
 

@@ -67,6 +67,9 @@ export interface ModuleBase {
   on(event: string, handler: EventHandler): void;
   emit(event: string, payload?: any): void;
   off(event: string, handler: EventHandler): void;
+  
+  // Logger support
+  setLogger(logger: any): void;
 }
 
 export type EventHandler = (payload?: any) => void | Promise<void>;
