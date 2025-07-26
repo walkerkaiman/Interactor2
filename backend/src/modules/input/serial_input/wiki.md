@@ -4,6 +4,28 @@
 
 The Serial Input module monitors serial data from hardware sensors and devices via RS-232/RS-485 communication. It supports both trigger and streaming modes, with sophisticated threshold-based triggering using configurable logic operators. This module is ideal for integrating Arduino, sensors, and other serial-enabled hardware into interactive installations.
 
+### Quick Guide for Artists
+
+- Plug your sensor/Arduino into a USB port.
+- Drag “Serial Input” onto the canvas and choose the **Port** and **Baud Rate** (common: 9600).
+- Optionally set a **Threshold** and **Operator** (e.g., `>` 50) to only fire events when the value crosses that point.
+- Press **Play** to start receiving data.
+
+### Developer Deep Dive
+
+Folder: `backend/src/modules/input/serial_input/`
+
+| Piece | Detail |
+|-------|--------|
+| `@serialport/stream` + `readlineParser` | Reads ASCII lines from the serial port. |
+| `shouldTrigger()` | Implements threshold comparison for trigger mode. |
+| `handleSerialData()` | Converts raw lines to numbers and emits `serialData` / `thresholdTrigger`. |
+| Re-connect | `onStop()` / `onStart()` handle device unplug/replug gracefully. |
+
+Adjust `parseSerialLine()` to handle binary protocols or checksums.
+
+---
+
 ## Configuration
 
 ### Parameters

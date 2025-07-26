@@ -4,6 +4,31 @@
 
 The Frames Input module monitors sACN (Streaming ACN) frame numbers on a specified universe, typically Universe 999. It reads channels 1 and 2 as Most Significant Byte (MSB) and Least Significant Byte (LSB) respectively to extract frame numbers for triggering events or streaming data.
 
+### Quick Guide for Artists
+
+- Drag the “Frames Input” module onto the canvas.
+- Choose the sACN **Universe** you want to listen to (default **999**).
+- Press **Play** and wire its output to any other module – no coding required.
+
+### Developer Deep Dive
+
+Location: `backend/src/modules/input/frames_input/`
+
+| File | Responsibility |
+|------|----------------|
+| `index.ts` | Sets up a `sacn.Receiver`, converts channels 1 & 2 (MSB/LSB) into a 16-bit frame number and emits `frameChange` / `frameData` / `stateUpdate`. |
+| `manifest.json` | Declares the config schema (universe, enabled) and event contracts. |
+
+Core snippet:
+
+```typescript
+const frameNumber = (packet.slotsData[0] << 8) | packet.slotsData[1];
+```
+
+Extend or hack by editing `handleSacnPacket()` to add filtering, smoothing, or extra metadata.
+
+---
+
 ## How MSB/LSB Frame Extraction Works
 
 The module combines two DMX channels to create a 16-bit unsigned integer frame number:

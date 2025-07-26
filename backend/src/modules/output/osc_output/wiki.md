@@ -4,6 +4,26 @@
 
 The OSC Output module sends Open Sound Control (OSC) messages to external endpoints. It can be triggered by events from input modules or manually controlled to send OSC messages to audio software, lighting systems, or other OSC-compatible devices.
 
+### Quick Guide for Artists
+
+- Add “OSC Output” and set **Host** & **Port** (default 8000).
+- Keep the default address `/trigger` or change it to suit your receiving software.
+- Connect an event to this module – each event is packed into an OSC message and sent instantly.
+
+### Developer Deep Dive
+
+Directory: `backend/src/modules/output/osc_output/`
+
+| Part | Detail |
+|------|--------|
+| `osc` package | Serialises data to OSC binary and sends via UDP. |
+| `sendOscMessage()` | Accepts numeric values or `{ address, args }` objects and dispatches them. |
+| Error tracking | Maintains `messageCount` & `errorCount` and emits `oscError` on failure. |
+
+Add bundle or TCP support by swapping the transport layer in `onInit()`.
+
+---
+
 ## Configuration
 
 ### Required Parameters

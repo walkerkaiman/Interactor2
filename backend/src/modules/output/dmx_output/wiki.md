@@ -4,6 +4,28 @@
 
 The DMX Output module is a powerful output module that allows you to control DMX lighting fixtures using CSV files containing frame data. It supports multiple DMX protocols (Art-Net, sACN, DMX512) and provides both trigger and streaming modes for playback.
 
+### Quick Guide for Artists
+
+1. Drop “DMX Output” into the canvas.
+2. Click **Upload CSV** and select your frame file exported from your lighting desk.
+3. Choose **Protocol** (Art-Net, sACN, or DMX512), **Universe**, and Brightness.
+4. Use Trigger mode to step through frames or Streaming mode to jump to any frame based on an input value.
+
+### Developer Deep Dive
+
+Directory: `backend/src/modules/output/dmx_output/`
+
+| Piece | Role |
+|-------|------|
+| CSV loader | `parseCsvFile()` caches frames (512 channels max). |
+| Protocol drivers | `sendArtNet()`, `sendSacn()`, `sendDmx512()` abstract network vs serial output. |
+| Playback engine | Keeps an internal frame pointer & brightness multiplier. |
+| State events | Emits `stateUpdate` for UI progress bars and diagnostics. |
+
+Enhance with live editing, RDM feedback, or compressed file formats.
+
+---
+
 ## Features
 
 - **CSV File Upload**: Upload CSV files containing DMX frame data (0-255 values per channel)

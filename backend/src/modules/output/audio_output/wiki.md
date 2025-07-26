@@ -4,6 +4,28 @@
 
 The Audio Output module provides audio playback capabilities for the Interactor system. It can play audio files, generate test tones, and control audio playback with features like volume control, looping, and fade effects.
 
+### Quick Guide for Artists
+
+1. Add “Audio Output” to your patch.
+2. Upload an audio file (WAV/MP3/OGG) via the inspector.
+3. Trigger `audioPlay` (or press the play icon) to hear the file.
+4. Adjust Volume, Loop, and Fade settings visually – no code needed.
+
+### Developer Deep Dive
+
+Folder: `backend/src/modules/output/audio_output/`
+
+| Part | Description |
+|------|-------------|
+| Playback engine | Utilises `node-speaker` & `wav-decoder` (FFmpeg fallback) to stream PCM data. |
+| Upload server | Express + `multer`, launched in `initUploadServer()`, saves to `assets/`. |
+| Mixer | `applyVolumeCurve()` handles fades & gain changes sample-accurately. |
+| Event flow | Receives `audioPlay/Stop/Pause/Resume`, emits `audioOutput` & `audioError`. |
+
+Extend with DSP effects or multi-track playback in `processBuffer()`.
+
+---
+
 ## Features
 
 - **Audio Playback**: Play audio files in various formats (WAV, MP3, OGG)
