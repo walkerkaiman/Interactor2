@@ -113,7 +113,7 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
    * Load a module from a directory
    */
   public async loadModuleFromDirectory(moduleDir: string): Promise<void> {
-    const moduleName = path.basename(moduleDir);
+    const directoryName = path.basename(moduleDir);
     
     try {
       // Check if module directory exists
@@ -125,7 +125,7 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
       // Load manifest
       const manifestPath = path.join(moduleDir, 'manifest.json');
       if (!await fs.pathExists(manifestPath)) {
-        this.logger?.warn(`No manifest found for module: ${moduleName}`);
+        this.logger?.warn(`No manifest found for module: ${directoryName}`);
         return;
       }
 
@@ -135,21 +135,22 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
       // Validate manifest
       const validation = this.validateManifest(manifest);
       if (!validation.valid) {
-        this.logger?.error(`Invalid manifest for module ${moduleName}:`, validation.errors);
+        this.logger?.error(`Invalid manifest for module ${directoryName}:`, validation.errors);
         return;
       }
 
       // Load module implementation
       const modulePath = path.join(moduleDir, 'index.ts');
       if (!await fs.pathExists(modulePath)) {
-        this.logger?.warn(`No index.ts found for module: ${moduleName}`);
+        this.logger?.warn(`No index.ts found for module: ${directoryName}`);
         return;
       }
 
       // Create module factory
       const factory = await this.createModuleFactory(modulePath, manifest);
       
-      // Register module
+      // Register module using the manifest name, not directory name
+      const moduleName = manifest.name;
       this.register(moduleName, factory);
       this.manifests.set(moduleName, manifest);
       this.modulePaths.set(moduleName, moduleDir);
@@ -158,15 +159,15 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
       this.emit('moduleLoaded', { name: moduleName, manifest });
       
     } catch (error) {
-      this.logger?.error(`Error loading module ${moduleName}:`, error);
-      this.emit('moduleLoadError', { name: moduleName, error });
+      this.logger?.error(`Error loading module ${directoryName}:`, error);
+      this.emit('moduleLoadError', { name: directoryName, error });
     }
   }
 
   /**
    * Create a module instance
    */
-  public async createInstance(moduleName: string, config: ModuleConfig): Promise<ModuleBase> {
+  public async createInstance(moduleName: string, config: ModuleConfig, instanceId?: string): Promise<ModuleBase> {
     const factory = this.modules.get(moduleName);
     if (!factory) {
       throw new Error(`Module not found: ${moduleName}`);
@@ -174,12 +175,21 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
 
     try {
       const instance = await factory.create(config);
-      const instanceId = `${moduleName}_${Date.now()}`;
+      const finalInstanceId = instanceId || `${moduleName}_${Date.now()}`;
       
-      this.instances.set(instanceId, instance);
+      // Set the instance ID on the instance itself
+      (instance as any).id = finalInstanceId;
       
-      this.logger?.info(`Created instance: ${instanceId} of module: ${moduleName}`);
-      this.emit('instanceCreated', { instanceId, moduleName, instance });
+      // Set the logger on the instance
+      instance.setLogger(this.logger);
+      
+      // Initialize the module
+      await instance.init();
+      
+      this.instances.set(finalInstanceId, instance);
+      
+      this.logger?.info(`Created instance: ${finalInstanceId} of module: ${moduleName}`);
+      this.emit('instanceCreated', { instanceId: finalInstanceId, moduleName, instance });
       
       return instance;
     } catch (error) {
@@ -200,6 +210,13 @@ export class ModuleLoader extends EventEmitter implements ModuleRegistry {
    */
   public get(name: string): ModuleFactory | undefined {
     return this.modules.get(name);
+  }
+
+  /**
+   * Get module instance by ID
+   */
+  public getInstance(instanceId: string): ModuleBase | undefined {
+    return this.instances.get(instanceId);
   }
 
   /**

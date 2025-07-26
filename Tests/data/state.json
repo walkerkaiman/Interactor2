@@ -1,7 +1,102 @@
 {
   "interactions": [],
-  "modules": [],
+  "modules": [
+    {
+      "id": "d2dbfce7-c848-4d5a-9f1c-9b0850eefca1",
+      "moduleName": "Frames Input",
+      "config": {
+        "test": "config"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "Frames Input_1753488214117_nablmhdbp",
+      "moduleName": "Frames Input",
+      "config": {
+        "test": "config"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    }
+  ],
   "routes": [
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
     {
       "id": "test-route",
       "source": "test-source",
@@ -96,6 +191,6 @@
   "settings": {
     "test-setting": "test-value"
   },
-  "lastSaved": 1753483047528,
+  "lastSaved": 1753488304200,
   "version": "1.0.0"
 }

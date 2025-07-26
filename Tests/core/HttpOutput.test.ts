@@ -519,7 +519,7 @@ describe('HTTP Output Module', () => {
       for (const url of invalidUrls) {
         const testModule = new HttpOutputModule({ url, method: 'POST' });
         (testModule as any).logger = mockLogger;
-        await expect(testModule.init()).rejects.toThrow('Invalid URL format');
+        await expect(testModule.init()).rejects.toThrow('Invalid URL format:');
       }
     });
   });

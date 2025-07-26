@@ -275,8 +275,9 @@ export class HttpOutputModule extends OutputModuleBase {
    */
   private isValidUrl(url: string): boolean {
     try {
-      new URL(url);
-      return true;
+      const parsedUrl = new URL(url);
+      // Only allow HTTP and HTTPS protocols
+      return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
     } catch {
       return false;
     }

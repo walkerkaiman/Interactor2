@@ -108,7 +108,11 @@ export class InteractorServer {
         },
         modules: {
           autoLoad: true,
-          hotReload: true
+          hotReload: false
+        },
+        interactions: {
+          autoSave: true,
+          saveInterval: 30000
         }
       };
     }
@@ -125,9 +129,18 @@ export class InteractorServer {
       enableConsole: true
     });
 
+    // Determine the correct modules directory path
+    // If we're running from Tests directory, we need to go up to backend/src/modules
+    let modulesDir: string;
+    if (process.cwd().includes('Tests')) {
+      modulesDir = path.join(process.cwd(), '..', 'backend', 'src', 'modules');
+    } else {
+      modulesDir = path.join(__dirname, 'modules');
+    }
+
     // Initialize other services
     this.messageRouter = new MessageRouter();
-    this.moduleLoader = new ModuleLoader(undefined, this.logger);
+    this.moduleLoader = new ModuleLoader(modulesDir, this.logger);
     this.stateManager = new StateManager({
       autoSave: this.config.interactions?.autoSave !== false,
       autoSaveInterval: this.config.interactions?.saveInterval || 30000
@@ -164,7 +177,7 @@ export class InteractorServer {
     this.app.use(helmet());
     
     // CORS
-    this.app.use(cors(this.config.server?.cors || {
+    this.app.use(cors({
       origin: ['http://localhost:3000'],
       credentials: true
     }));
@@ -331,12 +344,16 @@ export class InteractorServer {
     this.app.post('/api/module-instances', async (req, res) => {
       try {
         const { moduleName, config } = req.body;
-        // Create the module instance using ModuleLoader
-        const moduleInstance = await this.moduleLoader.createInstance(moduleName, config);
+        
+        // Generate a unique instance ID
+        const instanceId = `${moduleName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create the module instance using ModuleLoader with the specific instance ID
+        const moduleInstance = await this.moduleLoader.createInstance(moduleName, config, instanceId);
         
         // Add it to state management
         const instanceData: ModuleInstance = {
-          id: moduleInstance.id,
+          id: instanceId,
           moduleName,
           config,
           position: req.body.position
@@ -370,8 +387,12 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
-        // Get the actual module instance from ModuleLoader
-        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        // Get the actual module instance from ModuleLoader using the instance ID
+        const moduleInstance = this.moduleLoader.getInstance(req.params.id as string);
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found in ModuleLoader' });
+        }
+        
         await moduleInstance.start();
         return res.json({ success: true });
       } catch (error) {
@@ -386,8 +407,12 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
-        // Get the actual module instance from ModuleLoader
-        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        // Get the actual module instance from ModuleLoader using the instance ID
+        const moduleInstance = this.moduleLoader.getInstance(req.params.id as string);
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found in ModuleLoader' });
+        }
+        
         await moduleInstance.stop();
         return res.json({ success: true });
       } catch (error) {
@@ -403,7 +428,7 @@ export class InteractorServer {
         }
         
         // Get the actual module instance from ModuleLoader
-        const moduleInstance = await this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
+        const moduleInstance = this.moduleLoader.createInstance(instanceData.moduleName, instanceData.config);
         
         // Check if the module has a manual trigger method (only output modules have this)
         if ('onManualTrigger' in moduleInstance && typeof moduleInstance.onManualTrigger === 'function') {

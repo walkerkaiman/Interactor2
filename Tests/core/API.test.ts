@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { InteractorServer } from '../../backend/src/index';
 import { MessageRoute, InteractionConfig, ModuleInstance } from '@interactor/shared';
+import * as path from 'path';
 
 describe('Backend API', () => {
   let server: InteractorServer;
@@ -109,7 +110,8 @@ describe('Backend API', () => {
         .get('/api/modules')
         .expect(200);
 
-      if (modulesResponse.body.data.modules.length > 0) {
+      // Check if we have any modules
+      if (modulesResponse.body.data.modules && modulesResponse.body.data.modules.length > 0) {
         const moduleName = modulesResponse.body.data.modules[0].name;
         
         const response = await request(app)
@@ -123,8 +125,13 @@ describe('Backend API', () => {
         expect(response.body.data).toHaveProperty('version');
         expect(response.body.data).toHaveProperty('description');
       } else {
-        // Skip test if no modules are available
-        console.log('No modules available, skipping module manifest test');
+        // If no modules are available, test that we get a 404 for a non-existent module
+        const response = await request(app)
+          .get('/api/modules/test-module')
+          .expect(404);
+
+        expect(response.body).toHaveProperty('success', false);
+        expect(response.body).toHaveProperty('error', 'Module not found');
       }
     });
   });
@@ -155,7 +162,8 @@ describe('Backend API', () => {
         .get('/api/modules')
         .expect(200);
 
-      if (modulesResponse.body.data.modules.length > 0) {
+      // Check if we have any modules
+      if (modulesResponse.body.data.modules && modulesResponse.body.data.modules.length > 0) {
         const moduleName = modulesResponse.body.data.modules[0].name;
         
         // Create a module instance
@@ -206,8 +214,18 @@ describe('Backend API', () => {
 
         expect(deleteResponse.body).toHaveProperty('success', true);
       } else {
-        // Skip test if no modules are available
-        console.log('No modules available, skipping module instance management test');
+        // If no modules are available, test that we get an error when trying to create an instance
+        const createResponse = await request(app)
+          .post('/api/module-instances')
+          .send({
+            moduleName: 'non-existent-module',
+            config: { test: 'config' },
+            position: { x: 100, y: 100 }
+          })
+          .expect(400);
+
+        expect(createResponse.body).toHaveProperty('success', false);
+        expect(createResponse.body).toHaveProperty('error');
       }
     });
 
@@ -414,6 +432,7 @@ describe('Backend API', () => {
     it('should include CORS headers', async () => {
       const response = await request(app)
         .get('/health')
+        .set('Origin', 'http://localhost:3000')
         .expect(200);
 
       expect(response.headers).toHaveProperty('access-control-allow-origin');

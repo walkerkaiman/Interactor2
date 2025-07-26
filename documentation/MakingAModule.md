@@ -26,7 +26,7 @@ This guide describes best practices and the step-by-step process for packaging m
   - `index.ts` (main module implementation)
   - `manifest.json` (metadata/config)
   - `wiki.md` (documentation)
-  - Optional: tests, assets, helper files
+  - Optional: assets, helper files
 - This structure allows for easy discovery, loading, and hot-reloading.
 
 ## 4. Loose Coupling and Dependency Injection
@@ -66,7 +66,6 @@ my_input_trigger/
 ├── index.ts         # Module implementation (extends ModuleBase)
 ├── manifest.json    # Metadata, config schema, event definitions
 ├── wiki.md          # Documentation and usage
-├── tests/           # Unit/integration tests (optional)
 └── assets/          # Static assets (optional)
 ```
 
@@ -79,7 +78,6 @@ my_input_trigger/
 | `index.ts`          | Module implementation (extends `ModuleBase`) |
 | `manifest.json`     | Metadata, config schema, event definitions   |
 | `wiki.md`           | Documentation and usage                      |
-| `tests/`            | Unit/integration tests (optional)            |
 | `assets/`           | Static assets (optional)                     |
 
 ---
