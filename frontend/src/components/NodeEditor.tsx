@@ -19,6 +19,7 @@ import { apiService } from '../api';
 import { ModuleManifest, InteractionConfig } from '@interactor/shared';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
+import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
 import styles from './NodeEditor.module.css';
 
 const nodeTypes: NodeTypes = {
@@ -53,7 +54,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle ReactFlow instance
   const onInit = useCallback((instance: any) => {
-    console.log('🎯 NodeEditor: ReactFlow instance initialized:', !!instance);
     setReactFlowInstance(instance);
   }, []);
 
@@ -72,7 +72,18 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     onInteractionsChange(updatedInteractions);
     
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setEdges((eds) => {
+      const filtered = eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+      
+      // Remove edges from tracker
+      eds.forEach(edge => {
+        if (edge.source === nodeId || edge.target === nodeId) {
+          edgeRegistrationTracker.unregisterEdge(edge.id);
+        }
+      });
+      
+      return filtered;
+    });
   }, [setNodes, setEdges, interactions, onInteractionsChange]);
 
     // Handle module drop
@@ -84,88 +95,95 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         return;
       }
 
-      let dragData = event.dataTransfer.getData('application/json');
-      const reactFlowData = event.dataTransfer.getData('application/reactflow');
-      
-      if (!dragData && reactFlowData) {
-        dragData = reactFlowData;
-      }
-      
-      if (!dragData) {
+      // Get the drag data
+      const type = event.dataTransfer.getData('application/reactflow');
+
+      if (!type) {
         return;
       }
 
+      let dragData;
       try {
-        const parsedData = JSON.parse(dragData);
-        const { moduleName } = parsedData;
-        
-        if (!moduleName) {
-          return;
-        }
-
-        const module = modules.find(m => m.name === moduleName);
-        
-        if (!module) {
-          return;
-        }
-
-        const position = reactFlowInstance.screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        });
-
-        const newNodeId = `node-${Date.now()}`;
-        
-        const newNode = {
-          id: newNodeId,
-          type: 'custom',
-          position,
-          data: {
-            module,
-            instance: {
-              id: newNodeId,
-              moduleName: module.name,
-              config: {},
-              status: 'stopped',
-              messageCount: 0,
-              currentFrame: undefined,
-              frameCount: 0,
-              lastUpdate: Date.now()
-            },
-            isSelected: false,
-            onSelect: () => onNodeSelect(newNodeId),
-            onDelete: handleDeleteNode,
-          },
-        };
-
-        // Add the new node to local interactions
-        const updatedInteractions = [...interactions];
-        
-        if (updatedInteractions.length === 0) {
-          // Create a new interaction if none exists
-          const newInteraction = {
-            id: `interaction-${Date.now()}`,
-            name: 'New Interaction',
-            description: 'Automatically created interaction',
-            enabled: true,
-            modules: [newNode.data.instance],
-            routes: [],
-          };
-          updatedInteractions.push(newInteraction);
-        } else {
-          // Add to the first interaction
-          updatedInteractions[0].modules = updatedInteractions[0].modules || [];
-          updatedInteractions[0].modules.push(newNode.data.instance);
-        }
-
-        // Notify parent of local changes
-        onInteractionsChange(updatedInteractions);
-
-        // Add the node to ReactFlow
-        setNodes((nds) => [...nds, newNode]);
+        dragData = JSON.parse(type);
       } catch (error) {
-        console.error('Error processing dropped module:', error);
+        return;
       }
+
+      const { moduleName } = dragData;
+      if (!moduleName) {
+        return;
+      }
+
+      const module = modules.find(m => m.name === moduleName);
+      if (!module) {
+        return;
+      }
+
+      // Get the ReactFlow container element
+      const reactFlowElement = document.querySelector('.react-flow__pane');
+      if (!reactFlowElement) {
+        return;
+      }
+
+      // Get the bounds of the ReactFlow container
+      const bounds = reactFlowElement.getBoundingClientRect();
+
+      // Calculate position relative to the ReactFlow container
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
+
+      const newNodeId = `node-${Date.now()}`;
+      
+      const newNode = {
+        id: newNodeId,
+        type: 'custom',
+        position,
+        data: {
+          module,
+          instance: {
+            id: newNodeId,
+            moduleName: module.name,
+            config: {},
+            status: 'stopped',
+            messageCount: 0,
+            currentFrame: undefined,
+            frameCount: 0,
+            lastUpdate: Date.now()
+          },
+          isSelected: false,
+          onSelect: () => onNodeSelect(newNodeId),
+          onDelete: handleDeleteNode,
+          edges: [], // Will be updated after edges are created
+        },
+      };
+
+      // Add the new node to local interactions
+      const updatedInteractions = [...interactions];
+      
+      if (updatedInteractions.length === 0) {
+        // Create a new interaction if none exists
+        const newInteraction = {
+          id: `interaction-${Date.now()}`,
+          name: 'New Interaction',
+          description: 'Automatically created interaction',
+          enabled: true,
+          modules: [newNode.data.instance],
+          routes: [],
+        };
+        updatedInteractions.push(newInteraction);
+      } else {
+        // Add to the first interaction
+        updatedInteractions[0].modules = updatedInteractions[0].modules || [];
+        updatedInteractions[0].modules.push(newNode.data.instance);
+      }
+
+      // Notify parent of local changes
+      onInteractionsChange(updatedInteractions);
+
+      // Add the node to ReactFlow
+      setNodes((nds) => [...nds, newNode]);
     },
     [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
   );
@@ -201,6 +219,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
                 isSelected: selectedNodeId === nodeId,
                 onSelect: () => onNodeSelect(nodeId),
                 onDelete: handleDeleteNode,
+                edges: [], // Will be updated after edges are created
               },
             });
           }
@@ -217,31 +236,14 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         const targetNode = newNodes.find(node => node.id === route.target);
 
         if (sourceNode && targetNode) {
-          console.log('Creating edge from route:', route);
           
-          // Determine edge style based on event type
-          let edgeStyle = {};
-          if (route.event === 'trigger') {
-            edgeStyle = {
-              stroke: '#dc2626',
-              strokeWidth: 2,
-            };
-            console.log('Route is trigger, using red color');
-          } else if (route.event === 'stream') {
-            edgeStyle = {
-              stroke: '#059669',
-              strokeWidth: 2,
-            };
-            console.log('Route is stream, using green color');
-          } else {
-            console.log('Route event type unknown:', route.event);
-          }
+          // No inline styles - everything handled by CSS classes
+          const edgeStyle = {};
 
-          // Check if this interaction is registered by looking for a registered route with the same ID
-          const isRegistered = route.id && route.id.startsWith('route-') === false; // Registered routes have proper IDs, not auto-generated ones
+          const edgeId = route.id || `edge-${interaction.id}-${route.source}-${route.target}`;
           
           newEdges.push({
-            id: route.id || `edge-${interaction.id}-${routeIndex}`,
+            id: edgeId,
             source: sourceNode.id,
             target: targetNode.id,
             sourceHandle: route.event, // Set the sourceHandle based on the route event
@@ -251,9 +253,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             data: { 
               route, 
               interaction,
-              isRegistered 
+              isRegistered: true // All backend-loaded edges are registered
             },
           });
+          
+          // Don't automatically register edges - let the tracker maintain individual states
+          // Only register if not already tracked
+          if (!edgeRegistrationTracker.isEdgeRegistered(edgeId) && !edgeRegistrationTracker.unregisteredEdges.has(edgeId)) {
+            edgeRegistrationTracker.registerEdge(edgeId);
+          }
         }
       });
     });
@@ -262,6 +270,18 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     setEdges(newEdges);
   }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode]); // Use interactions directly
 
+  // Update node data with current edges for handle coloring
+  useEffect(() => {
+    setNodes((currentNodes) => 
+      currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          edges: edges,
+        },
+      }))
+    );
+  }, [edges, setNodes]);
 
 
   // Handle drag start from handles
@@ -313,6 +333,14 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         const filtered = eds.filter(edge => 
           !(edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId)
         );
+        
+        // Remove edges from tracker
+        eds.forEach(edge => {
+          if (edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) {
+            edgeRegistrationTracker.unregisterEdge(edge.id);
+          }
+        });
+        
         return filtered;
       });
       setDraggedHandle(null);
@@ -322,32 +350,22 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   const onConnect = useCallback(
     (params: Connection) => {
-      console.log('onConnect called with params:', params);
       
       // Determine the event type based on the source handle
       let eventType = 'default';
-      let edgeStyle = {};
+      const edgeStyle = {}; // No inline styles - everything handled by CSS classes
       
       if (params.sourceHandle === 'trigger') {
         eventType = 'trigger';
-        edgeStyle = {
-          stroke: '#dc2626',
-          strokeWidth: 2,
-        };
-        console.log('Creating trigger edge with red color');
       } else if (params.sourceHandle === 'stream') {
         eventType = 'stream';
-        edgeStyle = {
-          stroke: '#059669',
-          strokeWidth: 2,
-        };
-        console.log('Creating stream edge with green color');
-      } else {
-        console.log('Unknown sourceHandle:', params.sourceHandle);
       }
   
+      const routeId = `route-${Date.now()}`;
+      const edgeId = routeId; // Use the route ID as the edge ID for consistency
+      
       const newEdge: Edge = {
-        id: `edge-${Date.now()}`,
+        id: edgeId,
         source: params.source!,
         target: params.target!,
         sourceHandle: params.sourceHandle,
@@ -356,13 +374,17 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         type: 'custom',
         data: { 
           route: {
-            id: `route-${Date.now()}`,
+            id: routeId,
             source: params.source!,
             target: params.target!,
             event: eventType,
-          }
+          },
+          isRegistered: false // Local edges are unregistered
         },
       };
+      
+      // Register the new edge as unregistered
+      edgeRegistrationTracker.unregisterEdge(edgeId);
   
       // Update local interactions state
       const updatedInteractions = [...interactions];
@@ -392,7 +414,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       setEdges((eds) => {
         // Remove any existing edges from the same source to the same target
         const filteredEdges = eds.filter(edge => {
-          return !(edge.source === params.source && edge.target === params.target);
+          const shouldRemove = edge.source === params.source && edge.target === params.target;
+          if (shouldRemove) {
+            // Remove from tracker
+            edgeRegistrationTracker.unregisterEdge(edge.id);
+          }
+          return !shouldRemove;
         });
         
         // Add the new edge
@@ -402,12 +429,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     [setEdges, interactions, onInteractionsChange]
   );
 
-      return (
-    <div 
-      className={styles.nodeEditor}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-    >
+  return (
+    <div className={styles.nodeEditor}>
       <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -419,6 +442,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           onPaneClick={onPaneClick}
           onNodeDragStop={onNodeDragStop}
           onInit={onInit}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView

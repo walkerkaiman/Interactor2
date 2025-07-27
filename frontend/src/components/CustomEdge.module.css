@@ -1,25 +1,35 @@
-/* Animated edge for registered interactions */
-.animatedEdge {
-  stroke-dasharray: 5, 5;
-  animation: flowAnimation 2s linear infinite, pulseAnimation 3s ease-in-out infinite;
+/* Simple edge styles for SVG path elements */
+.unregisteredEdge {
+  stroke-width: 3px !important;
+  opacity: .7 !important;
+  stroke-dasharray: none !important;
+  animation: none !important;
 }
 
-/* Flow animation for registered edges */
+.registeredEdge {
+  stroke: #666666 !important;
+  stroke-width: 3px !important;
+  opacity: 0.7 !important;
+  stroke-dasharray: 5, 5 !important;
+  animation: flowAnimation 1s linear infinite !important;
+}
+
+/* Event type colors - applied to both registered and unregistered edges */
+.triggerEdge {
+  stroke: #dc2626 !important;
+}
+
+.streamEdge {
+  stroke: #059669 !important;
+}
+
+/* Animation for registered edges */
 @keyframes flowAnimation {
   0% {
     stroke-dashoffset: 0;
   }
   100% {
-    stroke-dashoffset: -10;
+    stroke-dashoffset: -30;
   }
 }
 
-/* Pulse animation for registered edges */
-@keyframes pulseAnimation {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-} 

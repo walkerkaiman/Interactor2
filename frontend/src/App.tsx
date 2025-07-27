@@ -5,6 +5,7 @@ import 'reactflow/dist/style.css';
 import { apiService } from './api';
 import { AppState, UIState, AppPage, WikisPageState, PerformancePageState, ConsolePageState, ModulesPageState } from './types';
 import { InteractionConfig } from '@interactor/shared';
+import { edgeRegistrationTracker } from './utils/edgeRegistrationTracker';
 
 import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
@@ -33,6 +34,7 @@ function App() {
   // Local state for unregistered interactions
   const [localInteractions, setLocalInteractions] = useState<InteractionConfig[]>([]);
   const [registeredInteractions, setRegisteredInteractions] = useState<InteractionConfig[]>([]);
+  const [originalRegisteredIds, setOriginalRegisteredIds] = useState<Set<string>>(new Set());
 
   // UI state
   const [uiState, setUIState] = useState<UIState>({
@@ -73,33 +75,26 @@ function App() {
     const ws = new WebSocket('ws://localhost:3001');
     
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      // WebSocket connected
     };
     
     ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        if (message.type === 'state_update') {
-          console.log('Received state update from backend:', message.data);
-          
-          // Update registered interactions from backend
-          setRegisteredInteractions(message.data.interactions || []);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+      const message = JSON.parse(event.data);
+      if (message.type === 'state_update') {
+        // Update state from backend
+        setRegisteredInteractions(message.data.interactions || []);
+        setOriginalRegisteredIds(new Set<string>(message.data.interactions?.map((i: any) => i.id) || []));
       }
+    };
+    
+    ws.onclose = () => {
+      // WebSocket disconnected
     };
     
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
     };
     
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-    
-    // Cleanup on unmount
     return () => {
       ws.close();
     };
@@ -128,6 +123,13 @@ function App() {
       
       // Only update registered interactions, preserve local ones
       setRegisteredInteractions(interactions);
+      
+      // Track the original registered interaction IDs
+      const originalIds = new Set(interactions.map(interaction => interaction.id));
+      setOriginalRegisteredIds(originalIds);
+      
+      // Update edge registration tracker on initial load only
+      edgeRegistrationTracker.updateFromInteractions(interactions, localInteractions);
     } catch (error) {
       setAppState(prev => ({
         ...prev,
@@ -148,6 +150,17 @@ function App() {
       // Move local interactions to registered after successful registration
       setRegisteredInteractions(prev => [...prev, ...localInteractions]);
       setLocalInteractions([]);
+      
+      // Update original registered IDs to include the newly registered interactions
+      setOriginalRegisteredIds(prev => {
+        const newSet = new Set(prev);
+        localInteractions.forEach(interaction => newSet.add(interaction.id));
+        return newSet;
+      });
+      
+      // Update edge registration tracker after registration - all interactions are now registered
+      const allRegisteredInteractions = [...registeredInteractions, ...localInteractions];
+      edgeRegistrationTracker.updateFromInteractions(allRegisteredInteractions, []);
       
       setAppState(prev => ({
         ...prev,
@@ -170,17 +183,14 @@ function App() {
 
   // Handle interaction updates (local changes)
   const handleInteractionsUpdate = useCallback((interactions: InteractionConfig[]) => {
-    console.log('📱 App: handleInteractionsUpdate called with:', interactions);
-    console.log('📱 App: Current registered interactions:', registeredInteractions);
     
-    // Determine which interactions are local vs registered
+    // Determine which interactions are local vs registered based on original IDs
     const local: InteractionConfig[] = [];
     const registered: InteractionConfig[] = [];
     
     interactions.forEach(interaction => {
-      // Check if this interaction exists in registered interactions
-      const isRegistered = registeredInteractions.some(reg => reg.id === interaction.id);
-      console.log('📱 App: Interaction', interaction.id, 'is registered:', isRegistered);
+      // Check if this interaction was originally loaded from backend
+      const isRegistered = originalRegisteredIds.has(interaction.id);
       
       if (isRegistered) {
         registered.push(interaction);
@@ -189,15 +199,14 @@ function App() {
       }
     });
     
-    console.log('📱 App: Local interactions to set:', local);
-    console.log('📱 App: Registered interactions to set:', registered);
-    
     // Update local interactions with any new local changes
     setLocalInteractions(local);
-    
-    // Update registered interactions with any changes to existing registered ones
     setRegisteredInteractions(registered);
-  }, [registeredInteractions]);
+    
+    // Update edge registration tracker - but preserve individual edge registration states
+    // Don't call updateFromInteractions here as it would override individual edge states
+    // Instead, let the tracker maintain its current state for existing edges
+  }, [originalRegisteredIds]);
 
   // Handle settings updates
   const handleSettingsUpdate = useCallback(async (key: string, value: any) => {
@@ -235,7 +244,6 @@ function App() {
 
   // Handle page changes
   const handlePageChange = useCallback((page: AppPage) => {
-    console.log('Changing page from', uiState.currentPage, 'to', page);
     setUIState(prev => ({ ...prev, currentPage: page }));
   }, [uiState.currentPage]);
 

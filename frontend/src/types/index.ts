@@ -12,6 +12,7 @@ export interface FrontendNodeData {
   isSelected?: boolean;
   onSelect?: () => void;
   onDelete?: (nodeId: string) => void;
+  edges?: any[]; // Array of edges for handle coloring
 }
 
 // Frontend-specific edge data
@@ -102,4 +103,15 @@ export interface Connection {
 export interface AppEvent {
   type: 'node-added' | 'node-removed' | 'connection-added' | 'connection-removed' | 'config-changed';
   data: any;
+}
+
+// Edge registration tracking
+export interface EdgeRegistrationTracker {
+  registeredEdges: Set<string>; // Set of edge IDs that are registered
+  unregisteredEdges: Set<string>; // Set of edge IDs that are not registered
+  isEdgeRegistered: (edgeId: string) => boolean;
+  registerEdge: (edgeId: string) => void;
+  unregisterEdge: (edgeId: string) => void;
+  updateFromInteractions: (registeredInteractions: InteractionConfig[], localInteractions: InteractionConfig[]) => void;
+  clear: () => void;
 } 

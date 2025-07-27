@@ -138,6 +138,27 @@
   border-color: #065f46;
 }
 
+/* Input handle colors for output modules */
+.handle[data-handleid="input"].triggerConnected {
+  background: #dc2626;
+  border-color: #991b1b;
+}
+
+.handle[data-handleid="input"].triggerConnected:hover {
+  background: #b91c1c;
+  border-color: #7f1d1d;
+}
+
+.handle[data-handleid="input"].streamConnected {
+  background: #059669;
+  border-color: #047857;
+}
+
+.handle[data-handleid="input"].streamConnected:hover {
+  background: #047857;
+  border-color: #065f46;
+}
+
 .handleLabel {
   font-size: 10px;
   color: #9ca3af;

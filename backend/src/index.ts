@@ -64,29 +64,14 @@ export class InteractorServer {
    */
   public async init(): Promise<void> {
     try {
-      // Load configuration only if not already set
-      if (!this.config) {
-        await this.loadConfig();
-      }
-      
-      // Initialize core services
+      await this.loadConfig();
       await this.initializeServices();
-      
-      // Setup middleware
       await this.setupMiddleware();
-      
-      // Setup routes
-      this.setupRoutes();
-      
-      // Setup WebSocket
-      this.setupWebSocket();
-      
-      // Setup module state update listeners
-      this.setupModuleStateListeners();
-      
-      console.log('Interactor Server initialized successfully');
+      await this.setupRoutes();
+      await this.setupWebSocket();
+      await this.setupModuleStateListeners();
     } catch (error) {
-      console.error('Failed to initialize Interactor Server:', error);
+      this.logger.error('Failed to initialize Interactor Server', 'InteractorServer', { error: String(error) });
       throw error;
     }
   }
@@ -302,6 +287,41 @@ export class InteractorServer {
         
         // Replace entire interaction state
         await this.stateManager.replaceState({ interactions: interactionMap });
+        
+        // Process routes from interactions and add to MessageRouter
+        const messageRouter = MessageRouter.getInstance();
+        messageRouter.clearRoutes(); // Clear existing routes
+        
+        interactionMap.forEach(interaction => {
+          if (interaction.routes) {
+            interaction.routes.forEach(route => {
+              // For output modules, we need to map the simplified "input" handle to actual module events
+              // Since MessageRoute doesn't contain handle info, we'll use the event name to determine mapping
+              const targetModule = interaction.modules.find(m => m.id === route.target);
+              if (targetModule) {
+                const manifest = this.moduleLoader.getManifest(targetModule.moduleName);
+                if (manifest?.type === 'output' && manifest.events) {
+                  const inputEvents = manifest.events.filter(e => e.type === 'input');
+                  if (inputEvents.length > 0 && inputEvents[0]?.name) {
+                    // For output modules, map to the first available input event
+                    const mappedRoute = {
+                      ...route,
+                      event: inputEvents[0].name
+                    };
+                    messageRouter.addRoute(mappedRoute);
+                    this.logger.debug(`Mapped route for output module: ${route.id} -> ${inputEvents[0].name}`, 'InteractorServer');
+                  }
+                } else {
+                  // For regular routes, add as-is
+                  messageRouter.addRoute(route);
+                }
+              } else {
+                // Fallback: add route as-is
+                messageRouter.addRoute(route);
+              }
+            });
+          }
+        });
         
         // Create module instances for all modules in interactions
         const moduleInstances: any[] = [];
@@ -574,15 +594,15 @@ export class InteractorServer {
 if (require.main === module) {
   const server = new InteractorServer();
   
-  // Handle graceful shutdown
+  // Graceful shutdown handlers
   process.on('SIGINT', async () => {
-    console.log('\nReceived SIGINT, shutting down gracefully...');
+    console.log('Received SIGINT, shutting down gracefully...');
     await server.stop();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    console.log('\nReceived SIGTERM, shutting down gracefully...');
+    console.log('Received SIGTERM, shutting down gracefully...');
     await server.stop();
     process.exit(0);
   });

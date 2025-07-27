@@ -8,13 +8,35 @@ interface CustomNodeProps extends NodeProps<FrontendNodeData> {
 }
 
 const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id }) => {
-  const { module, instance, isSelected, onSelect, onDelete } = data;
+  const { module, instance, isSelected, onSelect, onDelete, edges = [] } = data;
   const moduleName = module.name;
   const config = instance?.config || {};
   const manifest = module;
 
   const inputEvents = manifest.events?.filter((e: any) => e.type === 'input') || [];
   const outputEvents = manifest.events?.filter((e: any) => e.type === 'output') || [];
+
+  // Determine the connection type for output module input handle
+  const getInputHandleClass = () => {
+    if (manifest.type !== 'output') return '';
+    
+    // Find edges that connect to this node's input handle
+    const connectedEdges = edges.filter((edge: any) => 
+      edge.target === id && edge.targetHandle === 'input'
+    );
+    
+    if (connectedEdges.length === 0) return '';
+    
+    // Get the source handle type from the first connected edge
+    const sourceHandle = connectedEdges[0].sourceHandle;
+    if (sourceHandle === 'trigger') {
+      return styles.triggerConnected;
+    } else if (sourceHandle === 'stream') {
+      return styles.streamConnected;
+    }
+    
+    return '';
+  };
 
   return (
     <div 
@@ -49,18 +71,32 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id }) => {
       {/* Input Handles */}
       <div className={styles.handles}>
         <div className={styles.inputHandles}>
-          {inputEvents.map((event: any, index: number) => (
-            <div key={event.name} className={styles.handleContainer}>
+          {manifest.type === 'output' ? (
+            // For output modules, show only one input handle
+            <div className={styles.handleContainer}>
               <Handle
                 type="target"
                 position={Position.Left}
-                id={event.name}
-                className={styles.handle}
-                style={{ top: `${20 + index * 20}px` }}
+                id="input"
+                className={`${styles.handle} ${getInputHandleClass()}`}
               />
-              <span className={styles.handleLabel}>{event.name}</span>
+              <span className={styles.handleLabel}>Input</span>
             </div>
-          ))}
+          ) : (
+            // For input modules, show all input events
+            inputEvents.map((event: any, index: number) => (
+              <div key={event.name} className={styles.handleContainer}>
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={event.name}
+                  className={styles.handle}
+                  style={{ top: `${20 + index * 20}px` }}
+                />
+                <span className={styles.handleLabel}>{event.name}</span>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Output Handles */}
@@ -88,18 +124,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id }) => {
               </div>
             </>
           ) : (
-            // For other module types, show the original output events
-            outputEvents.map((event: any) => (
-              <div key={event.name} className={styles.handleContainer}>
-                <span className={styles.handleLabel}>{event.name}</span>
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={event.name}
-                  className={styles.handle}
-                />
-              </div>
-            ))
+            // For output modules, show no output handles
+            null
           )}
         </div>
       </div>

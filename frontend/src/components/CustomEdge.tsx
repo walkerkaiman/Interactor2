@@ -1,6 +1,7 @@
 import React from 'react';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
+import { EdgeLabelRenderer, getBezierPath } from 'reactflow';
 import { FrontendEdgeData } from '../types';
+import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
 import styles from './CustomEdge.module.css';
 
 interface CustomEdgeProps {
@@ -16,74 +17,34 @@ interface CustomEdgeProps {
   selected?: boolean;
 }
 
-const CustomEdge: React.FC<CustomEdgeProps> = ({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  style = {},
-  data,
-}) => {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
-  // Only show label for stream connections
-  const isStreamConnection = data?.route?.event === 'stream';
-  const isRegistered = data?.isRegistered;
+const CustomEdge: React.FC<CustomEdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, data }) => {
+  const isRegistered = edgeRegistrationTracker.isEdgeRegistered(id);
   
-  // Mock value for demonstration - in a real implementation, this would come from the actual module data
-  const getStreamValue = () => {
-    if (!isStreamConnection) return null;
-    
-    // Generate different mock values based on time to simulate real data
-    const timestamp = Date.now();
-    const baseValue = (timestamp % 1000) / 10; // Value between 0-100
-    
-    // Add some variation to make it look more realistic
-    const variation = Math.sin(timestamp / 1000) * 10;
-    return (baseValue + variation).toFixed(1);
-  };
+  // Determine CSS classes based on registration status and event type
+  const edgeClasses = [];
   
-  const streamValue = getStreamValue();
-
+  if (isRegistered) {
+    edgeClasses.push(styles.registeredEdge);
+  } else {
+    edgeClasses.push(styles.unregisteredEdge);
+  }
+  
+  // Add event type color classes
+  if (data?.route?.event === 'trigger') {
+    edgeClasses.push(styles.triggerEdge);
+  } else if (data?.route?.event === 'stream') {
+    edgeClasses.push(styles.streamEdge);
+  }
+  
+  const className = edgeClasses.join(' ');
+  
   return (
-    <>
-      <BaseEdge 
-        path={edgePath} 
-        style={style} 
-        className={isRegistered ? styles.animatedEdge : ''}
-      />
-      {isStreamConnection && streamValue && (
-        <EdgeLabelRenderer>
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              fontSize: 12,
-              fontWeight: 'bold',
-              backgroundColor: '#059669',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              border: '1px solid #047857',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-              pointerEvents: 'none',
-              zIndex: 1000,
-            }}
-          >
-            {streamValue}
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
+    <path
+      d={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`}
+      className={className}
+      fill="none"
+      strokeWidth="2"
+    />
   );
 };
 
