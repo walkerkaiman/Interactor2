@@ -1,12 +1,12 @@
 @echo off
 REM ========================================
-REM    Interactor2 - Development Start
-REM    This script starts servers without building (faster for development)
-REM    For production build & start, use: start.bat
+REM    Interactor - Development Start
+REM    This script starts the development servers
+REM    For production build, use: start.bat
 REM ========================================
 echo ========================================
-echo    Interactor2 - Interactive Art
-echo    Development System
+echo    Interactor - Interactive Art
+echo    Development Mode
 echo ========================================
 echo.
 
@@ -67,51 +67,59 @@ cd ..
 
 echo.
 echo ========================================
-echo    Starting Interactor2 Development Servers
+echo    Starting Interactor Development
 echo ========================================
 echo.
 
-REM Start backend server in a new window
-echo Starting Backend Server...
-start "Interactor2 Backend" cmd /k "cd /d %CD%\backend && echo Backend Server Starting... && echo Server will be available at: http://localhost:3001 && echo Press Ctrl+C to stop the backend server && echo. && npm start"
+REM Start backend server in development mode
+echo Starting Backend Server (Development Mode)...
+echo The backend will serve both the API and the frontend interface.
+start "Interactor2 Backend Dev" cmd /k "cd /d %CD%\backend && echo Backend Server Starting (Dev Mode)... && echo Server will be available at: http://localhost:3001 && echo This serves both the API and the frontend interface && echo Press Ctrl+C to stop the server && echo. && npm run dev"
 
-REM Wait a moment for backend to start
-timeout /t 3 /nobreak >nul
-
-REM Start frontend server in a new window
-echo Starting Frontend Server...
-start "Interactor2 Frontend" cmd /k "cd /d %CD%\frontend && echo Frontend Server Starting... && echo Server will be available at: http://localhost:3002 && echo Press Ctrl+C to stop the frontend server && echo. && npm run dev"
-
-REM Wait a moment for frontend to start
+REM Wait for server to start and verify it's running
+echo Waiting for server to start...
 timeout /t 5 /nobreak >nul
+
+REM Check if server is running
+echo Checking if server is running...
+:check_server
+curl -s http://localhost:3001/health >nul 2>&1
+if errorlevel 1 (
+    echo Server not ready yet, waiting...
+    timeout /t 2 /nobreak >nul
+    goto check_server
+)
+
+echo Server is running! Opening browser...
 
 REM Open the web interface
 echo Opening Web Interface...
 echo.
 echo ========================================
-echo    Interactor2 Development Mode
+echo    Interactor is starting up...
 echo ========================================
-echo Backend:  http://localhost:3001
-echo Frontend: http://localhost:3002
+echo Server: http://localhost:3001
 echo.
 echo Opening web interface in your default browser...
 echo.
 
-REM Try to open the frontend URL
-start http://localhost:3002
+REM Try multiple ways to open the browser
+start http://localhost:3001 2>nul
+if errorlevel 1 (
+    echo Trying alternative browser launch method...
+    start "" http://localhost:3001
+)
 
 echo.
 echo ========================================
-echo    Interactor2 Development Started!
+echo    Interactor Development Started!
 echo ========================================
 echo.
-echo Both servers are now running in development mode:
-echo - Backend:  http://localhost:3001
-echo - Frontend: http://localhost:3002
+echo The server is now running at: http://localhost:3001
 echo.
 echo The web interface should have opened automatically.
-echo If not, please manually navigate to: http://localhost:3002
+echo If not, please manually navigate to: http://localhost:3001
 echo.
-echo To stop the servers, close the command windows or press Ctrl+C in each.
+echo To stop the server, close the command window or press Ctrl+C.
 echo.
 pause 

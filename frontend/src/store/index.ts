@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 // Simple store without actions in state
 export const useAppStore = create<Omit<AppState, 'actions'>>()(
   devtools(
-    immer((set) => ({
+    immer((_set) => ({
       // Core data
       modules: new Map(),
       moduleInstances: new Map(),

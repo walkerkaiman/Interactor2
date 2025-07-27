@@ -97,19 +97,29 @@ export const PerformanceDashboardTab: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="h-full flex flex-col bg-bg-primary"
+      className="h-full flex flex-col bg-gray-800 text-white"
     >
       {/* Header */}
-      <div className="bg-bg-secondary border-b border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-text-primary">
-            📊 Performance Dashboard
-          </h1>
+      <div className="bg-gray-700 border-b border-gray-600 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+              <span className="text-white text-xl">📊</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                Performance Dashboard
+              </h1>
+              <p className="text-sm text-gray-300">
+                Real-time system monitoring and analytics
+              </p>
+            </div>
+          </div>
           <div className="flex items-center space-x-4">
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="px-3 py-1 text-sm bg-bg-primary border border-border rounded text-text-primary"
+              className="px-4 py-2 text-sm bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="1h">Last Hour</option>
               <option value="6h">Last 6 Hours</option>
@@ -119,7 +129,7 @@ export const PerformanceDashboardTab: React.FC = () => {
             <select
               value={refreshInterval}
               onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="px-3 py-1 text-sm bg-bg-primary border border-border rounded text-text-primary"
+              className="px-4 py-2 text-sm bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value={1000}>1s Refresh</option>
               <option value={5000}>5s Refresh</option>
@@ -131,32 +141,35 @@ export const PerformanceDashboardTab: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-8">
         {systemStats ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {/* System Overview Cards */}
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">System Overview</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">⚙️</span>
+                System Overview
+              </h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-text-secondary">Uptime</span>
-                  <span className="text-text-primary font-mono">{formatUptime(systemStats.uptime)}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-600 rounded-lg">
+                  <span className="text-gray-300 font-medium">Uptime</span>
+                  <span className="text-white font-mono font-bold">{formatUptime(systemStats.uptime)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-text-secondary">CPU Cores</span>
-                  <span className="text-text-primary">{systemStats.cpu.cores}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-600 rounded-lg">
+                  <span className="text-gray-300 font-medium">CPU Cores</span>
+                  <span className="text-white font-bold">{systemStats.cpu.cores}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-text-secondary">Total Memory</span>
-                  <span className="text-text-primary">{formatBytes(systemStats.memory.total)}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-600 rounded-lg">
+                  <span className="text-gray-300 font-medium">Total Memory</span>
+                  <span className="text-white font-bold">{formatBytes(systemStats.memory.total)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-text-secondary">Used Memory</span>
-                  <span className="text-text-primary">{formatBytes(systemStats.memory.used)}</span>
+                <div className="flex justify-between items-center p-3 bg-gray-600 rounded-lg">
+                  <span className="text-gray-300 font-medium">Used Memory</span>
+                  <span className="text-white font-bold">{formatBytes(systemStats.memory.used)}</span>
                 </div>
               </div>
             </motion.div>
@@ -166,36 +179,39 @@ export const PerformanceDashboardTab: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">CPU Usage</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">🖥️</span>
+                CPU Usage
+              </h3>
               <div className="text-center">
                 <div className="relative inline-block">
-                  <svg className="w-24 h-24 transform -rotate-90">
+                  <svg className="w-32 h-32 transform -rotate-90">
                     <circle
-                      cx="48"
-                      cy="48"
-                      r="36"
+                      cx="64"
+                      cy="64"
+                      r="48"
                       stroke="currentColor"
-                      strokeWidth="8"
+                      strokeWidth="10"
                       fill="transparent"
-                      className="text-border"
+                      className="text-gray-300"
                     />
                     <circle
-                      cx="48"
-                      cy="48"
-                      r="36"
+                      cx="64"
+                      cy="64"
+                      r="48"
                       stroke="currentColor"
-                      strokeWidth="8"
+                      strokeWidth="10"
                       fill="transparent"
-                      strokeDasharray={`${2 * Math.PI * 36}`}
-                      strokeDashoffset={`${2 * Math.PI * 36 * (1 - systemStats.cpu.usage / 100)}`}
+                      strokeDasharray={`${2 * Math.PI * 48}`}
+                      strokeDashoffset={`${2 * Math.PI * 48 * (1 - systemStats.cpu.usage / 100)}`}
                       className="transition-all duration-500"
                       style={{ color: getCpuColor(systemStats.cpu.usage) }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-bold" style={{ color: getCpuColor(systemStats.cpu.usage) }}>
+                    <span className="text-3xl font-bold" style={{ color: getCpuColor(systemStats.cpu.usage) }}>
                       {Math.round(systemStats.cpu.usage)}%
                     </span>
                   </div>
@@ -208,36 +224,39 @@ export const PerformanceDashboardTab: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">Memory Usage</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">💾</span>
+                Memory Usage
+              </h3>
               <div className="text-center">
                 <div className="relative inline-block">
-                  <svg className="w-24 h-24 transform -rotate-90">
+                  <svg className="w-32 h-32 transform -rotate-90">
                     <circle
-                      cx="48"
-                      cy="48"
-                      r="36"
+                      cx="64"
+                      cy="64"
+                      r="48"
                       stroke="currentColor"
-                      strokeWidth="8"
+                      strokeWidth="10"
                       fill="transparent"
-                      className="text-border"
+                      className="text-gray-300"
                     />
                     <circle
-                      cx="48"
-                      cy="48"
-                      r="36"
+                      cx="64"
+                      cy="64"
+                      r="48"
                       stroke="currentColor"
-                      strokeWidth="8"
+                      strokeWidth="10"
                       fill="transparent"
-                      strokeDasharray={`${2 * Math.PI * 36}`}
-                      strokeDashoffset={`${2 * Math.PI * 36 * (1 - systemStats.memory.percentage / 100)}`}
+                      strokeDasharray={`${2 * Math.PI * 48}`}
+                      strokeDashoffset={`${2 * Math.PI * 48 * (1 - systemStats.memory.percentage / 100)}`}
                       className="transition-all duration-500"
                       style={{ color: getMemoryColor(systemStats.memory.percentage) }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-bold" style={{ color: getMemoryColor(systemStats.memory.percentage) }}>
+                    <span className="text-3xl font-bold" style={{ color: getMemoryColor(systemStats.memory.percentage) }}>
                       {Math.round(systemStats.memory.percentage)}%
                     </span>
                   </div>
@@ -250,9 +269,12 @@ export const PerformanceDashboardTab: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">Module Status</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">🔧</span>
+                Module Status
+              </h3>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -271,14 +293,14 @@ export const PerformanceDashboardTab: React.FC = () => {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="mt-4 space-y-2">
+              <div className="mt-6 space-y-3">
                 {moduleStatusData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-sm text-text-secondary">{item.name}</span>
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-600 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm font-medium text-gray-300">{item.name}</span>
                     </div>
-                    <span className="text-sm font-medium text-text-primary">{item.value}</span>
+                    <span className="text-sm font-bold text-white">{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -289,14 +311,17 @@ export const PerformanceDashboardTab: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">Message Statistics</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">📨</span>
+                Message Statistics
+              </h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={messageData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9ca3af" />
-                  <YAxis stroke="#9ca3af" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" />
+                  <XAxis dataKey="name" stroke="#64748b" />
+                  <YAxis stroke="#64748b" />
                   <Tooltip />
                   <Bar dataKey="value" fill="#3b82f6" />
                 </BarChart>
@@ -308,18 +333,21 @@ export const PerformanceDashboardTab: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="bg-bg-secondary rounded-lg p-4 border border-border lg:col-span-2 xl:col-span-1"
+              className="bg-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg hover:shadow-xl transition-all duration-300 lg:col-span-2 xl:col-span-1"
             >
-              <h3 className="text-lg font-semibold text-text-primary mb-4">Performance Trends</h3>
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                <span className="text-2xl mr-3">📈</span>
+                Performance Trends
+              </h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={historicalData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" />
                   <XAxis 
                     dataKey="timestamp" 
-                    stroke="#9ca3af"
+                    stroke="#64748b"
                     tickFormatter={(value) => new Date(value).toLocaleTimeString()}
                   />
-                  <YAxis stroke="#9ca3af" />
+                  <YAxis stroke="#64748b" />
                   <Tooltip 
                     labelFormatter={(value) => new Date(value).toLocaleTimeString()}
                   />
@@ -327,14 +355,14 @@ export const PerformanceDashboardTab: React.FC = () => {
                     type="monotone" 
                     dataKey="cpu" 
                     stroke="#3b82f6" 
-                    strokeWidth={2}
+                    strokeWidth={3}
                     dot={false}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="memory" 
                     stroke="#10b981" 
-                    strokeWidth={2}
+                    strokeWidth={3}
                     dot={false}
                   />
                 </LineChart>
@@ -345,9 +373,13 @@ export const PerformanceDashboardTab: React.FC = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-center justify-center h-full text-text-muted"
+            className="flex items-center justify-center h-full text-gray-400"
           >
-            <p>Loading system statistics...</p>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-lg font-medium">Loading system statistics...</p>
+              <p className="text-sm text-gray-400">Please wait while we gather performance data</p>
+            </div>
           </motion.div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { websocketService, WebSocketHandlers } from '@/services/websocket';
-import { useAppStore, useAppActions } from '@/store';
+import { useAppActions } from '@/store';
 import { SystemStats, LogEntry, InteractionConfig, MessageRoute } from '@/types/api';
 
 export const useWebSocket = () => {

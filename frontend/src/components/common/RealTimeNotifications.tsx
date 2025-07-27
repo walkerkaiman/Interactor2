@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAppStore } from '@/store';
 import { 
   InformationCircleIcon,
@@ -31,7 +31,7 @@ export const RealTimeNotifications: React.FC = () => {
       timestamp: Date.now()
     };
 
-    setNotifications(prev => [newNotification, ...prev.slice(0, 4)]); // Keep max 5 notifications
+    setNotifications(prev => [newNotification, ...prev.slice(0, 0)]); // Keep only the latest notification
   }, []);
 
   // Auto-remove notifications after duration
@@ -60,14 +60,14 @@ export const RealTimeNotifications: React.FC = () => {
         addNotification({
           type: 'success',
           title: 'Connected',
-          message: 'WebSocket connection established successfully',
+          message: 'WebSocket ready',
           duration: 3000
         });
       } else if (!currentState.connected && !currentState.connecting) {
         addNotification({
           type: 'error',
           title: 'Disconnected',
-          message: 'WebSocket connection lost. Attempting to reconnect...',
+          message: 'Reconnecting...',
           duration: 5000
         });
       }
@@ -86,20 +86,20 @@ export const RealTimeNotifications: React.FC = () => {
       const memoryDiff = Math.abs(currentState.memory - lastSystemState.current.memory);
       const cpuDiff = Math.abs(currentState.cpu - lastSystemState.current.cpu);
       
-      if (memoryDiff > 5 || cpuDiff > 5) {
-        if (memory.percentage > 90 || cpu.usage > 90) {
+      if (memoryDiff > 10 || cpuDiff > 10) {
+        if (memory.percentage > 95 || cpu.usage > 95) {
           addNotification({
             type: 'error',
-            title: 'System Critical',
-            message: `High resource usage: CPU ${cpu.usage.toFixed(1)}%, RAM ${memory.percentage.toFixed(1)}%`,
-            duration: 10000
+            title: 'Critical',
+            message: `CPU ${cpu.usage.toFixed(0)}%, RAM ${memory.percentage.toFixed(0)}%`,
+            duration: 8000
           });
-        } else if (memory.percentage > 70 || cpu.usage > 70) {
+        } else if (memory.percentage > 85 || cpu.usage > 85) {
           addNotification({
             type: 'warning',
-            title: 'System Warning',
-            message: `Elevated resource usage: CPU ${cpu.usage.toFixed(1)}%, RAM ${memory.percentage.toFixed(1)}%`,
-            duration: 8000
+            title: 'High Usage',
+            message: `CPU ${cpu.usage.toFixed(0)}%, RAM ${memory.percentage.toFixed(0)}%`,
+            duration: 6000
           });
         }
         
@@ -125,18 +125,7 @@ export const RealTimeNotifications: React.FC = () => {
     }
   };
 
-  const getNotificationStyles = (type: Notification['type']) => {
-    switch (type) {
-      case 'success':
-        return 'bg-green-50 border-green-200 text-green-800';
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'error':
-        return 'bg-red-50 border-red-200 text-red-800';
-      default:
-        return 'bg-blue-50 border-blue-200 text-blue-800';
-    }
-  };
+
 
   // Get the most recent notification for display in title bar
   const latestNotification = notifications[0];

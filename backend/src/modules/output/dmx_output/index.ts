@@ -14,9 +14,9 @@ import {
 } from '@interactor/shared';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as express from 'express';
-import * as multer from 'multer';
-import * as csv from 'csv-parser';
+import express from 'express';
+import multer from 'multer';
+import csv from 'csv-parser';
 
 export class DmxOutputModule extends OutputModuleBase {
   private universe: number;

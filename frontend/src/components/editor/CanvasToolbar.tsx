@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useReactFlow } from 'reactflow';
 import { useNodes, useEdges, useAppActions } from '@/store';
+import { ModuleDropdown } from './ModuleDropdown';
 import { 
   MagnifyingGlassIcon,
   PlusIcon,
@@ -323,6 +324,13 @@ export const CanvasToolbar: React.FC = () => {
       className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10"
     >
       <div className="flex items-center space-x-1 bg-white border border-gray-200 rounded-lg p-1 shadow-lg">
+        {/* Module Dropdown */}
+        <div className="mr-2">
+          <ModuleDropdown />
+        </div>
+        
+        {/* Divider */}
+        <div className="w-px h-6 bg-gray-300 mx-1"></div>
         {toolbarItems.map((item, index) => {
           const Icon = item.icon;
           return (

@@ -13,7 +13,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { ModulePalette } from './ModulePalette.tsx';
+// import { ModuleDropdown } from './ModuleDropdown.tsx';
 import { NodeProperties } from './NodeProperties.tsx';
 import { CanvasToolbar } from './CanvasToolbar.tsx';
 import { ContextMenu } from './ContextMenu.tsx';
@@ -104,8 +104,6 @@ const ReactFlowContent: React.FC = () => {
     actions.selectEdge(null);
   }, [actions]);
 
-
-
   return (
     <>
       <ReactFlow
@@ -121,19 +119,19 @@ const ReactFlowContent: React.FC = () => {
         edgeTypes={edgeTypes}
         fitView
         attributionPosition="bottom-left"
-        className="bg-bg-primary"
+        className="bg-gray-800"
       >
         <Background
           gap={20}
           size={1}
-          color="#374151"
+          color="#6b7280"
           className="opacity-30"
         />
-        <Controls className="bg-bg-secondary border border-border rounded-lg" />
+        <Controls className="bg-gray-700 border border-gray-600 rounded-lg shadow-lg" />
         <MiniMap
-          className="bg-bg-secondary border border-border rounded-lg"
+          className="bg-gray-700 border border-gray-600 rounded-lg shadow-lg"
           nodeColor="#3b82f6"
-          maskColor="rgba(0, 0, 0, 0.1)"
+          maskColor="rgba(0, 0, 0, 0.3)"
         />
       </ReactFlow>
       
@@ -160,8 +158,6 @@ export const NodeEditor: React.FC = () => {
     type: 'canvas',
   });
 
-
-
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, show: false }));
   }, []);
@@ -170,11 +166,8 @@ export const NodeEditor: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-full bg-bg-primary"
+      className="flex h-full bg-gray-800 text-white"
     >
-      {/* Module Palette */}
-      <ModulePalette />
-      
       {/* Main Canvas */}
       <div className="flex-1 relative">
         <ReactFlowProvider>

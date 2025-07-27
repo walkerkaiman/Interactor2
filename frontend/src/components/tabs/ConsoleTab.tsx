@@ -1,13 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Chip,
+  Checkbox,
+  FormControlLabel,
+  Paper
+} from '@mui/material';
+import {
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon
+} from '@mui/icons-material';
 import { useLogs, useAppActions } from '@/store';
-
 import { LogFilters } from '@/types/ui';
 
 export const ConsoleTab: React.FC = () => {
   const logs = useLogs();
-
   const actions = useAppActions();
+  
   const [filters, setFilters] = useState<LogFilters>({
     levels: ['info', 'warn', 'error'],
     modules: [],
@@ -45,31 +65,20 @@ export const ConsoleTab: React.FC = () => {
 
   const getLogLevelColor = (level: string) => {
     switch (level) {
-      case 'error':
-        return 'text-status-error';
-      case 'warn':
-        return 'text-status-warning';
-      case 'info':
-        return 'text-text-primary';
-      case 'debug':
-        return 'text-text-secondary';
-      default:
-        return 'text-text-secondary';
+      case 'error': return 'error';
+      case 'warn': return 'warning';
+      case 'info': return 'info';
+      default: return 'default';
     }
   };
 
   const getLogLevelIcon = (level: string) => {
     switch (level) {
-      case 'error':
-        return '❌';
-      case 'warn':
-        return '⚠️';
-      case 'info':
-        return 'ℹ️';
-      case 'debug':
-        return '🔍';
-      default:
-        return '📝';
+      case 'error': return '❌';
+      case 'warn': return '⚠️';
+      case 'info': return 'ℹ️';
+      case 'debug': return '🔍';
+      default: return '📝';
     }
   };
 
@@ -79,200 +88,211 @@ export const ConsoleTab: React.FC = () => {
   };
 
   const filteredLogs = logs.filter(log => {
-    // Level filter
     if (!filters.levels.includes(log.level as any)) return false;
-    
-    // Module filter
     if (filters.modules.length > 0 && log.module && !filters.modules.includes(log.module)) return false;
-    
-    // Search filter
     if (filters.searchQuery && !log.message.toLowerCase().includes(filters.searchQuery.toLowerCase())) return false;
-    
     return true;
   });
 
   const availableModules = Array.from(new Set(logs.map(log => log.module).filter(Boolean)));
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="h-full flex flex-col bg-bg-primary"
-    >
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 2 }}>
       {/* Header */}
-      <div className="bg-bg-secondary border-b border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-text-primary">
-            📋 Console
-          </h1>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handlePauseToggle}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
-                isPaused 
-                  ? 'bg-status-warning text-white' 
-                  : 'bg-status-active text-white'
-              }`}
-            >
-              {isPaused ? '▶️ Resume' : '⏸️ Pause'}
-            </button>
-            <button
-              onClick={handleClearLogs}
-              className="px-3 py-1 text-xs bg-status-error text-white rounded hover:bg-status-error/80"
-            >
-              🗑️ Clear
-            </button>
-          </div>
-        </div>
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                bgcolor: 'primary.main',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+              }}>
+                📋
+              </Box>
+              <Box>
+                <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>
+                  Console
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Real-time system logs and monitoring
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                color={isPaused ? "warning" : "success"}
+                startIcon={isPaused ? <PlayIcon /> : <PauseIcon />}
+                onClick={handlePauseToggle}
+              >
+                {isPaused ? 'Resume' : 'Pause'}
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleClearLogs}
+              >
+                Clear
+              </Button>
+            </Box>
+          </Box>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Level Filter */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Log Levels
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {['debug', 'info', 'warn', 'error'].map(level => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    const newLevels = filters.levels.includes(level as any)
-                      ? filters.levels.filter(l => l !== level)
-                      : [...filters.levels, level as any];
-                    handleFilterChange({ levels: newLevels });
-                  }}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    filters.levels.includes(level as any)
-                      ? 'bg-accent text-white'
-                      : 'bg-bg-primary text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {level.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Filters */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2 }}>
+            {/* Level Filter */}
+            <FormControl fullWidth>
+              <InputLabel>Log Levels</InputLabel>
+                             <Select
+                 multiple
+                 value={filters.levels}
+                 onChange={(e) => {
+                   const selectedLevels = e.target.value as string[];
+                   handleFilterChange({ 
+                     levels: selectedLevels as ("debug" | "info" | "warn" | "error")[] 
+                   });
+                 }}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip key={value} label={value.toUpperCase()} size="small" />
+                    ))}
+                  </Box>
+                )}
+              >
+                {['debug', 'info', 'warn', 'error'].map((level) => (
+                  <MenuItem key={level} value={level}>
+                    {level.toUpperCase()}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          {/* Module Filter */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Modules
-            </label>
-            <select
-              value={filters.modules[0] || ''}
-              onChange={(e) => handleFilterChange({ modules: e.target.value ? [e.target.value] : [] })}
-              className="w-full px-2 py-1 text-xs bg-bg-primary border border-border rounded text-text-primary"
-            >
-              <option value="">All Modules</option>
-              {availableModules.map(module => (
-                <option key={module} value={module}>{module}</option>
-              ))}
-            </select>
-          </div>
+            {/* Module Filter */}
+            <FormControl fullWidth>
+              <InputLabel>Modules</InputLabel>
+              <Select
+                value={filters.modules[0] || ''}
+                onChange={(e) => handleFilterChange({ modules: e.target.value ? [e.target.value] : [] })}
+              >
+                <MenuItem value="">All Modules</MenuItem>
+                {availableModules.map(module => (
+                  <MenuItem key={module} value={module}>{module}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Search
-            </label>
-            <input
-              type="text"
-              placeholder="Search logs..."
+            {/* Search */}
+            <TextField
+              fullWidth
+              label="Search logs"
               value={filters.searchQuery}
               onChange={(e) => handleFilterChange({ searchQuery: e.target.value })}
-              className="w-full px-2 py-1 text-xs bg-bg-primary border border-border rounded text-text-primary placeholder-text-muted"
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+              }}
             />
-          </div>
 
-          {/* Time Range */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Time Range
-            </label>
-            <select
-              value={filters.timeRange}
-              onChange={(e) => handleFilterChange({ timeRange: e.target.value as any })}
-              className="w-full px-2 py-1 text-xs bg-bg-primary border border-border rounded text-text-primary"
-            >
-              <option value="1h">Last Hour</option>
-              <option value="6h">Last 6 Hours</option>
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
-        </div>
-      </div>
+            {/* Time Range */}
+            <FormControl fullWidth>
+              <InputLabel>Time Range</InputLabel>
+              <Select
+                value={filters.timeRange}
+                onChange={(e) => handleFilterChange({ timeRange: e.target.value as any })}
+              >
+                <MenuItem value="1h">Last Hour</MenuItem>
+                <MenuItem value="6h">Last 6 Hours</MenuItem>
+                <MenuItem value="24h">Last 24 Hours</MenuItem>
+                <MenuItem value="7d">Last 7 Days</MenuItem>
+                <MenuItem value="all">All Time</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Logs Display */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col">
-          {/* Log Count */}
-          <div className="px-4 py-2 bg-bg-secondary border-b border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-secondary">
-                {filteredLogs.length} of {logs.length} logs
-              </span>
-              <label className="flex items-center space-x-2 text-sm text-text-secondary">
-                <input
-                  type="checkbox"
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Log Count */}
+        <Paper sx={{ p: 2, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="body2" color="text.secondary">
+              {filteredLogs.length} of {logs.length} logs
+            </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
                   checked={autoScroll}
                   onChange={(e) => setAutoScroll(e.target.checked)}
-                  className="rounded"
                 />
-                <span>Auto-scroll</span>
-              </label>
-            </div>
-          </div>
+              }
+              label="Auto-scroll"
+            />
+          </Box>
+        </Paper>
 
-          {/* Logs List */}
-          <div className="flex-1 overflow-y-auto bg-bg-primary">
-            <AnimatePresence>
-              {filteredLogs.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center justify-center h-full text-text-muted"
-                >
-                  <p>No logs to display</p>
-                </motion.div>
-              ) : (
-                <div className="p-4 space-y-1">
-                  {filteredLogs.map((log, index) => (
-                    <motion.div
-                      key={`${log.timestamp}-${index}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-start space-x-3 p-2 rounded hover:bg-bg-secondary transition-colors"
-                    >
-                      <span className="text-sm text-text-muted min-w-[60px]">
-                        {formatTimestamp(log.timestamp)}
-                      </span>
-                      <span className="text-sm min-w-[20px]">
-                        {getLogLevelIcon(log.level)}
-                      </span>
-                      <span className={`text-sm font-medium min-w-[50px] ${getLogLevelColor(log.level)}`}>
-                        {log.level.toUpperCase()}
-                      </span>
-                      {log.module && (
-                        <span className="text-sm text-accent min-w-[100px]">
-                          [{log.module}]
-                        </span>
-                      )}
-                      <span className="text-sm text-text-primary flex-1">
-                        {log.message}
-                      </span>
-                    </motion.div>
-                  ))}
-                  <div ref={logsEndRef} />
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </motion.div>
+        {/* Logs List */}
+        <Paper sx={{ flex: 1, overflow: 'hidden' }}>
+          <Box sx={{ height: '100%', overflow: 'auto', p: 2 }}>
+            {filteredLogs.length === 0 ? (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100%',
+                color: 'text.secondary'
+              }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" sx={{ mb: 2 }}>📝</Typography>
+                  <Typography variant="h6">No logs to display</Typography>
+                  <Typography variant="body2">Try adjusting your filters</Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {filteredLogs.map((log, index) => (
+                  <Card key={`${log.timestamp}-${index}`} variant="outlined">
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 80, fontFamily: 'monospace' }}>
+                          {formatTimestamp(log.timestamp)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ minWidth: 24 }}>
+                          {getLogLevelIcon(log.level)}
+                        </Typography>
+                        <Chip
+                          label={log.level.toUpperCase()}
+                          color={getLogLevelColor(log.level) as any}
+                          size="small"
+                          sx={{ minWidth: 60 }}
+                        />
+                        {log.module && (
+                          <Chip
+                            label={log.module}
+                            variant="outlined"
+                            size="small"
+                            sx={{ minWidth: 120 }}
+                          />
+                        )}
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {log.message}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+                <div ref={logsEndRef} />
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+    </Box>
   );
 }; 

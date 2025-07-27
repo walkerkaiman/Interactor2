@@ -1,60 +1,124 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Chip,
+  Avatar,
+  useTheme
+} from '@mui/material';
+import {
+  Book as BookIcon,
+  Build as BuildIcon,
+  List as ListIcon,
+  Analytics as AnalyticsIcon,
+  Circle as CircleIcon
+} from '@mui/icons-material';
 import { useActiveTab, useAppActions } from '@/store';
 import { RealTimeNotifications } from './RealTimeNotifications';
 
 export const TopBar: React.FC = () => {
   const activeTab = useActiveTab();
-
   const actions = useAppActions();
+  const theme = useTheme();
 
   const tabs = [
-    { id: 'wiki', label: '📚 Wiki', icon: '📚' },
-    { id: 'editor', label: '🔧 Module Editor', icon: '🔧' },
-    { id: 'console', label: '📋 Console', icon: '📋' },
-    { id: 'dashboard', label: '📊 Performance', icon: '📊' },
+    { id: 'wiki', label: 'Wiki', icon: <BookIcon /> },
+    { id: 'editor', label: 'Module Editor', icon: <BuildIcon /> },
+    { id: 'console', label: 'Console', icon: <ListIcon /> },
+    { id: 'dashboard', label: 'Performance', icon: <AnalyticsIcon /> },
   ] as const;
 
   return (
-    <motion.header
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="bg-bg-secondary border-b border-border px-6 py-4"
+    <AppBar
+      position="static"
+      elevation={2}
+      sx={{
+        bgcolor: 'background.paper',
+        borderBottom: `1px solid ${theme.palette.divider}`
+      }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-6">
-          <h1 className="text-xl font-bold text-text-primary">
-            Interactor
-          </h1>
-          
-          <nav className="flex space-x-1">
+      <Toolbar sx={{ justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          {/* Logo */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'primary.main',
+                width: 40,
+                height: 40
+              }}
+            >
+              I
+            </Avatar>
+            <Typography
+              variant="h5"
+              component="h1"
+              sx={{
+                fontWeight: 'bold',
+                color: 'text.primary'
+              }}
+            >
+              Interactor
+            </Typography>
+          </Box>
+
+          {/* Navigation */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
             {tabs.map((tab) => (
-              <motion.button
+              <Button
                 key={tab.id}
                 onClick={() => actions.switchTab(tab.id)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`
-                  px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${activeTab === tab.id
-                    ? 'bg-accent text-white'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-primary'
-                  }
-                `}
+                variant={activeTab === tab.id ? "contained" : "text"}
+                startIcon={tab.icon}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 'medium',
+                  px: 2,
+                  py: 1,
+                  ...(activeTab === tab.id && {
+                    bgcolor: 'primary.main',
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    }
+                  }),
+                  ...(activeTab !== tab.id && {
+                    color: 'text.secondary',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                      color: 'text.primary',
+                    }
+                  })
+                }}
               >
                 {tab.label}
-              </motion.button>
+              </Button>
             ))}
-          </nav>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-status-active rounded-full animate-pulse" />
-            <span className="text-sm text-text-secondary">System Online</span>
-          </div>
-        </div>
-      </div>
-    </motion.header>
+          </Box>
+        </Box>
+
+        {/* Status & Notifications */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <RealTimeNotifications />
+          <Chip
+            icon={<CircleIcon sx={{ color: 'success.main', fontSize: 12 }} />}
+            label="System Online"
+            variant="outlined"
+            color="success"
+            size="small"
+            sx={{
+              borderColor: 'success.main',
+              color: 'success.main',
+              '& .MuiChip-label': {
+                fontWeight: 'medium'
+              }
+            }}
+          />
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
 }; 
