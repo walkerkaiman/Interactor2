@@ -105,6 +105,8 @@ function App() {
     };
   }, []);
 
+
+
   // Load initial data
   useEffect(() => {
     loadInitialData();
@@ -168,6 +170,9 @@ function App() {
 
   // Handle interaction updates (local changes)
   const handleInteractionsUpdate = useCallback((interactions: InteractionConfig[]) => {
+    console.log('📱 App: handleInteractionsUpdate called with:', interactions);
+    console.log('📱 App: Current registered interactions:', registeredInteractions);
+    
     // Determine which interactions are local vs registered
     const local: InteractionConfig[] = [];
     const registered: InteractionConfig[] = [];
@@ -175,12 +180,17 @@ function App() {
     interactions.forEach(interaction => {
       // Check if this interaction exists in registered interactions
       const isRegistered = registeredInteractions.some(reg => reg.id === interaction.id);
+      console.log('📱 App: Interaction', interaction.id, 'is registered:', isRegistered);
+      
       if (isRegistered) {
         registered.push(interaction);
       } else {
         local.push(interaction);
       }
     });
+    
+    console.log('📱 App: Local interactions to set:', local);
+    console.log('📱 App: Registered interactions to set:', registered);
     
     // Update local interactions with any new local changes
     setLocalInteractions(local);

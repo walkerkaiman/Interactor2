@@ -37,19 +37,80 @@
             "x": 659.0929542850979,
             "y": 249.74717004476577
           }
+        },
+        {
+          "id": "node-1753647892473",
+          "moduleName": "HTTP Input",
+          "config": {},
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1753647892473,
+          "position": {
+            "x": 95.04756030439376,
+            "y": 44.53267540921087
+          }
         }
       ],
       "routes": [
         {
-          "id": "f786f6b6-d41d-4d56-9de8-52c3e215c906",
+          "id": "route-1753647827752",
           "source": "c8469352-698d-4398-8c04-dc3d782a7a29",
           "target": "0536f883-0f64-4af1-9617-7451af01f7c6",
           "event": "stream"
+        },
+        {
+          "id": "route-1753647965683",
+          "source": "node-1753647892473",
+          "target": "0536f883-0f64-4af1-9617-7451af01f7c6",
+          "event": "trigger"
         }
       ]
     }
   ],
-  "modules": [],
+  "modules": [
+    {
+      "id": "c8469352-698d-4398-8c04-dc3d782a7a29",
+      "moduleName": "Frames Input",
+      "config": {
+        "universe": 999,
+        "enabled": true
+      },
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1753647969403
+    },
+    {
+      "id": "0536f883-0f64-4af1-9617-7451af01f7c6",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 1,
+        "brightness": 1,
+        "enabled": true,
+        "enableFileUpload": true,
+        "uploadPort": 3001,
+        "uploadHost": "localhost",
+        "maxFileSize": 10485760,
+        "allowedExtensions": [
+          ".csv"
+        ]
+      },
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1753647969403
+    },
+    {
+      "id": "node-1753647892473",
+      "moduleName": "HTTP Input",
+      "config": {},
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1753647969403
+    }
+  ],
   "routes": [],
   "settings": {}
 }
