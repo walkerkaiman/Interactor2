@@ -3,10 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useModules, useAppActions } from '@/store';
 import { ModuleManifest } from '@/types/api';
 
-
 export const ModulePalette: React.FC = () => {
   const modules = useModules();
-
   const actions = useAppActions();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -51,112 +49,154 @@ export const ModulePalette: React.FC = () => {
   const getModuleIcon = (moduleType: string) => {
     switch (moduleType) {
       case 'input':
-        return '📥';
+        return '⚡';
       case 'output':
-        return '📤';
+        return '🎯';
       case 'transform':
-        return '⚙️';
+        return '✨';
       default:
-        return '🔧';
+        return '🔮';
     }
   };
 
-  const getModuleColor = (moduleType: string) => {
+  const getModuleGradient = (moduleType: string) => {
     switch (moduleType) {
       case 'input':
-        return 'border-input-module bg-input-module/5 hover:bg-input-module/10';
+        return 'from-blue-500/20 to-cyan-500/20 border-module-input hover:from-blue-500/30 hover:to-cyan-500/30';
       case 'output':
-        return 'border-output-module bg-output-module/5 hover:bg-output-module/10';
+        return 'from-emerald-500/20 to-green-500/20 border-module-output hover:from-emerald-500/30 hover:to-green-500/30';
       case 'transform':
-        return 'border-transform-module bg-transform-module/5 hover:bg-transform-module/10';
+        return 'from-amber-500/20 to-orange-500/20 border-module-transform hover:from-amber-500/30 hover:to-orange-500/30';
       default:
-        return 'border-border bg-bg-secondary hover:bg-bg-tertiary';
+        return 'from-purple-500/20 to-pink-500/20 border-accent hover:from-purple-500/30 hover:to-pink-500/30';
     }
   };
 
   return (
-    <motion.div
-      initial={{ x: -300 }}
-      animate={{ x: 0 }}
-      className="w-80 bg-bg-secondary border-r border-border flex flex-col"
-    >
+    <div className="w-80 bg-bg-secondary/50 backdrop-blur-xl border-r border-border flex flex-col relative">
+      {/* Glass effect overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-bg-secondary/20 to-transparent pointer-events-none" />
+      
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold text-text-primary mb-3">
-          Module Palette
-        </h2>
+      <div className="relative p-5 border-b border-border">
+        <motion.h2 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xl font-display font-semibold text-text-primary mb-4"
+        >
+          Module Library
+        </motion.h2>
         
-        {/* Search */}
-        <div className="mb-3">
+        {/* Search with enhanced styling */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="mb-4 relative"
+        >
           <input
             type="text"
             placeholder="Search modules..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 bg-bg-primary border border-border rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full px-4 py-2.5 bg-bg-primary/50 border border-border rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200"
           />
-        </div>
+          <svg className="absolute right-3 top-2.5 w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </motion.div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap gap-1">
-          {categories.map(category => (
-            <button
+        {/* Category Filter with pills */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-wrap gap-2"
+        >
+          {categories.map((category, index) => (
+            <motion.button
               key={category}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 + index * 0.05 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setSelectedCategory(category)}
               className={`
-                px-2 py-1 text-xs rounded-md transition-colors
+                px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200
                 ${selectedCategory === category
-                  ? 'bg-accent text-white'
-                  : 'bg-bg-primary text-text-secondary hover:text-text-primary'
+                  ? 'bg-gradient-to-r from-accent to-accent-light text-white shadow-glow'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-hover'
                 }
               `}
             >
               {category.charAt(0).toUpperCase() + category.slice(1)}
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </motion.div>
       </div>
 
-      {/* Module List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        <AnimatePresence>
-          {filteredModules.map(module => (
+      {/* Module List with enhanced cards */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 relative">
+        <AnimatePresence mode="popLayout">
+          {filteredModules.map((module, index) => (
             <motion.div
               key={module.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              layout
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ delay: index * 0.05, duration: 0.3 }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               className={`
-                p-3 rounded-lg border cursor-pointer transition-all duration-200
-                ${getModuleColor(module.type)}
-                hover:shadow-md hover:scale-105
+                relative p-4 rounded-xl border cursor-pointer
+                bg-gradient-to-r ${getModuleGradient(module.type)}
+                backdrop-blur-sm transition-all duration-300
+                hover:shadow-lg hover:shadow-black/20
+                group
               `}
               draggable
               onDragStart={(e: any) => handleModuleDrag(e, module)}
               onClick={() => handleModuleClick(module)}
             >
-              <div className="flex items-center space-x-3">
-                <span className="text-lg">{getModuleIcon(module.type)}</span>
+              {/* Hover glow effect */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              
+              <div className="relative flex items-start space-x-3">
+                <motion.span 
+                  className="text-2xl mt-0.5"
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  {getModuleIcon(module.type)}
+                </motion.span>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-text-primary truncate">
+                  <h3 className="text-sm font-semibold text-text-primary truncate">
                     {module.name}
                   </h3>
-                  <p className="text-xs text-text-secondary truncate">
+                  <p className="text-xs text-text-secondary line-clamp-2 mt-1">
                     {module.description}
                   </p>
                 </div>
               </div>
               
-              {/* Module Type Badge */}
-              <div className="mt-2 flex justify-between items-center">
-                <span className="text-xs px-2 py-1 rounded bg-bg-primary text-text-secondary capitalize">
+              {/* Module metadata */}
+              <div className="mt-3 flex justify-between items-center">
+                <span className="text-2xs px-2 py-1 rounded-full bg-bg-primary/50 text-text-secondary capitalize font-medium">
                   {module.type}
                 </span>
                 {module.version && (
-                  <span className="text-xs text-text-muted">
+                  <span className="text-2xs text-text-muted font-mono">
                     v{module.version}
                   </span>
                 )}
+              </div>
+              
+              {/* Drag indicator */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg className="w-4 h-4 text-text-muted" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M7 2a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0zM17 10a2 2 0 11-4 0 2 2 0 014 0zM7 18a2 2 0 11-4 0 2 2 0 014 0zM17 18a2 2 0 11-4 0 2 2 0 014 0zM17 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
               </div>
             </motion.div>
           ))}
@@ -164,22 +204,24 @@ export const ModulePalette: React.FC = () => {
 
         {filteredModules.length === 0 && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-8 text-text-muted"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12"
           >
-            <p className="text-sm">No modules found</p>
-            <p className="text-xs mt-1">Try adjusting your search or category filter</p>
+            <div className="text-4xl mb-4">🔍</div>
+            <p className="text-sm text-text-secondary">No modules found</p>
+            <p className="text-xs text-text-muted mt-1">Try adjusting your filters</p>
           </motion.div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-border">
-        <p className="text-xs text-text-muted text-center">
+      {/* Footer with gradient border */}
+      <div className="relative p-4 border-t border-border">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border-light to-transparent" />
+        <p className="text-xs text-text-muted text-center font-medium">
           {filteredModules.length} of {modules.length} modules
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }; 

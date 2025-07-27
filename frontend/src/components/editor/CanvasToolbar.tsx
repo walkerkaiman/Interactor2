@@ -317,100 +317,136 @@ export const CanvasToolbar: React.FC = () => {
   ];
 
   return (
-    <motion.div
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10"
-    >
-      <div className="flex items-center space-x-1 bg-white border border-gray-200 rounded-lg p-1 shadow-lg">
-        {toolbarItems.map((item, index) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.label} className="relative">
+    <>
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.3 }}
+        className="absolute top-4 left-1/2 -translate-x-1/2 z-10"
+      >
+        <div className="bg-bg-secondary/80 backdrop-blur-xl border border-border rounded-2xl shadow-elevation-2 p-2">
+          <div className="flex items-center space-x-1">
+            {/* Zoom In */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleZoomIn}
+              className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+              title="Zoom In"
+            >
+              <PlusIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
+            </motion.button>
+
+            {/* Zoom Out */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleZoomOut}
+              className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+              title="Zoom Out"
+            >
+              <MinusIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
+            </motion.button>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
+            {/* Fit View */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleFitView}
+              className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+              title="Fit to View"
+            >
+              <MagnifyingGlassIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
+            </motion.button>
+
+            {/* Center View */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleCenterView}
+              className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+              title="Center View"
+            >
+              <ArrowPathIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
+            </motion.button>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
+            {/* Export */}
+            <div className="relative">
               <motion.button
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
-                onClick={item.action}
-                className={`
-                  p-2 rounded-md text-gray-600 hover:text-gray-900
-                  hover:bg-gray-100 transition-all duration-200
-                  focus:outline-none focus:ring-2 focus:ring-blue-500
-                  group relative
-                  ${item.hasMenu && (showExportMenu || showImportMenu) ? 'bg-blue-500 text-white' : ''}
-                `}
-                title={item.tooltip}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+                title="Export"
               >
-                <Icon className="w-5 h-5" />
-                
-                {/* Tooltip */}
-                <div className="
-                  absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2
-                  px-2 py-1 text-xs text-white bg-gray-800 rounded
-                  opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                  pointer-events-none whitespace-nowrap z-20
-                ">
-                  {item.tooltip}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-                </div>
+                <DocumentArrowDownIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
               </motion.button>
 
               {/* Export Menu */}
-              {item.label === 'Export' && showExportMenu && (
+              {showExportMenu && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 min-w-[140px]"
+                  initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                  className="absolute top-full mt-2 left-0 bg-bg-secondary/95 backdrop-blur-xl border border-border rounded-xl shadow-elevation-3 py-2 min-w-[160px]"
                 >
                   <button
                     onClick={() => handleExport('json')}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex items-center space-x-2"
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors flex items-center space-x-2"
                   >
                     <DocumentTextIcon className="w-4 h-4" />
                     <span>Export as JSON</span>
                   </button>
                   <button
                     onClick={() => handleExport('png')}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex items-center space-x-2"
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors flex items-center space-x-2"
                   >
                     <PhotoIcon className="w-4 h-4" />
                     <span>Export as PNG</span>
                   </button>
                   <button
                     onClick={() => handleExport('svg')}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex items-center space-x-2"
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors flex items-center space-x-2"
                   >
                     <SwatchIcon className="w-4 h-4" />
                     <span>Export as SVG</span>
                   </button>
                 </motion.div>
               )}
-
-              {/* Import Menu */}
-              {item.label === 'Import' && showImportMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 min-w-[140px]"
-                >
-                  <button
-                    onClick={handleLoadProject}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex items-center space-x-2"
-                  >
-                    <DocumentTextIcon className="w-4 h-4" />
-                    <span>Load Project</span>
-                  </button>
-                  <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-                    Supported: JSON files
-                  </div>
-                </motion.div>
-              )}
             </div>
-          );
-        })}
-      </div>
 
-      {/* Hidden file input for import */}
+            {/* Import */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 rounded-xl hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all duration-200 group"
+              title="Import"
+            >
+              <ArrowUpTrayIcon className="w-5 h-5 group-hover:text-accent transition-colors" />
+            </motion.button>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
+            {/* Clear Canvas */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleClearCanvas}
+              className="p-2.5 rounded-xl hover:bg-red-500/10 text-text-secondary hover:text-red-500 transition-all duration-200 group"
+              title="Clear Canvas"
+            >
+              <TrashIcon className="w-5 h-5" />
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -419,13 +455,26 @@ export const CanvasToolbar: React.FC = () => {
         className="hidden"
       />
 
-      {/* Project Info */}
-      <div className="mt-2 text-center">
-        <div className="inline-flex items-center space-x-2 bg-white border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-600">
-          <span>📊 {nodes.length} nodes</span>
-          <span>🔗 {edges.length} connections</span>
+      {/* Canvas Stats */}
+      <motion.div
+        initial={{ x: 20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.3 }}
+        className="absolute bottom-4 right-4 z-10"
+      >
+        <div className="bg-bg-secondary/80 backdrop-blur-xl border border-border rounded-xl shadow-elevation-1 px-3 py-2">
+          <div className="flex items-center space-x-4 text-xs text-text-secondary">
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-module-input rounded-full" />
+              <span>{nodes.length} nodes</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-2 h-2 bg-module-output rounded-full" />
+              <span>{edges.length} connections</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }; 
