@@ -1,8 +1,15 @@
 {
-  "interactions": [],
+  "interactions": [
+    {
+      "id": "main-interaction",
+      "name": "Main Interaction",
+      "description": "Primary interaction configuration",
+      "enabled": true,
+      "modules": [],
+      "routes": []
+    }
+  ],
   "modules": [],
   "routes": [],
-  "settings": {},
-  "lastSaved": 1753464199425,
-  "version": "1.0.0"
+  "settings": {}
 }

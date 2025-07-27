@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -23,10 +23,6 @@ interface NodeEditorProps {
   onNodeSelect: (nodeId: string | null) => void;
   onInteractionsUpdate: (interactions: InteractionConfig[]) => void;
 }
-
-const nodeTypes: NodeTypes = {
-  custom: CustomNode,
-};
 
 const NodeEditor: React.FC<NodeEditorProps> = ({
   interactions,
@@ -72,6 +68,18 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(nodes);
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges);
+
+  // Handle node deletion
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    setReactFlowNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setReactFlowEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    // Note: updateInteractions will be called automatically when nodes/edges change
+  }, [setReactFlowNodes, setReactFlowEdges]);
+
+  // Create node types with delete handler
+  const nodeTypes: NodeTypes = useMemo(() => ({
+    custom: (props: any) => <CustomNode {...props} onDelete={handleDeleteNode} />,
+  }), [handleDeleteNode]);
 
   // Handle drag and drop
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -180,6 +188,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     updatedInteractions.push(interaction);
     onInteractionsUpdate(updatedInteractions);
   }, [reactFlowNodes, reactFlowEdges, onInteractionsUpdate]);
+
+  // Call updateInteractions when nodes or edges change
+  useEffect(() => {
+    updateInteractions();
+  }, [reactFlowNodes, reactFlowEdges, updateInteractions]);
 
   // Get default configuration for a module
   const getDefaultConfig = (manifest: ModuleManifest): Record<string, any> => {

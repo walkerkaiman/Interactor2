@@ -14,6 +14,36 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+.deleteButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.node:hover .deleteButton {
+  opacity: 1;
+}
+
+.deleteButton:hover {
+  background: #b91c1c;
+}
+
 .header {
   margin-bottom: 8px;
 }
@@ -23,6 +53,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+  padding-right: 28px; /* Make room for the delete button */
 }
 
 .moduleName {

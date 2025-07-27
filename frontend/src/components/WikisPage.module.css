@@ -1,0 +1,187 @@
+.wikisPage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f8f9fa;
+}
+
+.header {
+  padding: 20px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.header h1 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #212529;
+}
+
+.header p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 300px;
+  background: white;
+  border-right: 1px solid #e9ecef;
+  overflow-y: auto;
+}
+
+.sidebar h3 {
+  margin: 0;
+  padding: 20px 20px 10px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #212529;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.moduleList {
+  padding: 10px 0;
+}
+
+.moduleItem {
+  padding: 15px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #f8f9fa;
+  transition: background-color 0.2s ease;
+}
+
+.moduleItem:hover {
+  background-color: #f8f9fa;
+}
+
+.moduleItem.selected {
+  background-color: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+.moduleInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.moduleName {
+  font-weight: 600;
+  color: #212529;
+  font-size: 14px;
+}
+
+.moduleType {
+  background: #e9ecef;
+  color: #495057;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.moduleDescription {
+  margin: 0;
+  color: #6c757d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mainContent {
+  flex: 1;
+  overflow-y: auto;
+  background: white;
+}
+
+.documentation {
+  padding: 30px;
+}
+
+.docHeader {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.docHeader h2 {
+  margin: 0 0 10px 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #212529;
+}
+
+.moduleMeta {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.version {
+  background: #28a745;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.author {
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.wikiContent {
+  line-height: 1.6;
+  color: #212529;
+}
+
+.wikiContent pre {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  white-space: pre-wrap;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #6c757d;
+  text-align: center;
+}
+
+.emptyState h3 {
+  margin: 0 0 10px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 14px;
+} 

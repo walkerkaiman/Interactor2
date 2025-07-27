@@ -17,11 +17,37 @@
   background: #111827;
 }
 
+.titleButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  border-radius: 4px;
+}
+
+.titleButton:hover {
+  background: #374151;
+}
+
 .title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
   color: #ffffff;
+}
+
+.cycleIndicator {
+  font-size: 1rem;
+  color: #9ca3af;
+  transition: transform 0.2s;
+}
+
+.titleButton:hover .cycleIndicator {
+  transform: rotate(180deg);
 }
 
 .closeButton {

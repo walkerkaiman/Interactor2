@@ -1,13 +1,15 @@
 import React from 'react';
 import { ModuleManifest } from '@interactor/shared';
+import { AppPage } from '../types';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
   modules: ModuleManifest[];
-  onClose: () => void;
+  currentPage: AppPage;
+  onPageChange: (page: AppPage) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ modules, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange }) => {
   const handleDragStart = (event: React.DragEvent, module: ModuleManifest) => {
     event.dataTransfer.setData('application/json', JSON.stringify({
       moduleName: module.name,
@@ -19,12 +21,29 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, onClose }) => {
   const inputModules = modules.filter(m => m.type === 'input');
   const outputModules = modules.filter(m => m.type === 'output');
 
+  const getPageTitle = (page: AppPage): string => {
+    switch (page) {
+      case 'modules': return 'Modules';
+      case 'wikis': return 'Wikis';
+      case 'performance': return 'Performance';
+      case 'console': return 'Console';
+      default: return 'Modules';
+    }
+  };
+
+  const cycleToNextPage = () => {
+    const pages: AppPage[] = ['modules', 'wikis', 'performance', 'console'];
+    const currentIndex = pages.indexOf(currentPage);
+    const nextIndex = (currentIndex + 1) % pages.length;
+    onPageChange(pages[nextIndex]);
+  };
+
   return (
     <div className={styles.sidebar}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Modules</h2>
-        <button className={styles.closeButton} onClick={onClose}>
-          ×
+        <button className={styles.titleButton} onClick={cycleToNextPage}>
+          <h2 className={styles.title}>{getPageTitle(currentPage)}</h2>
+          <span className={styles.cycleIndicator}>↻</span>
         </button>
       </div>
 

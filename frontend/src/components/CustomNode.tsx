@@ -3,7 +3,11 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { FrontendNodeData } from '../types';
 import styles from './CustomNode.module.css';
 
-const CustomNode: React.FC<NodeProps<FrontendNodeData>> = ({ data, selected }) => {
+interface CustomNodeProps extends NodeProps<FrontendNodeData> {
+  onDelete?: (nodeId: string) => void;
+}
+
+const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, onDelete }) => {
   const { moduleName, config, manifest } = data;
 
   const inputEvents = manifest.events?.filter((e: any) => e.type === 'input') || [];
@@ -11,6 +15,20 @@ const CustomNode: React.FC<NodeProps<FrontendNodeData>> = ({ data, selected }) =
 
   return (
     <div className={`${styles.node} ${selected ? styles.selected : ''}`}>
+      {/* Delete Button */}
+      {onDelete && (
+        <button
+          className={styles.deleteButton}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(id);
+          }}
+          title="Remove module"
+        >
+          ×
+        </button>
+      )}
+      
       {/* Node Header */}
       <div className={styles.header}>
         <div className={styles.title}>

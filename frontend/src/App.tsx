@@ -3,7 +3,7 @@ import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { apiService } from './api';
-import { AppState, UIState } from './types';
+import { AppState, UIState, AppPage, WikisPageState, PerformancePageState, ConsolePageState, ModulesPageState } from './types';
 import { InteractionConfig } from '@interactor/shared';
 
 import Sidebar from './components/Sidebar';
@@ -12,6 +12,9 @@ import Toolbar from './components/Toolbar';
 import SettingsPanel from './components/SettingsPanel';
 import TriggerPanel from './components/TriggerPanel';
 import Notification from './components/Notification';
+import WikisPage from './components/WikisPage';
+import PerformancePage from './components/PerformancePage';
+import ConsolePage from './components/ConsolePage';
 
 import styles from './App.module.css';
 
@@ -32,6 +35,33 @@ function App() {
     sidebarOpen: true,
     settingsPanelOpen: false,
     triggerPanelOpen: false,
+    currentPage: 'modules',
+    pageStates: {
+      modules: {
+        selectedNodeId: null,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+      },
+      wikis: {
+        selectedModule: null,
+        wikiContent: '',
+        loading: false,
+      },
+      performance: {
+        stats: null,
+        loading: true,
+        error: null,
+        lastRefresh: null,
+      },
+      console: {
+        logs: [],
+        loading: true,
+        error: null,
+        autoScroll: true,
+        filterLevel: 'all',
+        lastRefresh: null,
+      },
+    },
   });
 
   // Load initial data
@@ -125,6 +155,53 @@ function App() {
     setUIState(prev => ({ ...prev, triggerPanelOpen: !prev.triggerPanelOpen }));
   }, []);
 
+  // Handle page changes
+  const handlePageChange = useCallback((page: AppPage) => {
+    console.log('Changing page from', uiState.currentPage, 'to', page);
+    setUIState(prev => ({ ...prev, currentPage: page }));
+  }, [uiState.currentPage]);
+
+  // Handle page state updates
+  const updateWikisPageState = useCallback((updates: Partial<WikisPageState>) => {
+    setUIState(prev => ({
+      ...prev,
+      pageStates: {
+        ...prev.pageStates,
+        wikis: { ...prev.pageStates.wikis, ...updates },
+      },
+    }));
+  }, []);
+
+  const updatePerformancePageState = useCallback((updates: Partial<PerformancePageState>) => {
+    setUIState(prev => ({
+      ...prev,
+      pageStates: {
+        ...prev.pageStates,
+        performance: { ...prev.pageStates.performance, ...updates },
+      },
+    }));
+  }, []);
+
+  const updateConsolePageState = useCallback((updates: Partial<ConsolePageState>) => {
+    setUIState(prev => ({
+      ...prev,
+      pageStates: {
+        ...prev.pageStates,
+        console: { ...prev.pageStates.console, ...updates },
+      },
+    }));
+  }, []);
+
+  const updateModulesPageState = useCallback((updates: Partial<ModulesPageState>) => {
+    setUIState(prev => ({
+      ...prev,
+      pageStates: {
+        ...prev.pageStates,
+        modules: { ...prev.pageStates.modules, ...updates },
+      },
+    }));
+  }, []);
+
   return (
     <div className={styles.app}>
       <ReactFlowProvider>
@@ -134,7 +211,8 @@ function App() {
           {uiState.sidebarOpen && (
             <Sidebar
               modules={appState.modules}
-              onClose={toggleSidebar}
+              currentPage={uiState.currentPage}
+              onPageChange={handlePageChange}
             />
           )}
 
@@ -150,13 +228,40 @@ function App() {
               sidebarOpen={uiState.sidebarOpen}
             />
 
-            {/* Node Editor */}
-            <NodeEditor
-              interactions={appState.interactions}
-              modules={appState.modules}
-              onNodeSelect={handleNodeSelect}
-              onInteractionsUpdate={handleInteractionsUpdate}
-            />
+            {/* Page Content */}
+            {uiState.currentPage === 'modules' && (
+              <NodeEditor
+                interactions={appState.interactions}
+                modules={appState.modules}
+                onNodeSelect={(nodeId) => {
+                  handleNodeSelect(nodeId);
+                  updateModulesPageState({ selectedNodeId: nodeId });
+                }}
+                onInteractionsUpdate={handleInteractionsUpdate}
+              />
+            )}
+            
+            {uiState.currentPage === 'wikis' && (
+              <WikisPage 
+                modules={appState.modules}
+                state={uiState.pageStates.wikis}
+                onStateUpdate={updateWikisPageState}
+              />
+            )}
+            
+            {uiState.currentPage === 'performance' && (
+              <PerformancePage 
+                state={uiState.pageStates.performance}
+                onStateUpdate={updatePerformancePageState}
+              />
+            )}
+            
+            {uiState.currentPage === 'console' && (
+              <ConsolePage 
+                state={uiState.pageStates.console}
+                onStateUpdate={updateConsolePageState}
+              />
+            )}
           </div>
 
           {/* Settings Panel */}

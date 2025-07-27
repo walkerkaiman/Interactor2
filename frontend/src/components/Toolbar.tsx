@@ -26,7 +26,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           onClick={onToggleSidebar}
           title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
         >
-          ☰
+          {sidebarOpen ? '👁️' : '👁️‍🗨️'}
         </button>
       </div>
 

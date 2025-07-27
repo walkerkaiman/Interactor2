@@ -29,11 +29,50 @@ export interface AppState {
   lastSuccess: string | null;
 }
 
+// Page types
+export type AppPage = 'modules' | 'wikis' | 'performance' | 'console';
+
+// Page state types
+export interface WikisPageState {
+  selectedModule: string | null;
+  wikiContent: string;
+  loading: boolean;
+}
+
+export interface PerformancePageState {
+  stats: any | null;
+  loading: boolean;
+  error: string | null;
+  lastRefresh: number | null;
+}
+
+export interface ConsolePageState {
+  logs: any[];
+  loading: boolean;
+  error: string | null;
+  autoScroll: boolean;
+  filterLevel: 'all' | 'info' | 'warn' | 'error' | 'debug';
+  lastRefresh: number | null;
+}
+
+export interface ModulesPageState {
+  selectedNodeId: string | null;
+  zoom: number;
+  pan: { x: number; y: number };
+}
+
 // UI state
 export interface UIState {
   sidebarOpen: boolean;
   settingsPanelOpen: boolean;
   triggerPanelOpen: boolean;
+  currentPage: AppPage;
+  pageStates: {
+    modules: ModulesPageState;
+    wikis: WikisPageState;
+    performance: PerformancePageState;
+    console: ConsolePageState;
+  };
 }
 
 // Form data for node configuration
