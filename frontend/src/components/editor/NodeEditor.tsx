@@ -122,18 +122,30 @@ const ReactFlowContent: React.FC = () => {
         fitView
         attributionPosition="bottom-left"
         className="bg-bg-primary"
+        proOptions={{ hideAttribution: true }}
       >
         <Background
-          gap={20}
+          variant="dots"
+          gap={32}
           size={1}
-          color="#374151"
-          className="opacity-30"
+          color="rgba(255, 255, 255, 0.03)"
         />
-        <Controls className="bg-bg-secondary border border-border rounded-lg" />
+        <Controls 
+          className="bg-bg-secondary/80 backdrop-blur-xl border border-border rounded-xl shadow-elevation-2"
+          showInteractive={false}
+        />
         <MiniMap
-          className="bg-bg-secondary border border-border rounded-lg"
-          nodeColor="#3b82f6"
-          maskColor="rgba(0, 0, 0, 0.1)"
+          className="bg-bg-secondary/80 backdrop-blur-xl border border-border rounded-xl shadow-elevation-2"
+          nodeColor={(node) => {
+            if (node.selected) return '#7c3aed';
+            switch (node.data?.type) {
+              case 'input': return '#3b82f6';
+              case 'output': return '#10b981';
+              case 'transform': return '#f59e0b';
+              default: return '#6b7280';
+            }
+          }}
+          maskColor="rgba(0, 0, 0, 0.8)"
         />
       </ReactFlow>
       
@@ -160,23 +172,34 @@ export const NodeEditor: React.FC = () => {
     type: 'canvas',
   });
 
-
-
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, show: false }));
   }, []);
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex h-full bg-bg-primary"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+      className="flex h-full bg-bg-primary relative overflow-hidden"
     >
+      {/* Ambient gradient background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-module-input/10 rounded-full blur-3xl" />
+      </div>
+      
       {/* Module Palette */}
-      <ModulePalette />
+      <motion.div
+        initial={{ x: -300, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <ModulePalette />
+      </motion.div>
       
       {/* Main Canvas */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative z-10">
         <ReactFlowProvider>
           <ReactFlowContent />
         </ReactFlowProvider>
@@ -184,7 +207,14 @@ export const NodeEditor: React.FC = () => {
       
       {/* Node Properties Panel */}
       {(selectedNode || selectedEdge) && (
-        <NodeProperties />
+        <motion.div
+          initial={{ x: 300, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 300, opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <NodeProperties />
+        </motion.div>
       )}
 
       {/* Context Menu */}
