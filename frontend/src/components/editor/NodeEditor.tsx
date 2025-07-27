@@ -19,6 +19,7 @@ import { CanvasToolbar } from './CanvasToolbar.tsx';
 import { ContextMenu } from './ContextMenu.tsx';
 import { ModuleNode } from './nodes/ModuleNode';
 import { CustomEdge } from './edges/CustomEdge';
+import { ModulePalette } from './ModulePalette';
 import { useNodes, useEdges, useSelectedNode, useSelectedEdge, useAppActions } from '@/store';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
@@ -123,7 +124,6 @@ const ReactFlowContent: React.FC = () => {
         proOptions={{ hideAttribution: true }}
       >
         <Background
-          variant="dots"
           gap={32}
           size={1}
           color="rgba(255, 255, 255, 0.03)"

@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useReactFlow } from 'reactflow';
 import { useNodes, useEdges, useAppActions } from '@/store';
-import { ModuleDropdown } from './ModuleDropdown';
 import { 
   MagnifyingGlassIcon,
   PlusIcon,
@@ -35,7 +34,6 @@ export const CanvasToolbar: React.FC = () => {
 
   const actions = useAppActions();
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showImportMenu, setShowImportMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFitView = () => {
@@ -238,7 +236,6 @@ export const CanvasToolbar: React.FC = () => {
         
         if (projectData.nodes && projectData.edges) {
           actions.loadProject(projectData);
-          setShowImportMenu(false);
         } else {
           alert('Invalid project file format');
         }
@@ -255,67 +252,7 @@ export const CanvasToolbar: React.FC = () => {
     }
   };
 
-  const handleSaveProject = async () => {
-    // TODO: Implement save to backend
-    console.log('Save project to backend to be implemented');
-  };
 
-  const handleLoadProject = () => {
-    fileInputRef.current?.click();
-  };
-
-  const toolbarItems = [
-    {
-      icon: MagnifyingGlassIcon,
-      label: 'Fit View',
-      action: handleFitView,
-      tooltip: 'Fit all nodes in view (F)',
-    },
-    {
-      icon: PlusIcon,
-      label: 'Zoom In',
-      action: handleZoomIn,
-      tooltip: 'Zoom in (+)',
-    },
-    {
-      icon: MinusIcon,
-      label: 'Zoom Out',
-      action: handleZoomOut,
-      tooltip: 'Zoom out (-)',
-    },
-    {
-      icon: ArrowPathIcon,
-      label: 'Center',
-      action: handleCenterView,
-      tooltip: 'Center view (C)',
-    },
-    {
-      icon: TrashIcon,
-      label: 'Clear',
-      action: handleClearCanvas,
-      tooltip: 'Clear canvas',
-    },
-    {
-      icon: DocumentArrowDownIcon,
-      label: 'Save',
-      action: handleSaveProject,
-      tooltip: 'Save project (Ctrl+S)',
-    },
-    {
-      icon: ArrowUpTrayIcon,
-      label: 'Export',
-      action: () => setShowExportMenu(!showExportMenu),
-      tooltip: 'Export graph',
-      hasMenu: true,
-    },
-    {
-      icon: DocumentTextIcon,
-      label: 'Import',
-      action: () => setShowImportMenu(!showImportMenu),
-      tooltip: 'Import graph',
-      hasMenu: true,
-    },
-  ];
 
   return (
     <>
