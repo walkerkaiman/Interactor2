@@ -1,259 +1,171 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0a0a0a;
 
-@layer base {
-  /* Global styles */
-  * {
-    @apply border-border;
-  }
-  
-  body {
-    @apply bg-bg-primary text-text-primary;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-  
-  /* Custom selection colors */
-  ::selection {
-    @apply bg-accent/30 text-text-primary;
-  }
-  
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
-  }
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 }
 
-@layer components {
-  /* Glass morphism effect */
-  .glass {
-    @apply bg-bg-secondary/80 backdrop-blur-xl border border-border;
-  }
-  
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-accent-light to-accent bg-clip-text text-transparent;
-  }
-  
-  /* Glow effect */
-  .glow {
-    @apply shadow-glow;
-  }
-  
-  /* Card styles */
-  .card {
-    @apply bg-bg-secondary rounded-lg border border-border p-4 transition-all duration-200;
-  }
-  
-  .card-hover {
-    @apply hover:bg-bg-tertiary hover:border-border-light hover:shadow-elevation-1;
-  }
-  
-  /* Button base styles */
-  .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95;
-  }
-  
-  .btn-primary {
-    @apply bg-accent hover:bg-accent-hover text-white shadow-lg hover:shadow-glow;
-  }
-  
-  .btn-secondary {
-    @apply bg-bg-tertiary hover:bg-bg-hover text-text-primary border border-border hover:border-border-light;
-  }
-  
-  .btn-ghost {
-    @apply hover:bg-bg-tertiary text-text-secondary hover:text-text-primary;
-  }
+* {
+  box-sizing: border-box;
 }
 
-/* Custom scrollbar with modern design */
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #0a0a0a;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.m-4 {
+  margin: 1rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.rounded {
+  border-radius: 0.25rem;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+.border {
+  border: 1px solid;
+}
+
+.border-gray-600 {
+  border-color: #4b5563;
+}
+
+.bg-gray-800 {
+  background-color: #1f2937;
+}
+
+.bg-gray-900 {
+  background-color: #111827;
+}
+
+.text-gray-300 {
+  color: #d1d5db;
+}
+
+.text-white {
+  color: #ffffff;
+}
+
+.hover\:bg-gray-700:hover {
+  background-color: #374151;
+}
+
+.transition {
+  transition: all 0.2s ease-in-out;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
+}
+
+/* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-bg-primary;
+  background: #1f2937;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full;
-  transition: background-color 0.2s;
+  background: #4b5563;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-border-light;
-}
-
-::-webkit-scrollbar-corner {
-  @apply bg-bg-primary;
-}
-
-/* React Flow custom styles with modern dark theme */
-.react-flow {
-  @apply bg-bg-primary;
-  background-image: 
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.react-flow__node {
-  @apply font-sans;
-}
-
-.react-flow__handle {
-  width: 14px;
-  height: 14px;
-  @apply border-2 border-border-light bg-bg-secondary;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.react-flow__handle:hover {
-  @apply bg-accent border-accent scale-125;
-  box-shadow: 0 0 10px rgba(124, 58, 237, 0.5);
-}
-
-.react-flow__handle.connectionindicator {
-  @apply bg-status-active border-status-active;
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.react-flow__edge-path {
-  stroke-width: 2;
-  transition: stroke 0.2s;
-}
-
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 3;
-  filter: drop-shadow(0 0 4px currentColor);
-}
-
-.react-flow__edge.trigger .react-flow__edge-path {
-  stroke: #10b981;
-}
-
-.react-flow__edge.stream .react-flow__edge-path {
-  stroke: #3b82f6;
-}
-
-.react-flow__edge.animated .react-flow__edge-path {
-  stroke-dasharray: 5;
-  animation: dashdraw 0.5s linear infinite;
-}
-
-@keyframes dashdraw {
-  to {
-    stroke-dashoffset: -10;
-  }
-}
-
-/* Custom node styles with glass morphism */
-.custom-node {
-  @apply bg-bg-secondary/90 backdrop-blur-md border border-border rounded-xl p-4;
-  min-width: 180px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.custom-node:hover {
-  @apply bg-bg-tertiary border-border-light;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 12px -1px rgba(0, 0, 0, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-}
-
-.custom-node.selected {
-  @apply border-accent;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2), 0 8px 12px -1px rgba(0, 0, 0, 0.4);
-}
-
-.custom-node.active {
-  @apply border-status-active;
-  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.custom-node.error {
-  @apply border-status-error;
-  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-}
-
-.custom-node.inactive {
-  @apply opacity-50;
-  filter: grayscale(0.5);
-}
-
-/* Port styles with gradient effects */
-.port-input {
-  @apply bg-module-input border-module-input;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-}
-
-.port-output {
-  @apply bg-module-output border-module-output;
-  background: linear-gradient(135deg, #10b981, #059669);
-}
-
-.port-transform {
-  @apply bg-module-transform border-module-transform;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-/* Animation utilities */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes shake {
-  10%, 90% {
-    transform: translate3d(-1px, 0, 0);
-  }
-  20%, 80% {
-    transform: translate3d(2px, 0, 0);
-  }
-  30%, 50%, 70% {
-    transform: translate3d(-4px, 0, 0);
-  }
-  40%, 60% {
-    transform: translate3d(4px, 0, 0);
-  }
-}
-
-/* Focus styles for accessibility */
-.focus-visible:focus {
-  @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg-primary;
-}
-
-/* Loading states */
-.skeleton {
-  @apply animate-pulse bg-gradient-to-r from-bg-secondary via-bg-tertiary to-bg-secondary;
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* Tooltip styles */
-.tooltip {
-  @apply absolute z-50 px-2 py-1 text-xs font-medium text-text-primary bg-bg-elevated border border-border rounded-md shadow-elevation-2;
-}
-
-/* Modal backdrop */
-.modal-backdrop {
-  @apply fixed inset-0 bg-black/60 backdrop-blur-sm;
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+  background: #6b7280;
 } 

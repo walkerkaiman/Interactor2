@@ -14,6 +14,11 @@
             "date": 1753567013537,
             "name": "test-lifecycle.log.2025-07-26.1",
             "hash": "4d035a37977672b563b81c4257bda57a3ad0ee5279dea33b95c1a31e3606e4e9"
+        },
+        {
+            "date": 1753629590682,
+            "name": "test-lifecycle.log.2025-07-27",
+            "hash": "08c549bf432315eacc7796cd8bb548ed508b21ba134dcb30f9318aaece064800"
         }
     ],
     "hashType": "sha256"

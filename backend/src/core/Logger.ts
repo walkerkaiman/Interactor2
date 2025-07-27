@@ -4,20 +4,20 @@ import { EventEmitter } from 'events';
 import { LogEntry } from '@interactor/shared';
 
 export class Logger extends EventEmitter {
+  private static instance: Logger;
   private logger: winston.Logger;
   private logBuffer: LogEntry[] = [];
   private maxBufferSize = 1000;
-  private frontendClients: Set<any> = new Set();
+  private frontendClients: any[] = [];
 
-  constructor(config: {
+  private constructor(config: {
     level?: string;
     file?: string;
     maxSize?: string;
     maxFiles?: number;
     enableConsole?: boolean;
   } = {}) {
-    super();
-
+    super(); // Call EventEmitter constructor
     const {
       level = 'info',
       file = 'logs/interactor.log',
@@ -95,6 +95,19 @@ export class Logger extends EventEmitter {
     );
   }
 
+  public static getInstance(config?: {
+    level?: string;
+    file?: string;
+    maxSize?: string;
+    maxFiles?: number;
+    enableConsole?: boolean;
+  }): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger(config);
+    }
+    return Logger.instance;
+  }
+
   /**
    * Log a debug message
    */
@@ -143,9 +156,6 @@ export class Logger extends EventEmitter {
 
     // Log to winston
     this.logger.log(level, message, { module, ...metadata });
-
-    // Emit to frontend clients
-    this.broadcastToFrontend(logEntry);
   }
 
   /**
@@ -178,47 +188,6 @@ export class Logger extends EventEmitter {
   }
 
   /**
-   * Register a frontend client for real-time log streaming
-   */
-  public registerFrontendClient(client: any): void {
-    this.frontendClients.add(client);
-    this.debug('Frontend client registered for log streaming');
-  }
-
-  /**
-   * Unregister a frontend client
-   */
-  public unregisterFrontendClient(client: any): void {
-    this.frontendClients.delete(client);
-    this.debug('Frontend client unregistered from log streaming');
-  }
-
-  /**
-   * Broadcast log entry to all frontend clients
-   */
-  private broadcastToFrontend(logEntry: LogEntry): void {
-    if (this.frontendClients.size === 0) {
-      return;
-    }
-
-    const message = JSON.stringify({
-      type: 'log',
-      data: logEntry
-    });
-
-    for (const client of this.frontendClients) {
-      try {
-        if (client.readyState === 1) { // WebSocket.OPEN
-          client.send(message);
-        }
-      } catch (error) {
-        // Remove broken clients
-        this.frontendClients.delete(client);
-      }
-    }
-  }
-
-  /**
    * Create a child logger for a specific module
    */
   public createModuleLogger(moduleName: string): ModuleLogger {
@@ -230,14 +199,31 @@ export class Logger extends EventEmitter {
    */
   public getStats(): {
     bufferSize: number;
-    frontendClients: number;
     level: string;
+    frontendClients: number;
   } {
     return {
       bufferSize: this.logBuffer.length,
-      frontendClients: this.frontendClients.size,
-      level: this.logger.level
+      level: this.logger.level,
+      frontendClients: this.frontendClients.length
     };
+  }
+
+  /**
+   * Register frontend client (for compatibility with tests)
+   */
+  public registerFrontendClient(client: any): void {
+    this.frontendClients.push(client);
+  }
+
+  /**
+   * Unregister frontend client (for compatibility with tests)
+   */
+  public unregisterFrontendClient(client: any): void {
+    const index = this.frontendClients.indexOf(client);
+    if (index > -1) {
+      this.frontendClients.splice(index, 1);
+    }
   }
 }
 

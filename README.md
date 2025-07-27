@@ -1,96 +1,176 @@
-# // Interactor //
+# Interactor2 - Simplified Headless Service
 
-Welcome to **Interactor** - a creative platform that bridges the gap between art and technology! Whether you're an artist looking to create interactive installations or a developer wanting to build custom modules, you've come to the right place.
-
-## What is Interactor? 
-
-Interactor is a **modular, visual interaction system** designed for creating complex interactive art installations and experiences. Think of it as a digital canvas where you can connect different "building blocks" (modules) to create amazing interactive workflows.
-
-### For Artists 🎭
-- **Visual Node Editor**: Drag and drop to connect different modules - no coding required!
-- **Real-time Control**: See your interactions come to life instantly
-- **Rich Module Library**: From motion sensors to LED displays, from audio playback to network communication
-- **Easy Setup**: Upload audio files, configure sensors, and create complex interactions through a friendly web interface
-
-### For Developers 🔧
-- **Extensible Architecture**: Build custom modules using our robust TypeScript framework
-- **Type-Safe Development**: Full TypeScript support with shared types across the entire system
-- **Event-Driven Design**: Clean, decoupled architecture that's easy to understand and extend
-- **Comprehensive Testing**: Built-in testing framework to ensure your modules work reliably
-
-## Quick Start
-
-### For Artists
-1. **Start the System**: Run `npm start` in the root directory
-2. **Open the Web Interface**: Navigate to the provided URL in your browser
-3. **Explore Modules**: Browse available input and output modules
-4. **Create Connections**: Use the visual editor to wire modules together
-5. **Test & Iterate**: See your interactions in real-time!
-
-### For Developers
-1. **Setup**: `npm install` to get all dependencies
-2. **Development Mode**: `npm run dev` for hot-reloading development
-3. **Create a Module**: Follow our [Module Development Guide](./ModuleDevelopmentGuide.md)
-4. **Test Your Work**: cd to the Tests folder and `npm test` to run the test suite. Can keep running in a seperate terminal during development.
-5. **Documentation**: Check out our [TypeScript Type System Guide](./TypesGuide.md)
-
-## What Can You Build?
-
-### Interactive Art Installations
-- **Motion-Responsive Displays**: Connect motion sensors to LED arrays or projectors
-- **Audio-Visual Experiences**: Trigger sounds and visuals based on audience interaction
-- **Network-Connected Installations**: Share data across multiple locations
-- **Time-Based Performances**: Create scheduled or duration-based interactions
-
-### Custom Modules
-- **Input Modules**: Sensors, APIs, time triggers, network data
-- **Output Modules**: Displays, speakers, motors, network endpoints
-- **Processing Modules**: Data transformation, filtering, aggregation
+Interactor2 is a simplified, headless singleton service for building interactive art installations. It provides a streamlined architecture focused on module-based interactions with minimal complexity.
 
 ## Architecture Overview
 
-Interactor V2 is built around a simple but powerful concept:
+### Backend (Headless Singleton)
+- **Single Process**: Runs as a single Node.js process
+- **Singleton Services**: Core services (Logger, MessageRouter, ModuleLoader, StateManager, SystemStats) are true singletons
+- **Stateless API**: REST API for configuration and state management
+- **Atomic Updates**: Full interaction map replacement via `/api/interactions/register`
+- **No Real-time Sync**: Manual "Register" button for state persistence
 
+### Frontend (Node Editor)
+- **React-Based**: Modern React 18 with TypeScript
+- **Node Editor**: Visual drag-and-drop interface using ReactFlow
+- **Dark Theme**: Clean, modern dark interface
+- **Manual Sync**: All changes local until "Register" is clicked
+- **REST API**: No WebSocket, simple HTTP communication
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+
+### Installation & Start
+
+1. **Simple Start (Recommended)**
+   ```bash
+   # Windows
+   start-simple.bat
+   
+   # Or manually:
+   cd backend && npm install
+   cd ../frontend && npm install && npm run build
+   cd ../backend && npm start
+   ```
+
+2. **Development Mode**
+   ```bash
+   # Windows (Recommended)
+   start-full-dev.bat
+   
+   # Or manually:
+   # Terminal 1: Backend
+   cd backend
+   npm install
+   npm run dev
+   
+   # Terminal 2: Frontend
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **Access the Application**
+   - Backend API: http://localhost:3001
+   - Frontend UI: http://localhost:3000 (development mode)
+   - Production: http://localhost:3001 (serves built frontend)
+   - Use the node editor to create interactions
+   - Click "Register" to save to backend
+
+## API Endpoints
+
+### Core Endpoints
+- `GET /health` - Health check
+- `GET /api/stats` - System statistics
+- `GET /api/modules` - List available modules
+- `GET /api/interactions` - Get current interactions
+- `POST /api/interactions/register` - Register full interaction map
+- `POST /api/trigger/:moduleId` - Manually trigger module
+- `GET /api/settings` - Get system settings
+- `PUT /api/settings/:key` - Update setting
+
+## Module System
+
+### Available Modules
+- **Input Modules**: frames_input, http_input, osc_input, serial_input, time_input
+- **Output Modules**: audio_output, dmx_output, http_output, osc_output
+
+### Module Structure
 ```
-Input Modules → Message Router → Output Modules
-     ↓              ↓              ↓
-  Sensors      Event Bus      Displays
-  APIs         Real-time      Speakers  
-  Triggers     Routing        Motors
+modules/
+├── input/
+│   ├── frames_input/
+│   ├── http_input/
+│   ├── osc_input/
+│   ├── serial_input/
+│   └── time_input/
+└── output/
+    ├── audio_output/
+    ├── dmx_output/
+    ├── http_output/
+    └── osc_output/
 ```
 
-- **Input Modules**: Capture data from the real world (sensors, APIs, time, etc.)
-- **Message Router**: The "brain" that routes data between modules
-- **Output Modules**: Control physical or digital outputs (displays, speakers, motors, etc.)
+## Usage
 
-## Documentation Structure
+### Creating Interactions
+1. **Add Modules**: Drag modules from the sidebar to the canvas
+2. **Connect Nodes**: Draw connections between input/output handles
+3. **Configure Modules**: Click nodes to view and edit configuration
+4. **Test Outputs**: Use the trigger panel to manually test outputs
+5. **Register**: Click "Register" to save the interaction map to backend
 
-- **[Module Development Guide](./ModuleDevelopmentGuide.md)**: Complete guide for creating custom modules
-- **[TypeScript Type System Guide](./TypesGuide.md)**: Understanding the type system and shared interfaces
-- **[Frontend Design](./FrontendDesign.md)**: UI/UX design principles and implementation details
+### Manual Triggering
+- Use `POST /api/trigger/:moduleId` to manually trigger output modules
+- Useful for testing and manual control
 
-## Getting Help
+## Configuration
 
-### For Artists
-- Start with the visual interface - it's designed to be intuitive!
-- Check the module documentation for specific features
-- Most modules have built-in test functions to verify they're working
+### Backend Configuration
+```json
+{
+  "server": {
+    "port": 3001,
+    "host": "localhost"
+  },
+  "logging": {
+    "level": "info",
+    "file": "logs/interactor.log"
+  },
+  "modules": {
+    "autoLoad": true
+  }
+}
+```
 
-### For Developers
-- Read the [Module Development Guide](./ModuleDevelopmentGuide.md) for detailed technical information
-- Check the [TypeScript Type System Guide](./TypesGuide.md) for type definitions
-- Look at existing modules in `backend/src/modules/` for examples
-- Run tests to understand expected behavior
+### State Persistence
+- Interactions are stored in `backend/data/state.json`
+- Single file storage for simplicity
+- Atomic updates replace entire state
 
-## Community & Contribution
+## Development
 
-We believe in the power of collaboration! Whether you're:
-- **An artist** sharing your creative workflows
-- **A developer** contributing new modules
-- **A user** reporting bugs or suggesting features
+### Project Structure
+```
+Interactor2/
+├── backend/           # Headless singleton service
+│   ├── src/
+│   │   ├── core/     # Singleton services
+│   │   ├── modules/  # Module implementations
+│   │   └── index.ts  # Main server
+│   └── data/         # State persistence
+├── frontend/         # React-based node editor UI
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── api/         # API service
+│   │   └── types/       # TypeScript types
+│   └── dist/         # Built frontend (served by backend)
+└── shared/           # Shared types
+```
 
-Your contributions help make Interactor better for everyone. Check out our existing modules to see what's possible, and don't hesitate to reach out with questions or ideas!
+### Key Simplifications
+- **No WebSocket**: REST-only communication
+- **No Hot Reloading**: Modules loaded once at startup
+- **No Multi-tenancy**: Single instance architecture
+- **No Real-time Sync**: Manual registration
+- **No Auto-save**: Explicit save via Register button
+- **No Backup System**: Simple file-based storage
 
----
+## Troubleshooting
 
-**Ready to create something amazing?** Start with the visual interface or dive into module development - the choice is yours! 🚀 
+### Common Issues
+1. **Port 3001 in use**: Change port in `backend/config/system.json`
+2. **Module not found**: Check module manifests in `backend/src/modules/`
+3. **Registration fails**: Check backend logs in `backend/logs/`
+
+### Logs
+- Backend logs: `backend/logs/interactor.log`
+- Console output for real-time debugging
+
+## License
+
+MIT License - see LICENSE file for details. 

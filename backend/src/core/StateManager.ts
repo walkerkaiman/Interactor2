@@ -1,76 +1,60 @@
-import { EventEmitter } from 'events';
+import { InteractionConfig, ModuleConfig, MessageRoute } from '@interactor/shared';
+import { Logger } from './Logger';
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import {
-  InteractionConfig,
-  ModuleInstance,
-  MessageRoute,
-  SystemStats
-} from '@interactor/shared';
 
-export interface SystemState {
-  interactions: InteractionConfig[];
-  modules: ModuleInstance[];
-  routes: MessageRoute[];
-  settings: Record<string, any>;
-  lastSaved: number;
-  version: string;
-}
-
-export class StateManager extends EventEmitter {
-  private state: SystemState;
+export class StateManager {
+  private static instance: StateManager;
+  private logger: Logger;
   private stateFile: string;
-  private autoSaveInterval: number;
-  private autoSaveTimer?: NodeJS.Timeout;
-  private isDirty = false;
-  private isSaving = false;
+  private state: {
+    interactions: InteractionConfig[];
+    modules: any[];
+    routes: MessageRoute[];
+    settings: Record<string, any>;
+  };
+  private lastSaved: number;
 
-  constructor(
-    private config: {
-      stateFile?: string;
-      autoSave?: boolean;
-      autoSaveInterval?: number;
-      backupCount?: number;
-    } = {},
-    private logger?: any
-  ) {
-    super();
-
+  private constructor(config: {
+    stateFile?: string;
+  } = {}) {
+    this.logger = Logger.getInstance();
     this.stateFile = config.stateFile || path.join(process.cwd(), 'data', 'state.json');
-    this.autoSaveInterval = config.autoSaveInterval || 30000; // 30 seconds
-
-    // Initialize default state
     this.state = {
       interactions: [],
       modules: [],
       routes: [],
-      settings: {},
-      lastSaved: 0,
-      version: '1.0.0'
+      settings: {}
     };
+    this.lastSaved = Date.now();
+  }
+
+  public static getInstance(config?: {
+    stateFile?: string;
+  }): StateManager {
+    if (!StateManager.instance) {
+      StateManager.instance = new StateManager(config);
+    }
+    return StateManager.instance;
   }
 
   /**
    * Initialize the state manager
    */
   public async init(): Promise<void> {
-    this.logger?.info('Initializing StateManager');
-    
     try {
-      // Ensure data directory exists
-      await fs.ensureDir(path.dirname(this.stateFile));
+      this.logger.info('Initializing state manager', 'StateManager');
       
-      // Load existing state if available
+      // Ensure data directory exists
+      const dataDir = path.dirname(this.stateFile);
+      await fs.ensureDir(dataDir);
+      
+      // Load existing state if it exists
       await this.loadState();
       
-      // Start auto-save if enabled
-      if (this.config.autoSave !== false) {
-        this.startAutoSave();
-      }
-      
-      this.logger?.info('StateManager initialized');
+      this.logger.info('State manager initialized', 'StateManager');
     } catch (error) {
-      this.logger?.error('Error initializing StateManager:', error);
+      this.logger.error('Failed to initialize state manager', 'StateManager', { error: String(error) });
       throw error;
     }
   }
@@ -78,294 +62,250 @@ export class StateManager extends EventEmitter {
   /**
    * Load state from file
    */
-  public async loadState(): Promise<void> {
+  private async loadState(): Promise<void> {
     try {
       if (await fs.pathExists(this.stateFile)) {
         const stateData = await fs.readFile(this.stateFile, 'utf-8');
         const loadedState = JSON.parse(stateData);
         
-        // Merge with default state to ensure all fields exist
+        // Merge with default state
         this.state = {
-          ...this.state,
-          ...loadedState,
-          lastSaved: Date.now()
+          interactions: loadedState.interactions || [],
+          modules: loadedState.modules || [],
+          routes: loadedState.routes || [],
+          settings: loadedState.settings || {}
         };
         
-        this.logger?.info('State loaded from file');
-        this.emit('stateLoaded', this.state);
+        this.logger.debug('State loaded from file', 'StateManager');
       } else {
-        this.logger?.info('No existing state file found, using default state');
-        await this.saveState();
+        this.logger.debug('No existing state file found, using defaults', 'StateManager');
       }
     } catch (error) {
-      this.logger?.error('Error loading state:', error);
-      throw error;
+      this.logger.error('Error loading state from file', 'StateManager', { error: String(error) });
+      // Continue with default state
     }
   }
 
   /**
    * Save state to file
    */
-  public async saveState(): Promise<void> {
-    if (this.isSaving) {
-      return; // Prevent concurrent saves
-    }
-
-    this.isSaving = true;
-    
+  private async saveState(): Promise<void> {
     try {
-      // Update last saved timestamp
-      this.state.lastSaved = Date.now();
-      
-      // Create backup before saving
-      await this.createBackup();
-      
-      // Save current state
-      await fs.writeFile(this.stateFile, JSON.stringify(this.state, null, 2));
-      
-      this.isDirty = false;
-      this.logger?.debug('State saved to file');
-      this.emit('stateSaved', this.state);
+      await fs.writeJson(this.stateFile, this.state, { spaces: 2 });
+      this.lastSaved = Date.now();
+      this.logger.debug('State saved to file', 'StateManager');
     } catch (error) {
-      this.logger?.error('Error saving state:', error);
+      this.logger.error('Error saving state to file', 'StateManager', { error: String(error) });
       throw error;
-    } finally {
-      this.isSaving = false;
     }
   }
 
   /**
-   * Create a backup of the current state
+   * Get current state
    */
-  private async createBackup(): Promise<void> {
-    const backupDir = path.join(path.dirname(this.stateFile), 'backups');
-    await fs.ensureDir(backupDir);
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFile = path.join(backupDir, `state-${timestamp}.json`);
-    
-    if (await fs.pathExists(this.stateFile)) {
-      await fs.copy(this.stateFile, backupFile);
-    }
-    
-    // Clean up old backups
-    await this.cleanupBackups(backupDir);
+  public getState(): any {
+    return { ...this.state };
   }
 
   /**
-   * Clean up old backup files
+   * Replace entire state
    */
-  private async cleanupBackups(backupDir: string): Promise<void> {
-    const maxBackups = this.config.backupCount || 5;
-    
-    try {
-      const files = await fs.readdir(backupDir);
-      const backupFiles = files
-        .filter(file => file.startsWith('state-') && file.endsWith('.json'))
-        .map(file => ({
-          name: file,
-          path: path.join(backupDir, file),
-          time: fs.statSync(path.join(backupDir, file)).mtime.getTime()
-        }))
-        .sort((a, b) => b.time - a.time);
-      
-      // Remove old backups
-      for (let i = maxBackups; i < backupFiles.length; i++) {
-        const backupFile = backupFiles[i];
-        if (backupFile?.path) {
-          await fs.remove(backupFile.path);
-        }
-      }
-    } catch (error) {
-      this.logger?.warn('Error cleaning up backups:', error);
-    }
+  public async replaceState(newState: Partial<any>): Promise<void> {
+    this.state = {
+      ...this.state,
+      ...newState
+    };
+    await this.saveState();
   }
 
   /**
-   * Start auto-save timer
+   * Get interactions
    */
-  private startAutoSave(): void {
-    if (this.autoSaveTimer) {
-      clearInterval(this.autoSaveTimer);
-    }
-    
-    this.autoSaveTimer = setInterval(async () => {
-      if (this.isDirty && !this.isSaving) {
-        try {
-          await this.saveState();
-        } catch (error) {
-          this.logger?.error('Auto-save failed:', error);
-        }
-      }
-    }, this.autoSaveInterval);
-    
-    this.logger?.info(`Auto-save started with ${this.autoSaveInterval}ms interval`);
-  }
-
-  /**
-   * Stop auto-save timer
-   */
-  private stopAutoSave(): void {
-    if (this.autoSaveTimer) {
-      clearInterval(this.autoSaveTimer);
-      this.autoSaveTimer = undefined as any;
-      this.logger?.info('Auto-save stopped');
-    }
-  }
-
-  /**
-   * Mark state as dirty (needs saving)
-   */
-  private markDirty(): void {
-    this.isDirty = true;
-    this.emit('stateChanged');
-  }
-
-  // Interaction management
   public getInteractions(): InteractionConfig[] {
     return [...this.state.interactions];
   }
 
-  public getInteraction(id: string): InteractionConfig | undefined {
-    return this.state.interactions.find(interaction => interaction.id === id);
-  }
-
+  /**
+   * Add interaction
+   */
   public async addInteraction(interaction: InteractionConfig): Promise<void> {
     this.state.interactions.push(interaction);
-    this.markDirty();
-    this.emit('interactionAdded', interaction);
+    await this.saveState();
   }
 
+  /**
+   * Get interaction by ID
+   */
+  public getInteraction(id: string): InteractionConfig | undefined {
+    return this.state.interactions.find(i => i.id === id);
+  }
+
+  /**
+   * Update interaction
+   */
   public async updateInteraction(interaction: InteractionConfig): Promise<void> {
     const index = this.state.interactions.findIndex(i => i.id === interaction.id);
     if (index !== -1) {
       this.state.interactions[index] = interaction;
-      this.markDirty();
-      this.emit('interactionUpdated', interaction);
+      await this.saveState();
     }
   }
 
+  /**
+   * Remove interaction
+   */
   public async removeInteraction(id: string): Promise<boolean> {
     const index = this.state.interactions.findIndex(i => i.id === id);
     if (index !== -1) {
-      const removed = this.state.interactions.splice(index, 1)[0];
-      this.markDirty();
-      this.emit('interactionRemoved', removed);
+      this.state.interactions.splice(index, 1);
+      await this.saveState();
       return true;
     }
     return false;
   }
 
-  // Module instance management
-  public getModuleInstances(): ModuleInstance[] {
+  /**
+   * Get module instances
+   */
+  public getModuleInstances(): any[] {
     return [...this.state.modules];
   }
 
-  public getModuleInstance(id: string): ModuleInstance | undefined {
-    return this.state.modules.find(module => module.id === id);
+  /**
+   * Add module instance
+   */
+  public async addModuleInstance(moduleInstance: any): Promise<void> {
+    this.state.modules.push(moduleInstance);
+    await this.saveState();
   }
 
-  public async addModuleInstance(module: ModuleInstance): Promise<void> {
-    this.state.modules.push(module);
-    this.markDirty();
-    this.emit('moduleInstanceAdded', module);
+  /**
+   * Get module instance by ID
+   */
+  public getModuleInstance(id: string): any | undefined {
+    return this.state.modules.find(m => m.id === id);
   }
 
-  public async updateModuleInstance(module: ModuleInstance): Promise<void> {
-    const index = this.state.modules.findIndex(m => m.id === module.id);
+  /**
+   * Update module instance
+   */
+  public async updateModuleInstance(moduleInstance: any): Promise<void> {
+    const index = this.state.modules.findIndex(m => m.id === moduleInstance.id);
     if (index !== -1) {
-      this.state.modules[index] = module;
-      this.markDirty();
-      this.emit('moduleInstanceUpdated', module);
+      this.state.modules[index] = moduleInstance;
+      await this.saveState();
     }
   }
 
+  /**
+   * Remove module instance
+   */
   public async removeModuleInstance(id: string): Promise<boolean> {
     const index = this.state.modules.findIndex(m => m.id === id);
     if (index !== -1) {
-      const removed = this.state.modules.splice(index, 1)[0];
-      this.markDirty();
-      this.emit('moduleInstanceRemoved', removed);
+      this.state.modules.splice(index, 1);
+      await this.saveState();
       return true;
     }
     return false;
   }
 
-  // Route management
+  /**
+   * Get routes
+   */
   public getRoutes(): MessageRoute[] {
     return [...this.state.routes];
   }
 
-  public getRoute(id: string): MessageRoute | undefined {
-    return this.state.routes.find(route => route.id === id);
-  }
-
+  /**
+   * Add route
+   */
   public async addRoute(route: MessageRoute): Promise<void> {
     this.state.routes.push(route);
-    this.markDirty();
-    this.emit('routeAdded', route);
+    await this.saveState();
   }
 
+  /**
+   * Get route by ID
+   */
+  public getRoute(id: string): MessageRoute | undefined {
+    return this.state.routes.find(r => r.id === id);
+  }
+
+  /**
+   * Update route
+   */
   public async updateRoute(route: MessageRoute): Promise<void> {
     const index = this.state.routes.findIndex(r => r.id === route.id);
     if (index !== -1) {
       this.state.routes[index] = route;
-      this.markDirty();
-      this.emit('routeUpdated', route);
+      await this.saveState();
     }
   }
 
+  /**
+   * Remove route
+   */
   public async removeRoute(id: string): Promise<boolean> {
     const index = this.state.routes.findIndex(r => r.id === id);
     if (index !== -1) {
-      const removed = this.state.routes.splice(index, 1)[0];
-      this.markDirty();
-      this.emit('routeRemoved', removed);
+      this.state.routes.splice(index, 1);
+      await this.saveState();
       return true;
     }
     return false;
   }
 
-  // Settings management
+  /**
+   * Get settings
+   */
   public getSettings(): Record<string, any> {
     return { ...this.state.settings };
   }
 
+  /**
+   * Get setting by key
+   */
   public getSetting(key: string): any {
     return this.state.settings[key];
   }
 
+  /**
+   * Set setting
+   */
   public async setSetting(key: string, value: any): Promise<void> {
     this.state.settings[key] = value;
-    this.markDirty();
-    this.emit('settingChanged', { key, value });
+    await this.saveState();
   }
 
+  /**
+   * Remove setting
+   */
   public async removeSetting(key: string): Promise<boolean> {
     if (key in this.state.settings) {
       delete this.state.settings[key];
-      this.markDirty();
-      this.emit('settingRemoved', { key });
+      await this.saveState();
       return true;
     }
     return false;
   }
 
-  // System state
-  public getState(): SystemState {
-    return { ...this.state };
-  }
-
+  /**
+   * Check if state is dirty (always false in simplified version)
+   */
   public isStateDirty(): boolean {
-    return this.isDirty;
-  }
-
-  public getLastSaved(): number {
-    return this.state.lastSaved;
+    return false;
   }
 
   /**
-   * Force save state immediately
+   * Get last saved timestamp
+   */
+  public getLastSaved(): number {
+    return this.lastSaved;
+  }
+
+  /**
+   * Force save state
    */
   public async forceSave(): Promise<void> {
     await this.saveState();
@@ -379,30 +319,23 @@ export class StateManager extends EventEmitter {
       interactions: [],
       modules: [],
       routes: [],
-      settings: {},
-      lastSaved: Date.now(),
-      version: '1.0.0'
+      settings: {}
     };
-    
-    this.isDirty = true;
     await this.saveState();
-    this.emit('stateReset');
   }
 
   /**
-   * Cleanup resources
+   * Reset singleton instance (for testing)
+   */
+  public static resetInstance(): void {
+    StateManager.instance = undefined as any;
+  }
+
+  /**
+   * Destroy state manager
    */
   public async destroy(): Promise<void> {
-    this.logger?.info('Destroying StateManager');
-    
-    // Stop auto-save
-    this.stopAutoSave();
-    
-    // Save any pending changes
-    if (this.isDirty) {
-      await this.saveState();
-    }
-    
-    this.logger?.info('StateManager destroyed');
+    await this.saveState();
+    this.logger.info('State manager destroyed', 'StateManager');
   }
-} 
+}

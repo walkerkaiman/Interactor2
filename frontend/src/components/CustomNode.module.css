@@ -1,0 +1,165 @@
+.node {
+  background: #1f2937;
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 200px;
+  color: #ffffff;
+  font-size: 12px;
+  position: relative;
+}
+
+.node.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.header {
+  margin-bottom: 8px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.moduleName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.type {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.type.input {
+  background: #059669;
+  color: #ffffff;
+}
+
+.type.output {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.description {
+  color: #d1d5db;
+  font-size: 11px;
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+
+.handles {
+  position: relative;
+  min-height: 40px;
+}
+
+.handleContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 2px 0;
+}
+
+.handle {
+  background: #6b7280;
+  border: 2px solid #374151;
+  width: 8px;
+  height: 8px;
+}
+
+.handle:hover {
+  background: #3b82f6;
+  border-color: #1d4ed8;
+}
+
+.handleLabel {
+  font-size: 10px;
+  color: #9ca3af;
+  margin: 0 4px;
+}
+
+.inputHandles .handleLabel {
+  margin-left: 8px;
+}
+
+.outputHandles .handleLabel {
+  margin-right: 8px;
+  text-align: right;
+}
+
+.config {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #374151;
+}
+
+.configTitle {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d1d5db;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.configItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.configItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.configKey {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.configValue {
+  color: #d1d5db;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.configMore {
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+  margin-top: 2px;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #374151;
+  font-size: 10px;
+}
+
+.version {
+  background: #1f2937;
+  color: #9ca3af;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.author {
+  color: #6b7280;
+  font-style: italic;
+} 

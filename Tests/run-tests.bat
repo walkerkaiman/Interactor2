@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Interactor2 Test Runner Script for Windows
-REM This script provides an easy way to run different types of tests
+REM Interactor2 Simplified Test Runner Script for Windows
+REM This script provides an easy way to run different types of tests for the simplified backend
 
 set "RED=[91m"
 set "GREEN=[92m"
@@ -103,87 +103,156 @@ if exist "..\backend" (
     cd ..\Tests
 )
 
-call :print_success "Packages built"
+call :print_success "All packages built successfully"
 goto :eof
 
-REM Function to run unit tests
-:run_unit_tests
-call :print_status "Running unit tests..."
-npm run test:unit
+REM Function to run core tests
+:run_core_tests
+call :print_status "Running core service tests..."
+npx vitest run core --reporter=verbose
+if %errorlevel% neq 0 (
+    call :print_error "Core tests failed"
+    exit /b 1
+)
+call :print_success "Core tests completed"
 goto :eof
 
 REM Function to run integration tests
 :run_integration_tests
 call :print_status "Running integration tests..."
-npm run integration
+npx vitest run integration --reporter=verbose
+if %errorlevel% neq 0 (
+    call :print_error "Integration tests failed"
+    exit /b 1
+)
+call :print_success "Integration tests completed"
 goto :eof
 
 REM Function to run all tests
 :run_all_tests
 call :print_status "Running all tests..."
-npm run test:all
+npx vitest run --reporter=verbose
+if %errorlevel% neq 0 (
+    call :print_error "Some tests failed"
+    exit /b 1
+)
+call :print_success "All tests completed successfully"
 goto :eof
 
 REM Function to run tests with coverage
-:run_tests_with_coverage
+:run_coverage
 call :print_status "Running tests with coverage..."
-npm run test:all:coverage
+npx vitest run --coverage --reporter=verbose
+if %errorlevel% neq 0 (
+    call :print_error "Coverage tests failed"
+    exit /b 1
+)
+call :print_success "Coverage tests completed"
 goto :eof
 
-REM Function to clean up test artifacts
-:cleanup
-call :print_status "Cleaning up test artifacts..."
-npm run test:clean
-call :print_success "Cleanup completed"
+REM Function to run tests in watch mode
+:run_watch
+call :print_status "Starting tests in watch mode..."
+call :print_warning "Press Ctrl+C to stop watching"
+npx vitest --reporter=verbose
 goto :eof
 
-REM Function to show help
-:show_help
-echo Interactor2 Test Runner
-echo.
-echo Usage: %~nx0 [OPTION]
-echo.
-echo Options:
-echo   unit              Run unit tests only
-echo   integration       Run integration tests only
-echo   all               Run all tests ^(unit + integration^)
-echo   coverage          Run all tests with coverage
-echo   setup             Install dependencies and build packages
-echo   clean             Clean up test artifacts
-echo   help              Show this help message
-echo.
-echo Examples:
-echo   %~nx0 setup          # First time setup
-echo   %~nx0 all            # Run all tests
-echo   %~nx0 coverage       # Run tests with coverage
-echo   %~nx0 integration    # Run only integration tests
+REM Function to clean test artifacts
+:clean_artifacts
+call :print_status "Cleaning test artifacts..."
+
+REM Remove test data directories
+if exist "test-data" (
+    rmdir /s /q "test-data"
+)
+
+REM Remove test log files
+if exist "*.log" (
+    del /q "*.log"
+)
+
+REM Remove coverage reports
+if exist "coverage" (
+    rmdir /s /q "coverage"
+)
+
+call :print_success "Test artifacts cleaned"
 goto :eof
 
 REM Main script logic
-set "COMMAND=%~1"
-if "%COMMAND%"=="" set "COMMAND=help"
+:main
+call :print_status "Interactor2 Simplified Test Runner"
+call :print_status "================================"
 
-if "%COMMAND%"=="unit" (
-    call :check_prerequisites
-    call :run_unit_tests
-) else if "%COMMAND%"=="integration" (
-    call :check_prerequisites
-    call :run_integration_tests
-) else if "%COMMAND%"=="all" (
-    call :check_prerequisites
-    call :run_all_tests
-) else if "%COMMAND%"=="coverage" (
-    call :check_prerequisites
-    call :run_tests_with_coverage
-) else if "%COMMAND%"=="setup" (
+REM Check command line arguments
+if "%1"=="" (
+    call :print_status "No test type specified. Running all tests..."
     call :check_prerequisites
     call :install_dependencies
     call :build_packages
-    call :print_success "Setup completed successfully!"
-) else if "%COMMAND%"=="clean" (
-    call :cleanup
-) else (
-    call :show_help
+    call :run_all_tests
+    goto :end
 )
 
-endlocal 
+if "%1"=="core" (
+    call :print_status "Running core tests only..."
+    call :check_prerequisites
+    call :install_dependencies
+    call :build_packages
+    call :run_core_tests
+    goto :end
+)
+
+if "%1"=="integration" (
+    call :print_status "Running integration tests only..."
+    call :check_prerequisites
+    call :install_dependencies
+    call :build_packages
+    call :run_integration_tests
+    goto :end
+)
+
+if "%1"=="coverage" (
+    call :print_status "Running tests with coverage..."
+    call :check_prerequisites
+    call :install_dependencies
+    call :build_packages
+    call :run_coverage
+    goto :end
+)
+
+if "%1"=="watch" (
+    call :print_status "Starting watch mode..."
+    call :check_prerequisites
+    call :install_dependencies
+    call :build_packages
+    call :run_watch
+    goto :end
+)
+
+if "%1"=="clean" (
+    call :clean_artifacts
+    goto :end
+)
+
+if "%1"=="help" (
+    call :print_status "Usage: run-tests.bat [test_type]"
+    call :print_status ""
+    call :print_status "Available test types:"
+    call :print_status "  (no args) - Run all tests"
+    call :print_status "  core      - Run core service tests only"
+    call :print_status "  integration - Run integration tests only"
+    call :print_status "  coverage  - Run tests with coverage report"
+    call :print_status "  watch     - Run tests in watch mode"
+    call :print_status "  clean     - Clean test artifacts"
+    call :print_status "  help      - Show this help message"
+    goto :end
+)
+
+call :print_error "Unknown test type: %1"
+call :print_status "Use 'run-tests.bat help' for usage information"
+exit /b 1
+
+:end
+call :print_success "Test runner completed"
+exit /b 0 
