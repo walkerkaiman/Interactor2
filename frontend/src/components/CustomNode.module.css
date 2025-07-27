@@ -96,7 +96,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin: 2px 0;
+  justify-content: flex-end;
+  margin: 4px 0;
+  min-height: 20px;
 }
 
 .handle {
@@ -104,11 +106,36 @@
   border: 2px solid #374151;
   width: 8px;
   height: 8px;
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .handle:hover {
   background: #3b82f6;
   border-color: #1d4ed8;
+}
+
+/* Special styling for Trigger and Stream handles */
+.handle[data-handleid="trigger"] {
+  background: #dc2626;
+  border-color: #991b1b;
+}
+
+.handle[data-handleid="trigger"]:hover {
+  background: #b91c1c;
+  border-color: #7f1d1d;
+}
+
+.handle[data-handleid="stream"] {
+  background: #059669;
+  border-color: #047857;
+}
+
+.handle[data-handleid="stream"]:hover {
+  background: #047857;
+  border-color: #065f46;
 }
 
 .handleLabel {
@@ -122,7 +149,7 @@
 }
 
 .outputHandles .handleLabel {
-  margin-right: 8px;
+  margin-right: 16px;
   text-align: right;
 }
 

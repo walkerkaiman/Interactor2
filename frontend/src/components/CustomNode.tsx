@@ -59,18 +59,42 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, onDelete })
 
         {/* Output Handles */}
         <div className={styles.outputHandles}>
-          {outputEvents.map((event: any, index: number) => (
-            <div key={event.name} className={styles.handleContainer}>
-              <span className={styles.handleLabel}>{event.name}</span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={event.name}
-                className={styles.handle}
-                style={{ top: `${20 + index * 20}px` }}
-              />
-            </div>
-          ))}
+          {manifest.type === 'input' ? (
+            // For input modules, show Trigger and Stream handles
+            <>
+              <div className={styles.handleContainer}>
+                <span className={styles.handleLabel}>Trigger</span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="trigger"
+                  className={styles.handle}
+                />
+              </div>
+              <div className={styles.handleContainer}>
+                <span className={styles.handleLabel}>Stream</span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="stream"
+                  className={styles.handle}
+                />
+              </div>
+            </>
+          ) : (
+            // For other module types, show the original output events
+            outputEvents.map((event: any) => (
+              <div key={event.name} className={styles.handleContainer}>
+                <span className={styles.handleLabel}>{event.name}</span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={event.name}
+                  className={styles.handle}
+                />
+              </div>
+            ))
+          )}
         </div>
       </div>
 

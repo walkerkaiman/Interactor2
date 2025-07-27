@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -9,6 +9,8 @@ import ReactFlow, {
   Controls,
   Background,
   NodeTypes,
+  OnConnectStart,
+  OnConnectEnd,
 } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -54,10 +56,25 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       });
 
       interaction.routes.forEach((route) => {
+        // Determine edge style based on event type
+        let edgeStyle = {};
+        if (route.event === 'trigger') {
+          edgeStyle = {
+            stroke: '#dc2626',
+            strokeWidth: 2,
+          };
+        } else if (route.event === 'stream') {
+          edgeStyle = {
+            stroke: '#059669',
+            strokeWidth: 2,
+          };
+        }
+
         flowEdges.push({
           id: route.id,
           source: route.source,
           target: route.target,
+          style: edgeStyle,
           data: { route },
         });
       });
@@ -80,6 +97,45 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const nodeTypes: NodeTypes = useMemo(() => ({
     custom: (props: any) => <CustomNode {...props} onDelete={handleDeleteNode} />,
   }), [handleDeleteNode]);
+
+  // Track handle drag state
+  const [draggedHandle, setDraggedHandle] = useState<{ nodeId: string; handleId: string } | null>(null);
+
+  // Handle drag start from handles
+  const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    console.log('onConnectStart:', params);
+    if (params.nodeId && params.handleId) {
+      setDraggedHandle({ nodeId: params.nodeId, handleId: params.handleId });
+      console.log('Set dragged handle:', { nodeId: params.nodeId, handleId: params.handleId });
+    }
+  }, []);
+
+  // Handle drag end from handles
+  const onConnectEnd: OnConnectEnd = useCallback((_event) => {
+    console.log('onConnectEnd - clearing dragged handle after timeout');
+    // Clear draggedHandle after a short delay to allow for pane click
+    setTimeout(() => {
+      setDraggedHandle(null);
+    }, 100);
+  }, []);
+
+  // Handle pane click to disconnect
+  const onPaneClick = useCallback((_event: React.MouseEvent) => {
+    console.log('onPaneClick - draggedHandle:', draggedHandle);
+    if (draggedHandle) {
+      console.log('Disconnecting handle on pane click:', draggedHandle);
+      setReactFlowEdges((eds) => {
+        const filtered = eds.filter(edge => 
+          !(edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId)
+        );
+        console.log('Removed edge, remaining edges:', filtered.length);
+        return filtered;
+      });
+      setDraggedHandle(null);
+      // Note: updateInteractions will be called automatically via useEffect when edges change
+    }
+    onNodeSelect(null);
+  }, [draggedHandle, setReactFlowEdges, onNodeSelect]);
 
   // Handle drag and drop
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -122,22 +178,43 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         console.error('Failed to parse dropped data:', error);
       }
     },
-    [setReactFlowNodes]
+    [setReactFlowNodes, draggedHandle, setReactFlowEdges]
   );
 
   // Handle connections
   const onConnect = useCallback(
     (params: Connection) => {
+      // Determine the event type based on the source handle
+      let eventType = 'default';
+      let edgeStyle = {};
+      
+      if (params.sourceHandle === 'trigger') {
+        eventType = 'trigger';
+        edgeStyle = {
+          stroke: '#dc2626',
+          strokeWidth: 2,
+        };
+      } else if (params.sourceHandle === 'stream') {
+        eventType = 'stream';
+        edgeStyle = {
+          stroke: '#059669',
+          strokeWidth: 2,
+        };
+      }
+
       const newEdge: Edge<FrontendEdgeData> = {
         id: uuidv4(),
         source: params.source!,
         target: params.target!,
+        sourceHandle: params.sourceHandle,
+        targetHandle: params.targetHandle,
+        style: edgeStyle,
         data: {
           route: {
             id: uuidv4(),
             source: params.source!,
             target: params.target!,
-            event: 'default',
+            event: eventType,
           },
         },
       };
@@ -153,12 +230,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     onNodeSelect(node.id);
   }, [onNodeSelect]);
 
-  const onPaneClick = useCallback(() => {
-    onNodeSelect(null);
-  }, [onNodeSelect]);
+
 
   // Update interactions when nodes/edges change
   const updateInteractions = useCallback(() => {
+    console.log('updateInteractions called - nodes:', reactFlowNodes.length, 'edges:', reactFlowEdges.length);
     const updatedInteractions: InteractionConfig[] = [];
 
     // Group nodes by interaction (for now, create one interaction with all nodes)
@@ -173,7 +249,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      event: 'default',
+      event: edge.data?.route?.event || 'default',
     }));
 
     const interaction: InteractionConfig = {
@@ -186,6 +262,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     };
 
     updatedInteractions.push(interaction);
+    console.log('Updating interactions with routes:', routes.length);
     onInteractionsUpdate(updatedInteractions);
   }, [reactFlowNodes, reactFlowEdges, onInteractionsUpdate]);
 
@@ -217,6 +294,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onDragOver={onDragOver}
         onDrop={onDrop}
         onNodeClick={onNodeClick}

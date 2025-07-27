@@ -5,8 +5,59 @@
       "name": "Main Interaction",
       "description": "Primary interaction configuration",
       "enabled": true,
-      "modules": [],
-      "routes": []
+      "modules": [
+        {
+          "id": "f175cb7d-658d-4116-86a2-0c1d28e87698",
+          "moduleName": "Frames Input",
+          "config": {
+            "universe": 999,
+            "enabled": true
+          },
+          "position": {
+            "x": 174,
+            "y": 189
+          }
+        },
+        {
+          "id": "55e9ac8e-e5e8-4456-818d-542f4b8f24da",
+          "moduleName": "Audio Output",
+          "config": {
+            "deviceId": "default",
+            "sampleRate": 44100,
+            "channels": 2,
+            "format": "wav",
+            "volume": 1,
+            "enabled": true,
+            "bufferSize": 4096,
+            "loop": false,
+            "fadeInDuration": 0,
+            "fadeOutDuration": 0,
+            "enableFileUpload": true,
+            "uploadPort": 3001,
+            "uploadHost": "0.0.0.0",
+            "maxFileSize": 52428800,
+            "allowedExtensions": [
+              ".wav",
+              ".mp3",
+              ".ogg",
+              ".m4a",
+              ".flac"
+            ]
+          },
+          "position": {
+            "x": 780,
+            "y": 205.9999999999999
+          }
+        }
+      ],
+      "routes": [
+        {
+          "id": "37755657-f426-4b05-898d-daa4182b584c",
+          "source": "f175cb7d-658d-4116-86a2-0c1d28e87698",
+          "target": "55e9ac8e-e5e8-4456-818d-542f4b8f24da",
+          "event": "trigger"
+        }
+      ]
     }
   ],
   "modules": [],
