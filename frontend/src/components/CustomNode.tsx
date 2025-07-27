@@ -7,14 +7,20 @@ interface CustomNodeProps extends NodeProps<FrontendNodeData> {
   onDelete?: (nodeId: string) => void;
 }
 
-const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, onDelete }) => {
-  const { moduleName, config, manifest } = data;
+const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id }) => {
+  const { module, instance, isSelected, onSelect, onDelete } = data;
+  const moduleName = module.name;
+  const config = instance?.config || {};
+  const manifest = module;
 
   const inputEvents = manifest.events?.filter((e: any) => e.type === 'input') || [];
   const outputEvents = manifest.events?.filter((e: any) => e.type === 'output') || [];
 
   return (
-    <div className={`${styles.node} ${selected ? styles.selected : ''}`}>
+    <div 
+      className={`${styles.node} ${selected ? styles.selected : ''}`}
+      onClick={() => onSelect?.()}
+    >
       {/* Delete Button */}
       {onDelete && (
         <button
@@ -126,6 +132,15 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, onDelete })
       <div className={styles.meta}>
         <span className={styles.version}>v{manifest.version}</span>
         <span className={styles.author}>by {manifest.author}</span>
+        {instance && (
+          <div className={styles.status}>
+            <span className={`${styles.statusDot} ${styles[instance.status || 'stopped']}`}></span>
+            <span className={styles.statusText}>{instance.status || 'stopped'}</span>
+            {instance.currentFrame !== undefined && (
+              <span className={styles.frameInfo}>Frame: {instance.currentFrame}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

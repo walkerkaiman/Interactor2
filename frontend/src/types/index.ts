@@ -7,10 +7,11 @@ import {
 
 // Frontend-specific node data
 export interface FrontendNodeData {
-  moduleName: string;
-  config: Record<string, any>;
-  manifest: ModuleManifest;
-  instance?: ModuleInstance;
+  module: ModuleManifest;
+  instance?: any;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onDelete?: (nodeId: string) => void;
 }
 
 // Frontend-specific edge data

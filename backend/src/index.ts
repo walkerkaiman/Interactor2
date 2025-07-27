@@ -240,6 +240,36 @@ export class InteractorServer {
       res.json({ success: true, data: response });
     });
 
+    // Get module instances and their real-time state (must come before /:name route)
+    this.app.get('/api/modules/instances', (req, res) => {
+      try {
+        const moduleInstances = this.stateManager.getModuleInstances();
+        res.json({ 
+          success: true, 
+          data: { 
+            instances: moduleInstances,
+            count: moduleInstances.length 
+          } 
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
+    // Get specific module instance state (must come before /:name route)
+    this.app.get('/api/modules/instances/:id', (req, res) => {
+      try {
+        const moduleInstance = this.stateManager.getModuleInstance(req.params.id as string);
+        if (moduleInstance) {
+          res.json({ success: true, data: moduleInstance });
+        } else {
+          res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
     this.app.get('/api/modules/:name', (req, res) => {
       const manifest = this.moduleLoader.getManifest(req.params.name as string);
       if (manifest) {
@@ -264,13 +294,79 @@ export class InteractorServer {
         // Replace entire interaction state
         await this.stateManager.replaceState({ interactions: interactionMap });
         
+        // Create module instances for all modules in interactions
+        const moduleInstances: any[] = [];
+        interactionMap.forEach(interaction => {
+          interaction.modules.forEach(moduleInstance => {
+            // Create a module instance with state
+            const instance = {
+              id: moduleInstance.id,
+              moduleName: moduleInstance.moduleName,
+              config: moduleInstance.config,
+              status: 'stopped',
+              messageCount: 0,
+              currentFrame: undefined,
+              frameCount: 0,
+              lastUpdate: Date.now()
+            };
+            moduleInstances.push(instance);
+          });
+        });
+        
+        // Store module instances in state
+        await this.stateManager.replaceState({ 
+          interactions: interactionMap,
+          modules: moduleInstances 
+        });
+        
         res.json({ 
           success: true, 
           message: 'Interaction map registered successfully',
-          count: interactionMap.length
+          count: interactionMap.length,
+          moduleInstances: moduleInstances.length
         });
       } catch (error) {
         res.status(400).json({ success: false, error: String(error) });
+      }
+    });
+
+    // Create a new module instance
+    this.app.post('/api/modules/instances', async (req, res) => {
+      try {
+        const { moduleName, config } = req.body;
+        
+        if (!moduleName) {
+          return res.status(400).json({ success: false, error: 'Module name is required' });
+        }
+        
+        // Check if module exists
+        const manifest = this.moduleLoader.getManifest(moduleName);
+        if (!manifest) {
+          return res.status(404).json({ success: false, error: 'Module not found' });
+        }
+        
+        // Create module instance
+        const instance = {
+          id: `instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          moduleName,
+          config: config || {},
+          status: 'stopped',
+          messageCount: 0,
+          currentFrame: undefined,
+          frameCount: 0,
+          lastUpdate: Date.now()
+        };
+        
+        // Add to state
+        await this.stateManager.addModuleInstance(instance);
+        
+        res.json({ 
+          success: true, 
+          data: instance,
+          message: 'Module instance created successfully'
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
       }
     });
 

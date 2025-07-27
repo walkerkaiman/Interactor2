@@ -40,6 +40,27 @@ class ApiService {
     }
   }
 
+  // Get module instances and their real-time state
+  async getModuleInstances(): Promise<any[]> {
+    try {
+      const response = await this.request<ApiResponse<{ instances: any[]; count: number }>>('/modules/instances');
+      return response.data?.instances || [];
+    } catch (error) {
+      console.error('Failed to get module instances:', error);
+      return [];
+    }
+  }
+
+  async getModuleInstance(id: string): Promise<any | null> {
+    try {
+      const response = await this.request<ApiResponse<any>>(`/modules/instances/${id}`);
+      return response.data || null;
+    } catch (error) {
+      console.error(`Failed to get module instance ${id}:`, error);
+      return null;
+    }
+  }
+
   // Interaction management
   async getInteractions(): Promise<InteractionConfig[]> {
     const response = await this.request<ApiResponse<InteractionListResponse>>('/interactions');

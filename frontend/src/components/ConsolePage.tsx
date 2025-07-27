@@ -24,56 +24,36 @@ const ConsolePage: React.FC<ConsolePageProps> = ({ state, onStateUpdate }) => {
   const loadLogs = useCallback(async () => {
     try {
       onStateUpdate({ loading: true });
-      // This would be implemented in the backend to serve logs
-      // For now, we'll show mock data
-      const mockLogs: LogEntry[] = [
-        {
-          timestamp: new Date().toISOString(),
-          level: 'info',
-          message: 'System started successfully',
-          module: 'System'
-        },
-        {
-          timestamp: new Date(Date.now() - 1000).toISOString(),
-          level: 'info',
-          message: 'Loaded 8 modules',
-          module: 'ModuleLoader'
-        },
-        {
-          timestamp: new Date(Date.now() - 2000).toISOString(),
-          level: 'warn',
-          message: 'Module "http_input" has no configuration',
-          module: 'ModuleLoader'
-        },
-        {
-          timestamp: new Date(Date.now() - 3000).toISOString(),
-          level: 'info',
-          message: 'API server listening on port 3001',
-          module: 'Server'
-        },
-        {
-          timestamp: new Date(Date.now() - 4000).toISOString(),
-          level: 'error',
-          message: 'Failed to connect to database',
-          module: 'Database'
-        },
-        {
-          timestamp: new Date(Date.now() - 5000).toISOString(),
-          level: 'debug',
-          message: 'Processing interaction: frame_change -> dmx_output',
-          module: 'MessageRouter'
-        }
-      ];
+      
+      // Fetch real logs from the backend API
+      const response = await fetch('/api/logs?count=100');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch logs: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load logs');
+      }
+      
+      // Transform backend logs to frontend format
+      const realLogs: LogEntry[] = result.data.map((log: any) => ({
+        timestamp: log.timestamp || new Date().toISOString(),
+        level: log.level || 'info',
+        message: log.message || log.msg || 'No message',
+        module: log.module || log.moduleName || 'System',
+        data: log.data || log.meta || undefined
+      }));
       
       onStateUpdate({ 
-        logs: mockLogs, 
+        logs: realLogs, 
         error: null, 
         loading: false, 
         lastRefresh: Date.now() 
       });
     } catch (err) {
       onStateUpdate({ 
-        error: 'Failed to load logs', 
+        error: `Failed to load logs: ${err instanceof Error ? err.message : 'Unknown error'}`, 
         loading: false 
       });
       console.error('Error loading logs:', err);

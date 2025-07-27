@@ -16,38 +16,21 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
     try {
       onStateUpdate({ loading: true });
       
-      // For now, always use mock data since the API endpoint doesn't exist
-      const mockStats = {
-        uptime: '2 hours, 15 minutes',
-        memory: {
-          used: 1024 * 1024 * 512, // 512MB
-          total: 1024 * 1024 * 1024 * 8, // 8GB
-          percentage: 6.25,
-        },
-        cpu: {
-          usage: 15.2,
-          cores: 8,
-        },
-        modules: {
-          total: 8,
-          active: 6,
-          inactive: 2,
-        },
-        interactions: {
-          total: 3,
-          active: 2,
-        },
-        network: {
-          requests: 1250,
-          errors: 3,
-        },
-      };
+      // Fetch real stats from the backend API
+      const response = await fetch('/api/stats');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stats: ${response.statusText}`);
+      }
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load stats');
+      }
+      
+      const realStats = result.data;
       
       onStateUpdate({ 
-        stats: mockStats, 
+        stats: realStats, 
         error: null, 
         loading: false, 
         lastRefresh: Date.now() 
@@ -55,7 +38,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
     } catch (err) {
       console.error('Error loading stats:', err);
       onStateUpdate({ 
-        error: 'Failed to load system statistics', 
+        error: `Failed to load system statistics: ${err instanceof Error ? err.message : 'Unknown error'}`, 
         loading: false 
       });
     }
@@ -68,10 +51,10 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
     const interval = setInterval(loadStats, 10000);
     
     return () => clearInterval(interval);
-  }, [loadStats]);
+  }, []); // Remove loadStats from dependencies to prevent infinite loop
 
   const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -140,13 +123,13 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                   <h3>CPU Usage</h3>
                   <span 
                     className={styles.metricValue}
-                    style={{ color: getCpuColor(stats.cpu.usage) }}
+                    style={{ color: getCpuColor(stats.cpu?.usage || 0) }}
                   >
-                    {stats.cpu.usage.toFixed(1)}%
+                    {(stats.cpu?.usage || 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className={styles.metricSubtext}>
-                  {stats.cpu.cores} cores
+                  {stats.cpu?.cores || 0} cores
                 </div>
               </div>
 
@@ -155,13 +138,13 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                   <h3>Memory Usage</h3>
                   <span 
                     className={styles.metricValue}
-                    style={{ color: getMemoryColor(stats.memory.percentage) }}
+                    style={{ color: getMemoryColor(stats.memory?.percentage || 0) }}
                   >
-                    {stats.memory.percentage.toFixed(1)}%
+                    {(stats.memory?.percentage || 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className={styles.metricSubtext}>
-                  {formatBytes(stats.memory.used)} / {formatBytes(stats.memory.total)}
+                  {formatBytes(stats.memory?.used || 0)} / {formatBytes(stats.memory?.total || 0)}
                 </div>
               </div>
             </div>
@@ -174,7 +157,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
               <div className={styles.metricCard}>
                 <div className={styles.metricHeader}>
                   <h3>Total Modules</h3>
-                  <span className={styles.metricValue}>{stats.modules.total}</span>
+                  <span className={styles.metricValue}>{stats.modules?.total || 0}</span>
                 </div>
               </div>
               
@@ -182,7 +165,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                 <div className={styles.metricHeader}>
                   <h3>Active Modules</h3>
                   <span className={styles.metricValue} style={{ color: '#28a745' }}>
-                    {stats.modules.active}
+                    {stats.modules?.active || 0}
                   </span>
                 </div>
               </div>
@@ -191,7 +174,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                 <div className={styles.metricHeader}>
                   <h3>Inactive Modules</h3>
                   <span className={styles.metricValue} style={{ color: '#6c757d' }}>
-                    {stats.modules.inactive}
+                    {stats.modules?.inactive || 0}
                   </span>
                 </div>
               </div>
@@ -205,7 +188,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
               <div className={styles.metricCard}>
                 <div className={styles.metricHeader}>
                   <h3>Total Interactions</h3>
-                  <span className={styles.metricValue}>{stats.interactions.total}</span>
+                  <span className={styles.metricValue}>{stats.interactions?.total || 0}</span>
                 </div>
               </div>
               
@@ -213,7 +196,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                 <div className={styles.metricHeader}>
                   <h3>Active Interactions</h3>
                   <span className={styles.metricValue} style={{ color: '#28a745' }}>
-                    {stats.interactions.active}
+                    {stats.interactions?.active || 0}
                   </span>
                 </div>
               </div>
@@ -227,7 +210,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
               <div className={styles.metricCard}>
                 <div className={styles.metricHeader}>
                   <h3>Total Requests</h3>
-                  <span className={styles.metricValue}>{stats.network.requests}</span>
+                  <span className={styles.metricValue}>{stats.network?.requests || 0}</span>
                 </div>
               </div>
               
@@ -235,7 +218,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({ state, onStateUpdate 
                 <div className={styles.metricHeader}>
                   <h3>Errors</h3>
                   <span className={styles.metricValue} style={{ color: '#dc3545' }}>
-                    {stats.network.errors}
+                    {stats.network?.errors || 0}
                   </span>
                 </div>
               </div>

@@ -220,4 +220,47 @@
 .author {
   color: #6b7280;
   font-style: italic;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.statusDot.running {
+  background-color: #10b981;
+}
+
+.statusDot.stopped {
+  background-color: #6b7280;
+}
+
+.statusDot.error {
+  background-color: #ef4444;
+}
+
+.statusDot.initializing {
+  background-color: #f59e0b;
+}
+
+.statusText {
+  color: #6b7280;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.frameInfo {
+  color: #3b82f6;
+  font-family: monospace;
+  font-weight: 600;
 } 

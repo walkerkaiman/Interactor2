@@ -30,6 +30,10 @@ function App() {
     lastSuccess: null,
   });
 
+  // Local state for unregistered interactions
+  const [localInteractions, setLocalInteractions] = useState<InteractionConfig[]>([]);
+  const [registeredInteractions, setRegisteredInteractions] = useState<InteractionConfig[]>([]);
+
   // UI state
   const [uiState, setUIState] = useState<UIState>({
     sidebarOpen: true,
@@ -80,9 +84,11 @@ function App() {
       setAppState(prev => ({
         ...prev,
         modules,
-        interactions,
         settings,
       }));
+      
+      // Only update registered interactions, preserve local ones
+      setRegisteredInteractions(interactions);
     } catch (error) {
       setAppState(prev => ({
         ...prev,
@@ -96,7 +102,14 @@ function App() {
     setAppState(prev => ({ ...prev, isRegistering: true, lastError: null, lastSuccess: null }));
 
     try {
-      await apiService.registerInteractions(appState.interactions);
+      // Combine local and registered interactions for registration
+      const allInteractions = [...localInteractions, ...registeredInteractions];
+      await apiService.registerInteractions(allInteractions);
+      
+      // Move local interactions to registered after successful registration
+      setRegisteredInteractions(prev => [...prev, ...localInteractions]);
+      setLocalInteractions([]);
+      
       setAppState(prev => ({
         ...prev,
         isRegistering: false,
@@ -109,17 +122,35 @@ function App() {
         lastError: `Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }));
     }
-  }, [appState.interactions]);
+  }, [localInteractions, registeredInteractions]);
 
   // Handle node selection
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     setAppState(prev => ({ ...prev, selectedNodeId: nodeId }));
   }, []);
 
-  // Handle interaction updates
+  // Handle interaction updates (local changes)
   const handleInteractionsUpdate = useCallback((interactions: InteractionConfig[]) => {
-    setAppState(prev => ({ ...prev, interactions }));
-  }, []);
+    // Determine which interactions are local vs registered
+    const local: InteractionConfig[] = [];
+    const registered: InteractionConfig[] = [];
+    
+    interactions.forEach(interaction => {
+      // Check if this interaction exists in registered interactions
+      const isRegistered = registeredInteractions.some(reg => reg.id === interaction.id);
+      if (isRegistered) {
+        registered.push(interaction);
+      } else {
+        local.push(interaction);
+      }
+    });
+    
+    // Update local interactions with any new local changes
+    setLocalInteractions(local);
+    
+    // Update registered interactions with any changes to existing registered ones
+    setRegisteredInteractions(registered);
+  }, [registeredInteractions]);
 
   // Handle settings updates
   const handleSettingsUpdate = useCallback(async (key: string, value: any) => {
@@ -160,6 +191,9 @@ function App() {
     console.log('Changing page from', uiState.currentPage, 'to', page);
     setUIState(prev => ({ ...prev, currentPage: page }));
   }, [uiState.currentPage]);
+
+  // Compute all interactions (local + registered)
+  const allInteractions = [...localInteractions, ...registeredInteractions];
 
   // Handle page state updates
   const updateWikisPageState = useCallback((updates: Partial<WikisPageState>) => {
@@ -231,13 +265,14 @@ function App() {
             {/* Page Content */}
             {uiState.currentPage === 'modules' && (
               <NodeEditor
-                interactions={appState.interactions}
+                interactions={allInteractions}
                 modules={appState.modules}
+                selectedNodeId={uiState.pageStates.modules.selectedNodeId}
                 onNodeSelect={(nodeId) => {
                   handleNodeSelect(nodeId);
                   updateModulesPageState({ selectedNodeId: nodeId });
                 }}
-                onInteractionsUpdate={handleInteractionsUpdate}
+                onInteractionsChange={handleInteractionsUpdate}
               />
             )}
             
@@ -276,7 +311,7 @@ function App() {
           {/* Trigger Panel */}
           {uiState.triggerPanelOpen && (
             <TriggerPanel
-              interactions={appState.interactions}
+              interactions={allInteractions}
               onClose={toggleTriggerPanel}
             />
           )}

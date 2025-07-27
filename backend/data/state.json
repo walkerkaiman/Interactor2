@@ -7,55 +7,44 @@
       "enabled": true,
       "modules": [
         {
-          "id": "f175cb7d-658d-4116-86a2-0c1d28e87698",
+          "id": "c8469352-698d-4398-8c04-dc3d782a7a29",
           "moduleName": "Frames Input",
           "config": {
             "universe": 999,
             "enabled": true
           },
           "position": {
-            "x": 174,
-            "y": 189
+            "x": 86.76667292554657,
+            "y": 254.06667280562925
           }
         },
         {
-          "id": "55e9ac8e-e5e8-4456-818d-542f4b8f24da",
-          "moduleName": "Audio Output",
+          "id": "0536f883-0f64-4af1-9617-7451af01f7c6",
+          "moduleName": "DMX Output",
           "config": {
-            "deviceId": "default",
-            "sampleRate": 44100,
-            "channels": 2,
-            "format": "wav",
-            "volume": 1,
+            "universe": 1,
+            "brightness": 1,
             "enabled": true,
-            "bufferSize": 4096,
-            "loop": false,
-            "fadeInDuration": 0,
-            "fadeOutDuration": 0,
             "enableFileUpload": true,
             "uploadPort": 3001,
-            "uploadHost": "0.0.0.0",
-            "maxFileSize": 52428800,
+            "uploadHost": "localhost",
+            "maxFileSize": 10485760,
             "allowedExtensions": [
-              ".wav",
-              ".mp3",
-              ".ogg",
-              ".m4a",
-              ".flac"
+              ".csv"
             ]
           },
           "position": {
-            "x": 780,
-            "y": 205.9999999999999
+            "x": 659.0929542850979,
+            "y": 249.74717004476577
           }
         }
       ],
       "routes": [
         {
-          "id": "37755657-f426-4b05-898d-daa4182b584c",
-          "source": "f175cb7d-658d-4116-86a2-0c1d28e87698",
-          "target": "55e9ac8e-e5e8-4456-818d-542f4b8f24da",
-          "event": "trigger"
+          "id": "f786f6b6-d41d-4d56-9de8-52c3e215c906",
+          "source": "c8469352-698d-4398-8c04-dc3d782a7a29",
+          "target": "0536f883-0f64-4af1-9617-7451af01f7c6",
+          "event": "stream"
         }
       ]
     }
