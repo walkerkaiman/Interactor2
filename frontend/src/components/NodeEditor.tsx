@@ -46,40 +46,16 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [moduleInstances, setModuleInstances] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const refreshIntervalRef = useRef<number | null>(null);
   const [draggedHandle, setDraggedHandle] = useState<{ nodeId: string; handleId: string } | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
-  // Load module instances and refresh periodically
-  const loadModuleInstances = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const instances = await apiService.getModuleInstances();
-      setModuleInstances(instances);
-    } catch (err) {
-      setError(`Failed to load module instances: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      console.error('Error loading module instances:', err);
-    } finally {
-      setLoading(false);
-    }
+
+
+  // Handle ReactFlow instance
+  const onInit = useCallback((instance: any) => {
+    console.log('🎯 NodeEditor: ReactFlow instance initialized:', !!instance);
+    setReactFlowInstance(instance);
   }, []);
-
-  // Set up periodic refresh of module instances
-  useEffect(() => {
-    loadModuleInstances();
-    
-    // Refresh module instances every 5 seconds to get real-time data
-    refreshIntervalRef.current = setInterval(loadModuleInstances, 5000);
-    
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, [loadModuleInstances]);
 
   // Handle node deletion
   const handleDeleteNode = useCallback((nodeId: string) => {
@@ -99,6 +75,131 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
   }, [setNodes, setEdges, interactions, onInteractionsChange]);
 
+    // Handle module drop
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      console.log('🎯 NodeEditor: Drop event triggered');
+      event.preventDefault();
+
+      console.log('🎯 NodeEditor: Checking reactFlowInstance:', !!reactFlowInstance);
+      if (!reactFlowInstance) {
+        console.error('🎯 NodeEditor: No reactFlowInstance available');
+        return;
+      }
+
+      const dragData = event.dataTransfer.getData('application/json');
+      console.log('🎯 NodeEditor: Retrieved drag data:', dragData);
+      
+      if (!dragData) {
+        console.error('🎯 NodeEditor: No drag data found');
+        return;
+      }
+
+      try {
+        console.log('🎯 NodeEditor: Parsing JSON drag data...');
+        const parsedData = JSON.parse(dragData);
+        console.log('🎯 NodeEditor: Parsed data:', parsedData);
+        
+        const { moduleName } = parsedData;
+        console.log('🎯 NodeEditor: Extracted moduleName:', moduleName);
+        
+        if (!moduleName) {
+          console.error('🎯 NodeEditor: No moduleName found in parsed data');
+          return;
+        }
+
+        console.log('🎯 NodeEditor: Available modules:', modules.map(m => m.name));
+        const module = modules.find(m => m.name === moduleName);
+        console.log('🎯 NodeEditor: Found module:', module);
+        
+        if (!module) {
+          console.error('🎯 NodeEditor: Module not found:', moduleName);
+          return;
+        }
+
+        console.log('🎯 NodeEditor: Converting screen coordinates to flow coordinates...');
+        const position = reactFlowInstance.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        console.log('🎯 NodeEditor: Calculated position:', position);
+
+        const newNodeId = `node-${Date.now()}`;
+        console.log('🎯 NodeEditor: Generated node ID:', newNodeId);
+        
+        const newNode = {
+          id: newNodeId,
+          type: 'custom',
+          position,
+          data: {
+            module,
+            instance: {
+              id: newNodeId,
+              moduleName: module.name,
+              config: {},
+              status: 'stopped',
+              messageCount: 0,
+              currentFrame: undefined,
+              frameCount: 0,
+              lastUpdate: Date.now()
+            },
+            isSelected: false,
+            onSelect: () => onNodeSelect(newNodeId),
+            onDelete: handleDeleteNode,
+          },
+        };
+        console.log('🎯 NodeEditor: Created new node:', newNode);
+
+        // Add the new node to local interactions
+        console.log('🎯 NodeEditor: Current interactions count:', interactions.length);
+        const updatedInteractions = [...interactions];
+        
+        if (updatedInteractions.length === 0) {
+          // Create a new interaction if none exists
+          console.log('🎯 NodeEditor: Creating new interaction...');
+          const newInteraction = {
+            id: `interaction-${Date.now()}`,
+            name: 'New Interaction',
+            description: 'Automatically created interaction',
+            enabled: true,
+            modules: [newNode.data.instance],
+            routes: [],
+          };
+          updatedInteractions.push(newInteraction);
+          console.log('🎯 NodeEditor: Created new interaction:', newInteraction);
+        } else {
+          // Add to the first interaction
+          console.log('🎯 NodeEditor: Adding to existing interaction...');
+          updatedInteractions[0].modules = updatedInteractions[0].modules || [];
+          updatedInteractions[0].modules.push(newNode.data.instance);
+          console.log('🎯 NodeEditor: Updated interaction modules:', updatedInteractions[0].modules);
+        }
+
+        // Notify parent of local changes
+        console.log('🎯 NodeEditor: Calling onInteractionsChange with:', updatedInteractions);
+        onInteractionsChange(updatedInteractions);
+
+        // Add the node to ReactFlow
+        console.log('🎯 NodeEditor: Adding node to ReactFlow...');
+        setNodes((nds) => {
+          const newNodes = [...nds, newNode];
+          console.log('🎯 NodeEditor: Updated nodes array:', newNodes);
+          return newNodes;
+        });
+      } catch (error) {
+        console.error('Error processing dropped module:', error);
+      }
+    },
+    [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
+  );
+
+  // Handle drag over
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    console.log('🎯 NodeEditor: Drag over event');
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
     const newNodes: Node[] = [];
@@ -109,24 +210,23 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     
     interactions.forEach((interaction) => {
       interaction.modules?.forEach((moduleInstance) => {
-        const manifest = modules.find(m => m.name === moduleInstance.moduleName);
-        if (manifest) {
-          const nodeId = moduleInstance.id;
-          const realInstance = moduleInstances.find(inst => inst.id === moduleInstance.id);
-          
-          moduleInstancesMap.set(nodeId, {
-            id: nodeId,
-            type: 'custom',
-            position: moduleInstance.position || { x: 100, y: 100 },
-            data: {
-              module: manifest,
-              instance: realInstance || moduleInstance,
-              isSelected: selectedNodeId === nodeId,
-              onSelect: () => onNodeSelect(nodeId),
-              onDelete: handleDeleteNode,
-            },
-          });
-        }
+                  const manifest = modules.find(m => m.name === moduleInstance.moduleName);
+          if (manifest) {
+            const nodeId = moduleInstance.id;
+            
+            moduleInstancesMap.set(nodeId, {
+              id: nodeId,
+              type: 'custom',
+              position: moduleInstance.position || { x: 100, y: 100 },
+              data: {
+                module: manifest,
+                instance: moduleInstance,
+                isSelected: selectedNodeId === nodeId,
+                onSelect: () => onNodeSelect(nodeId),
+                onDelete: handleDeleteNode,
+              },
+            });
+          }
       });
     });
     
@@ -160,6 +260,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             console.log('Route event type unknown:', route.event);
           }
 
+          // Check if this interaction is registered by looking for a registered route with the same ID
+          const isRegistered = route.id && route.id.startsWith('route-') === false; // Registered routes have proper IDs, not auto-generated ones
+          
           newEdges.push({
             id: route.id || `edge-${interaction.id}-${routeIndex}`,
             source: sourceNode.id,
@@ -168,7 +271,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             targetHandle: undefined, // Let ReactFlow determine the target handle
             type: 'custom',
             style: edgeStyle,
-            data: { route, interaction },
+            data: { 
+              route, 
+              interaction,
+              isRegistered 
+            },
           });
         }
       });
@@ -178,24 +285,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     setEdges(newEdges);
   }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode]); // Use interactions directly
 
-  // Update node data when module instances change (without recreating nodes/edges)
-  useEffect(() => {
-    setNodes((currentNodes) => {
-      return currentNodes.map(node => {
-        const realInstance = moduleInstances.find(inst => inst.id === node.id);
-        if (realInstance) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              instance: realInstance,
-            },
-          };
-        }
-        return node;
-      });
-    });
-  }, [moduleInstances]);
+
 
   // Handle drag start from handles
   const onConnectStart: OnConnectStart = useCallback((_event, params) => {
@@ -337,17 +427,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   return (
     <div className={styles.nodeEditor}>
-      {error && (
-        <div className={styles.error}>
-          <p>{error}</p>
-          <button onClick={loadModuleInstances}>Retry</button>
-        </div>
-      )}
-      
-      {loading && moduleInstances.length === 0 && (
-        <div className={styles.loading}>Loading module instances...</div>
-      )}
-      
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -358,6 +437,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         onConnectEnd={onConnectEnd}
         onPaneClick={onPaneClick}
         onNodeDragStop={onNodeDragStop}
+        onInit={onInit}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

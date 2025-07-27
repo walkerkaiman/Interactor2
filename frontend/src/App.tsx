@@ -68,6 +68,43 @@ function App() {
     },
   });
 
+  // WebSocket connection
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:3001');
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'state_update') {
+          console.log('Received state update from backend:', message.data);
+          
+          // Update registered interactions from backend
+          setRegisteredInteractions(message.data.interactions || []);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+    
+    // Cleanup on unmount
+    return () => {
+      ws.close();
+    };
+  }, []);
+
   // Load initial data
   useEffect(() => {
     loadInitialData();

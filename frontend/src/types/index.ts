@@ -17,6 +17,8 @@ export interface FrontendNodeData {
 // Frontend-specific edge data
 export interface FrontendEdgeData {
   route: MessageRoute;
+  interaction?: any;
+  isRegistered?: boolean;
 }
 
 // Application state

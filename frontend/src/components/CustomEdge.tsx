@@ -1,6 +1,7 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
 import { FrontendEdgeData } from '../types';
+import styles from './CustomEdge.module.css';
 
 interface CustomEdgeProps {
   id: string;
@@ -36,6 +37,7 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
 
   // Only show label for stream connections
   const isStreamConnection = data?.route?.event === 'stream';
+  const isRegistered = data?.isRegistered;
   
   // Mock value for demonstration - in a real implementation, this would come from the actual module data
   const getStreamValue = () => {
@@ -54,7 +56,11 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
 
   return (
     <>
-      <BaseEdge path={edgePath} style={style} />
+      <BaseEdge 
+        path={edgePath} 
+        style={style} 
+        className={isRegistered ? styles.animatedEdge : ''}
+      />
       {isStreamConnection && streamValue && (
         <EdgeLabelRenderer>
           <div

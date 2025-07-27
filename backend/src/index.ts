@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { WebSocketServer } from 'ws';
 
 // Core services (singletons)
 import { Logger } from './core/Logger';
@@ -25,6 +26,7 @@ import {
 export class InteractorServer {
   private app: express.Application;
   private server: any;
+  private wss: WebSocketServer;
   private logger: Logger;
   private messageRouter: MessageRouter;
   private moduleLoader: ModuleLoader;
@@ -36,6 +38,7 @@ export class InteractorServer {
   constructor() {
     this.app = express();
     this.server = createServer(this.app);
+    this.wss = new WebSocketServer({ server: this.server });
     
     // Initialize singleton services
     this.logger = Logger.getInstance();
@@ -74,6 +77,12 @@ export class InteractorServer {
       
       // Setup routes
       this.setupRoutes();
+      
+      // Setup WebSocket
+      this.setupWebSocket();
+      
+      // Setup module state update listeners
+      this.setupModuleStateListeners();
       
       console.log('Interactor Server initialized successfully');
     } catch (error) {
@@ -319,6 +328,9 @@ export class InteractorServer {
           modules: moduleInstances 
         });
         
+        // Broadcast state update to all connected clients
+        this.broadcastStateUpdate();
+        
         res.json({ 
           success: true, 
           message: 'Interaction map registered successfully',
@@ -359,6 +371,9 @@ export class InteractorServer {
         
         // Add to state
         await this.stateManager.addModuleInstance(instance);
+        
+        // Broadcast state update to all connected clients
+        this.broadcastStateUpdate();
         
         res.json({ 
           success: true, 
@@ -420,6 +435,90 @@ export class InteractorServer {
     // 404 handler
     this.app.use((req, res) => {
       res.status(404).json({ success: false, error: 'Not found' });
+    });
+  }
+
+  /**
+   * Setup WebSocket server
+   */
+  private setupWebSocket(): void {
+    this.wss.on('connection', (ws) => {
+      this.logger.info('WebSocket client connected');
+      
+      // Send initial state
+      this.sendStateToClient(ws);
+      
+      ws.on('close', () => {
+        this.logger.info('WebSocket client disconnected');
+      });
+      
+      ws.on('error', (error) => {
+        this.logger.error('WebSocket error:', String(error));
+      });
+    });
+  }
+
+  /**
+   * Send state to a specific WebSocket client
+   */
+  private sendStateToClient(ws: any): void {
+    try {
+      const state = {
+        type: 'state_update',
+        data: {
+          interactions: this.stateManager.getInteractions(),
+          moduleInstances: this.stateManager.getModuleInstances()
+        }
+      };
+      ws.send(JSON.stringify(state));
+    } catch (error) {
+      this.logger.error('Error sending state to client:', String(error));
+    }
+  }
+
+  /**
+   * Broadcast state update to all connected WebSocket clients
+   */
+  public broadcastStateUpdate(): void {
+    if (this.wss.clients.size === 0) return;
+    
+    try {
+      const state = {
+        type: 'state_update',
+        data: {
+          interactions: this.stateManager.getInteractions(),
+          moduleInstances: this.stateManager.getModuleInstances()
+        }
+      };
+      
+      const message = JSON.stringify(state);
+      this.wss.clients.forEach((client) => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(message);
+        }
+      });
+      
+      this.logger.debug(`Broadcasted state update to ${this.wss.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('Error broadcasting state update:', String(error));
+    }
+  }
+
+  /**
+   * Setup listeners for module state updates
+   */
+  private setupModuleStateListeners(): void {
+    // Listen for stateUpdate events from any module
+    process.on('stateUpdate', (data: any) => {
+      this.logger.debug('Received stateUpdate event from module:', data);
+      
+      // Update the module instance in state manager
+      if (data.id) {
+        this.stateManager.updateModuleInstance(data);
+      }
+      
+      // Broadcast the update to all connected clients
+      this.broadcastStateUpdate();
     });
   }
 

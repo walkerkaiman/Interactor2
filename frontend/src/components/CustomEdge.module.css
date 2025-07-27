@@ -1,0 +1,25 @@
+/* Animated edge for registered interactions */
+.animatedEdge {
+  stroke-dasharray: 5, 5;
+  animation: flowAnimation 2s linear infinite, pulseAnimation 3s ease-in-out infinite;
+}
+
+/* Flow animation for registered edges */
+@keyframes flowAnimation {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Pulse animation for registered edges */
+@keyframes pulseAnimation {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+} 

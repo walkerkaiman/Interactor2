@@ -201,8 +201,24 @@ export class FramesInputModule extends InputModuleBase {
         }
       }
 
-      // Emit state update
+      // Emit state update locally
       this.emit('stateUpdate', {
+        id: this.id,
+        moduleName: this.name,
+        status: 'listening',
+        universe: this.universe,
+        currentFrame: frameNumber,
+        msb,
+        lsb,
+        frameCount: this.frameCount,
+        mode: this.mode,
+        lastUpdate: frameData.timestamp
+      });
+
+      // Also emit to process for backend notification
+      process.emit('stateUpdate', {
+        id: this.id,
+        moduleName: this.name,
         status: 'listening',
         universe: this.universe,
         currentFrame: frameNumber,
