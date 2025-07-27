@@ -54,6 +54,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle ReactFlow instance
   const onInit = useCallback((instance: any) => {
+    console.log('🔍 [DEBUG] ReactFlow instance initialized:', instance);
     setReactFlowInstance(instance);
   }, []);
 
@@ -89,52 +90,95 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     // Handle module drop
   const onDrop = useCallback(
     (event: React.DragEvent) => {
+      console.log('🔍 [DEBUG] onDrop called', { 
+        clientX: event.clientX, 
+        clientY: event.clientY,
+        target: event.target,
+        currentTarget: event.currentTarget
+      });
+
       event.preventDefault();
 
       if (!reactFlowInstance) {
+        console.log('❌ [DEBUG] No reactFlowInstance available');
         return;
       }
 
       // Get the drag data
       const type = event.dataTransfer.getData('application/reactflow');
+      console.log('🔍 [DEBUG] Drag data type:', type);
 
       if (!type) {
+        console.log('❌ [DEBUG] No drag data found');
         return;
       }
 
       let dragData;
       try {
         dragData = JSON.parse(type);
+        console.log('🔍 [DEBUG] Parsed drag data:', dragData);
       } catch (error) {
+        console.log('❌ [DEBUG] Failed to parse drag data:', error);
         return;
       }
 
       const { moduleName } = dragData;
       if (!moduleName) {
+        console.log('❌ [DEBUG] No moduleName in drag data');
         return;
       }
+
+      // Get the offset from the drag data (default to 0 if not present)
+      const offsetX = dragData.offsetX || 0;
+      const offsetY = dragData.offsetY || 0;
+      console.log('🔍 [DEBUG] Drag offset:', { offsetX, offsetY });
 
       const module = modules.find(m => m.name === moduleName);
       if (!module) {
+        console.log('❌ [DEBUG] Module not found:', moduleName);
         return;
       }
 
-      // Get the ReactFlow container element
+      console.log('🔍 [DEBUG] Found module:', module.name);
+
+      // Debug: Log existing nodes to understand coordinate system
+      console.log('🔍 [DEBUG] Current nodes:', nodes.map(n => ({ id: n.id, position: n.position })));
+
+      // Get the ReactFlow pane element
       const reactFlowElement = document.querySelector('.react-flow__pane');
       if (!reactFlowElement) {
+        console.log('❌ [DEBUG] ReactFlow pane element not found');
         return;
       }
 
-      // Get the bounds of the ReactFlow container
+      // Get the bounds of the ReactFlow pane
       const bounds = reactFlowElement.getBoundingClientRect();
-
-      // Calculate position relative to the ReactFlow container
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
+      console.log('🔍 [DEBUG] ReactFlow pane bounds:', {
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height
       });
 
+      // Log current viewport transform
+      const viewport = reactFlowInstance.getViewport();
+      console.log('🔍 [DEBUG] Current viewport:', viewport);
+
+      // Calculate position relative to the ReactFlow pane, accounting for the drag offset
+      const relativeX = event.clientX - bounds.left - offsetX;
+      const relativeY = event.clientY - bounds.top - offsetY;
+      console.log('🔍 [DEBUG] Relative position (with offset):', { x: relativeX, y: relativeY });
+
+      // Correct formula: (relativePos - viewportOffset) / zoom
+      const position = {
+        x: (relativeX - viewport.x) / viewport.zoom,
+        y: (relativeY - viewport.y) / viewport.zoom,
+      };
+
+      console.log('🔍 [DEBUG] Calculated flow position:', position);
+
       const newNodeId = `node-${Date.now()}`;
+      console.log('🔍 [DEBUG] New node ID:', newNodeId);
       
       const newNode = {
         id: newNodeId,
@@ -159,6 +203,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         },
       };
 
+      console.log('🔍 [DEBUG] Created new node:', newNode);
+
       // Add the new node to local interactions
       const updatedInteractions = [...interactions];
       
@@ -169,23 +215,40 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           name: 'New Interaction',
           description: 'Automatically created interaction',
           enabled: true,
-          modules: [newNode.data.instance],
+          modules: [{ ...newNode.data.instance, position }],
           routes: [],
         };
         updatedInteractions.push(newInteraction);
+        console.log('🔍 [DEBUG] Created new interaction:', newInteraction);
       } else {
         // Add to the first interaction
         updatedInteractions[0].modules = updatedInteractions[0].modules || [];
-        updatedInteractions[0].modules.push(newNode.data.instance);
+        updatedInteractions[0].modules.push({ ...newNode.data.instance, position });
+        console.log('🔍 [DEBUG] Added to existing interaction');
       }
 
       // Notify parent of local changes
       onInteractionsChange(updatedInteractions);
 
       // Add the node to ReactFlow
-      setNodes((nds) => [...nds, newNode]);
+      setNodes((nds) => {
+        console.log('🔍 [DEBUG] Adding node to ReactFlow, current nodes:', nds.length);
+        const newNodes = [...nds, newNode];
+        console.log('🔍 [DEBUG] New nodes array:', newNodes.map((n: any) => ({ id: n.id, position: n.position })));
+        return newNodes;
+      });
+
+      console.log('✅ [DEBUG] Module drop completed successfully');
+      
+      // Debug: Check node position after a short delay
+      setTimeout(() => {
+        const updatedNodes = reactFlowInstance.getNodes();
+        const addedNode = updatedNodes.find((n: any) => n.id === newNodeId);
+        console.log('🔍 [DEBUG] Node position after creation:', addedNode?.position);
+        console.log('🔍 [DEBUG] All nodes after creation:', updatedNodes.map((n: any) => ({ id: n.id, position: n.position })));
+      }, 100);
     },
-    [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
+    [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes, nodes]
   );
 
   // Handle drag over

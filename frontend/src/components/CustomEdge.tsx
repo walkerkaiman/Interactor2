@@ -17,7 +17,26 @@ interface CustomEdgeProps {
   selected?: boolean;
 }
 
-const CustomEdge: React.FC<CustomEdgeProps> = ({ id, sourceX, sourceY, targetX, targetY, data }) => {
+const CustomEdge: React.FC<CustomEdgeProps> = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  data,
+}) => {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
   const isRegistered = edgeRegistrationTracker.isEdgeRegistered(id);
   
   // Determine CSS classes based on registration status and event type
@@ -40,7 +59,7 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({ id, sourceX, sourceY, targetX, 
   
   return (
     <path
-      d={`M ${sourceX} ${sourceY} L ${targetX} ${targetY}`}
+      d={edgePath}
       className={className}
       fill="none"
       strokeWidth="2"

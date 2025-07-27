@@ -28,7 +28,7 @@
           "frameCount": 0,
           "lastUpdate": 1753654410664,
           "position": {
-            "x": 67.79601106661926,
+            "x": 70.64065761675067,
             "y": 923.3622569352226
           }
         },
@@ -61,16 +61,16 @@
       ],
       "routes": [
         {
-          "id": "route-1753654414478",
-          "source": "node-1753654410664",
-          "target": "node-1753654407379",
-          "event": "trigger"
-        },
-        {
           "id": "route-1753656126998",
           "source": "node-1753655534644",
           "target": "node-1753655537668",
           "event": "stream"
+        },
+        {
+          "id": "route-1753656276371",
+          "source": "node-1753654410664",
+          "target": "node-1753654407379",
+          "event": "trigger"
         }
       ]
     }
@@ -83,7 +83,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656129940
+      "lastUpdate": 1753656282434
     },
     {
       "id": "node-1753654410664",
@@ -92,7 +92,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656129940
+      "lastUpdate": 1753656282434
     },
     {
       "id": "node-1753655534644",
@@ -101,7 +101,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656129940
+      "lastUpdate": 1753656282434
     },
     {
       "id": "node-1753655537668",
@@ -110,7 +110,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656129940
+      "lastUpdate": 1753656282434
     }
   ],
   "routes": [],
