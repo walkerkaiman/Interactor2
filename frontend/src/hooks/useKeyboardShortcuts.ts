@@ -1,23 +1,13 @@
 import { useEffect } from 'react';
 import { useReactFlow } from 'reactflow';
-import { useAppStore } from '@/store';
+import { useAppStore, useAppActions } from '@/store';
 
 export const useKeyboardShortcuts = () => {
   const { fitView, zoomIn, zoomOut, setViewport } = useReactFlow();
-  const { 
-    activeTab, 
-    selectedNode, 
-    selectedEdge,
-    actions: { 
-      switchTab, 
-      selectNode, 
-      selectEdge, 
-      clearSelection,
-      deleteModuleInstance,
-      deleteConnection,
-      clearCanvas
-    } 
-  } = useAppStore();
+  const activeTab = useAppStore(state => state.activeTab);
+  const selectedNode = useAppStore(state => state.ui.selectedNode);
+  const selectedEdge = useAppStore(state => state.ui.selectedEdge);
+  const actions = useAppActions();
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -110,16 +100,16 @@ export const useKeyboardShortcuts = () => {
         case 'escape':
           event.preventDefault();
           // Escape = Clear selection
-          clearSelection();
+          actions.clearSelection();
           break;
         case 'delete':
         case 'backspace':
           event.preventDefault();
           // Delete/Backspace = Delete selected items
           if (selectedNode) {
-            deleteModuleInstance(selectedNode);
+            actions.deleteModuleInstance(selectedNode);
           } else if (selectedEdge) {
-            deleteConnection(selectedEdge);
+            actions.deleteConnection(selectedEdge);
           }
           break;
         case 'f':
@@ -153,22 +143,22 @@ export const useKeyboardShortcuts = () => {
         case '1':
           event.preventDefault();
           // 1 = Switch to Editor tab
-          switchTab('editor');
+          actions.switchTab('editor');
           break;
         case '2':
           event.preventDefault();
           // 2 = Switch to Wiki tab
-          switchTab('wiki');
+          actions.switchTab('wiki');
           break;
         case '3':
           event.preventDefault();
           // 3 = Switch to Console tab
-          switchTab('console');
+          actions.switchTab('console');
           break;
         case '4':
           event.preventDefault();
           // 4 = Switch to Dashboard tab
-          switchTab('dashboard');
+          actions.switchTab('dashboard');
           break;
         case 'a':
           if (isCtrlOrCmd) {
@@ -202,7 +192,7 @@ export const useKeyboardShortcuts = () => {
 
       // Arrow keys for navigation
       if (selectedNode) {
-        const moveAmount = isShift ? 10 : 1;
+        // const moveAmount = isShift ? 10 : 1; // TODO: Implement node movement
         switch (event.key) {
           case 'arrowup':
             event.preventDefault();
@@ -241,12 +231,6 @@ export const useKeyboardShortcuts = () => {
     activeTab, 
     selectedNode, 
     selectedEdge,
-    switchTab, 
-    selectNode, 
-    selectEdge, 
-    clearSelection,
-    deleteModuleInstance,
-    deleteConnection,
-    clearCanvas
+    actions
   ]);
 }; 

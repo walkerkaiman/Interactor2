@@ -118,10 +118,14 @@ export class SystemStats extends EventEmitter {
     const memUsage = process.memoryUsage();
     const totalMem = require('os').totalmem();
     
+    // Use system memory usage instead of just heap usage
+    // This gives a more accurate picture of actual RAM usage
+    const usedMem = totalMem - require('os').freemem();
+    
     this.stats.memory = {
-      used: memUsage.heapUsed,
+      used: usedMem,
       total: totalMem,
-      percentage: (memUsage.heapUsed / totalMem) * 100
+      percentage: (usedMem / totalMem) * 100
     };
   }
 
@@ -140,8 +144,15 @@ export class SystemStats extends EventEmitter {
       const totalCpuTime = processUsage.user + processUsage.system;
       const cpuUsageDiff = totalCpuTime - this.lastCpuUsage;
       
-      // Convert to percentage (approximate)
-      this.stats.cpu.usage = (cpuUsageDiff / timeDiff) * 100;
+      // Convert to percentage and ensure it's reasonable
+      const rawUsage = (cpuUsageDiff / timeDiff) * 100;
+      
+      // Cap at 100% and apply smoothing to avoid spikes
+      const cappedUsage = Math.min(rawUsage, 100);
+      
+      // Apply exponential smoothing to reduce spikes
+      const smoothingFactor = 0.3;
+      this.stats.cpu.usage = this.stats.cpu.usage * (1 - smoothingFactor) + cappedUsage * smoothingFactor;
       
       this.lastCpuUsage = totalCpuTime;
     }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppStore } from '../../store';
+import { useAppStore } from '@/store';
 import { 
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -138,42 +138,40 @@ export const RealTimeNotifications: React.FC = () => {
     }
   };
 
-  if (notifications.length === 0) return null;
+  // Get the most recent notification for display in title bar
+  const latestNotification = notifications[0];
+
+  if (!latestNotification) return null;
+
+  const Icon = getNotificationIcon(latestNotification.type);
+  const getCompactStyles = (type: Notification['type']) => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'error':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+    }
+  };
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
-      <AnimatePresence>
-        {notifications.map((notification) => {
-          const Icon = getNotificationIcon(notification.type);
-          
-          return (
-            <motion.div
-              key={notification.id}
-              initial={{ opacity: 0, x: 300, scale: 0.8 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 300, scale: 0.8 }}
-              className={`flex items-start space-x-3 p-4 rounded-lg border shadow-lg max-w-sm ${getNotificationStyles(notification.type)}`}
-            >
-              <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
-              
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium">{notification.title}</h4>
-                <p className="text-sm mt-1">{notification.message}</p>
-                <p className="text-xs opacity-75 mt-2">
-                  {new Date(notification.timestamp).toLocaleTimeString()}
-                </p>
-              </div>
-              
-              <button
-                onClick={() => removeNotification(notification.id)}
-                className="flex-shrink-0 p-1 rounded-full hover:bg-black/10 transition-colors"
-              >
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-xs font-medium ${getCompactStyles(latestNotification.type)}`}
+    >
+      <Icon className="w-3 h-3 flex-shrink-0" />
+      <span className="truncate max-w-32">{latestNotification.title}</span>
+      <button
+        onClick={() => removeNotification(latestNotification.id)}
+        className="flex-shrink-0 p-0.5 rounded-full hover:bg-black/10 transition-colors"
+      >
+        <XMarkIcon className="w-3 h-3" />
+      </button>
+    </motion.div>
   );
 }; 

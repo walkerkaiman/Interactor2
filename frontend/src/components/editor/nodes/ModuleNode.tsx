@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
 import { UINode, UIPort } from '@/types/ui';
@@ -53,7 +53,7 @@ const getStatusIcon = (status: string) => {
 };
 
 export const ModuleNode = memo(({ data, selected }: NodeProps<ModuleNodeData>) => {
-  const { id, label, moduleType, status, config, inputs, outputs } = data;
+  const { label, moduleType, status, config, inputs, outputs } = data;
 
   return (
     <motion.div

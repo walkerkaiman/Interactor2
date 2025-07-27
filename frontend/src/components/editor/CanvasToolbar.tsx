@@ -31,7 +31,8 @@ export const CanvasToolbar: React.FC = () => {
   const { fitView, zoomIn, zoomOut, setViewport } = useReactFlow();
   const nodes = useNodes();
   const edges = useEdges();
-  const { clearCanvas, loadProject } = useAppActions();
+
+  const actions = useAppActions();
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +55,7 @@ export const CanvasToolbar: React.FC = () => {
 
   const handleClearCanvas = () => {
     if (window.confirm('Are you sure you want to clear the canvas? This action cannot be undone.')) {
-      clearCanvas();
+      actions.clearCanvas();
     }
   };
 
@@ -235,7 +236,7 @@ export const CanvasToolbar: React.FC = () => {
         const projectData: ProjectData = JSON.parse(e.target?.result as string);
         
         if (projectData.nodes && projectData.edges) {
-          loadProject(projectData);
+          actions.loadProject(projectData);
           setShowImportMenu(false);
         } else {
           alert('Invalid project file format');

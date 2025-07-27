@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppStore } from '@/store';
+import { useAppActions } from '@/store';
 import { 
   DocumentDuplicateIcon,
   TrashIcon,
@@ -45,18 +45,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   contextData
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { 
-    actions: { 
-      clearCanvas, 
-      deleteModuleInstance, 
-      deleteConnection,
-      selectNode,
-      selectEdge,
-      startModuleInstance,
-      stopModuleInstance
-    },
-    ui: { selectedNode, selectedEdge }
-  } = useAppStore();
+  const actions = useAppActions();
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -151,7 +141,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             icon: TrashIcon,
             action: () => handleAction(() => {
               if (window.confirm('Are you sure you want to clear the canvas? This action cannot be undone.')) {
-                clearCanvas();
+                actions.clearCanvas();
               }
             }),
             shortcut: 'Ctrl+Shift+C'
@@ -164,7 +154,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             id: 'select',
             label: 'Select',
             icon: EyeIcon,
-            action: () => handleAction(() => selectNode(contextData?.id)),
+            action: () => handleAction(() => actions.selectNode(contextData?.id)),
             shortcut: 'Enter'
           },
           {
@@ -192,14 +182,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             id: 'start',
             label: 'Start Module',
             icon: PlayIcon,
-            action: () => handleAction(() => startModuleInstance(contextData?.id)),
+            action: () => handleAction(() => actions.startModuleInstance(contextData?.id)),
             disabled: contextData?.status === 'active'
           },
           {
             id: 'stop',
             label: 'Stop Module',
             icon: StopIcon,
-            action: () => handleAction(() => stopModuleInstance(contextData?.id)),
+            action: () => handleAction(() => actions.stopModuleInstance(contextData?.id)),
             disabled: contextData?.status === 'inactive'
           },
           {
@@ -236,7 +226,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             icon: TrashIcon,
             action: () => handleAction(() => {
               if (window.confirm('Are you sure you want to delete this module?')) {
-                deleteModuleInstance(contextData?.id);
+                actions.deleteModuleInstance(contextData?.id);
               }
             }),
             shortcut: 'Delete'
@@ -249,7 +239,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             id: 'select',
             label: 'Select',
             icon: EyeIcon,
-            action: () => handleAction(() => selectEdge(contextData?.id)),
+            action: () => handleAction(() => actions.selectEdge(contextData?.id)),
             shortcut: 'Enter'
           },
           {
@@ -293,7 +283,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             icon: TrashIcon,
             action: () => handleAction(() => {
               if (window.confirm('Are you sure you want to delete this connection?')) {
-                deleteConnection(contextData?.id);
+                actions.deleteConnection(contextData?.id);
               }
             }),
             shortcut: 'Delete'

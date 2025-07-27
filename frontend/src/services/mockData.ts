@@ -1,4 +1,4 @@
-import { ModuleManifest, SystemStats, LogEntry } from '../types/api';
+import { ModuleManifest, SystemStats, LogEntry } from '@/types/api';
 
 // Mock modules data
 export const mockModules: ModuleManifest[] = [

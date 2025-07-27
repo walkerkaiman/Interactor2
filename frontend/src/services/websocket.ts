@@ -4,7 +4,7 @@ import {
   LogEntry, 
   InteractionConfig, 
   MessageRoute 
-} from '../types/api';
+} from '@/types/api';
 
 // WebSocket message types
 export interface WebSocketMessage {
@@ -54,7 +54,11 @@ export class WebSocketService {
       }
 
       if (this.isConnecting) {
-        reject(new Error('Connection already in progress'));
+        console.log('WebSocket connection already in progress, waiting...');
+        // Wait a bit and try again instead of rejecting
+        setTimeout(() => {
+          this.connect().then(resolve).catch(reject);
+        }, 1000);
         return;
       }
 
@@ -95,7 +99,12 @@ export class WebSocketService {
         this.socket.onerror = (error) => {
           console.error('WebSocket error:', error);
           this.isConnecting = false;
-          reject(error);
+          // Don't reject immediately, give it a chance to recover
+          setTimeout(() => {
+            if (this.socket?.readyState !== WebSocket.OPEN) {
+              reject(error);
+            }
+          }, 1000);
         };
 
       } catch (error) {

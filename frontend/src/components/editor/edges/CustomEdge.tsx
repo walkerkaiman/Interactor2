@@ -9,7 +9,7 @@ interface CustomEdgeData extends UIEdge {
 }
 
 export const CustomEdge: React.FC<EdgeProps<CustomEdgeData>> = ({
-  id,
+
   sourceX,
   sourceY,
   targetX,

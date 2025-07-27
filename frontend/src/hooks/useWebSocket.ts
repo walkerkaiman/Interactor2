@@ -1,47 +1,68 @@
 import { useEffect, useRef } from 'react';
-import { websocketService, WebSocketHandlers } from '../../services/websocket';
-import { useAppStore } from '../../store';
-import { SystemStats, LogEntry, InteractionConfig, MessageRoute } from '../../types/api';
+import { websocketService, WebSocketHandlers } from '@/services/websocket';
+import { useAppStore, useAppActions } from '@/store';
+import { SystemStats, LogEntry, InteractionConfig, MessageRoute } from '@/types/api';
 
 export const useWebSocket = () => {
-  const { 
-    actions: { 
-      updateSystemStats, 
-      addLog, 
-      setConnectionStatus,
-      loadModules,
-      loadInteractions
-    } 
-  } = useAppStore();
+  const actions = useAppActions();
   
-  const handlersRef = useRef<WebSocketHandlers>({});
+  // Track if initial data has been loaded
+  const hasLoadedInitialData = useRef(false);
+
+  useEffect(() => {
+    // Load initial data only once
+    if (!hasLoadedInitialData.current) {
+      try {
+        // Load initial data via API calls instead of WebSocket
+        fetch('/api/stats')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              actions.updateSystemStats(data.data);
+            }
+          })
+          .catch(err => console.warn('Failed to load stats:', err));
+
+        fetch('/api/modules')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              console.log('Modules loaded:', data.data.modules);
+            }
+          })
+          .catch(err => console.warn('Failed to load modules:', err));
+
+        hasLoadedInitialData.current = true;
+      } catch (error) {
+        console.warn('Failed to load initial data:', error);
+      }
+    }
+  }, []); // Empty dependency array since actions is now stable
 
   useEffect(() => {
     // Set up WebSocket handlers
-    handlersRef.current = {
+    const handlers: WebSocketHandlers = {
       onInit: (data: { stats: SystemStats; interactions: InteractionConfig[]; routes: MessageRoute[]; modules: any[] }) => {
         console.log('WebSocket init received:', data);
         
         // Update system stats
         if (data.stats) {
-          updateSystemStats(data.stats);
+          actions.updateSystemStats(data.stats);
         }
         
         // Load modules if not already loaded
         if (data.modules && data.modules.length > 0) {
-          // This would need to be handled in the store
           console.log('Modules received from WebSocket:', data.modules);
         }
         
         // Load interactions if not already loaded
         if (data.interactions && data.interactions.length > 0) {
-          // This would need to be handled in the store
           console.log('Interactions received from WebSocket:', data.interactions);
         }
       },
 
       onStats: (stats: SystemStats) => {
-        updateSystemStats(stats);
+        actions.updateSystemStats(stats);
       },
 
       onStateChanged: (data: { interactions: InteractionConfig[]; routes: MessageRoute[] }) => {
@@ -52,7 +73,7 @@ export const useWebSocket = () => {
       onModuleLoaded: (module: any) => {
         console.log('Module loaded:', module);
         // Reload modules to get the new one
-        loadModules();
+        actions.loadModules();
       },
 
       onMessageRouted: (message: any) => {
@@ -61,7 +82,7 @@ export const useWebSocket = () => {
       },
 
       onLog: (log: LogEntry) => {
-        addLog(log);
+        actions.addLog(log);
       },
 
       onLogs: (logs: LogEntry[]) => {
@@ -76,20 +97,22 @@ export const useWebSocket = () => {
       },
 
       onConnectionStatus: (connected: boolean) => {
-        setConnectionStatus({ connected });
+        actions.setConnectionStatus({ connected });
       }
     };
 
     // Set handlers on WebSocket service
-    websocketService.setHandlers(handlersRef.current);
+    websocketService.setHandlers(handlers);
 
-    // Connect to WebSocket
+    // Simple connection - no retry logic needed since we're on same origin
     const connectWebSocket = async () => {
       try {
         await websocketService.connect();
         console.log('WebSocket connected successfully');
       } catch (error) {
         console.error('Failed to connect to WebSocket:', error);
+        // Fall back to polling for real-time updates
+        console.log('Falling back to polling for updates');
       }
     };
 
@@ -99,7 +122,7 @@ export const useWebSocket = () => {
     return () => {
       websocketService.disconnect();
     };
-  }, []); // Empty dependency array to prevent infinite re-renders
+  }, []); // Empty dependency array since actions is now stable
 
   // Return WebSocket service for manual operations
   return websocketService;

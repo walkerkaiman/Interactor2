@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLogs, useAppActions } from '@/store';
-import { LogEntry } from '@/types/api';
+
 import { LogFilters } from '@/types/ui';
 
 export const ConsoleTab: React.FC = () => {
   const logs = useLogs();
-  const { setLogFilters, clearLogs, pauseLogs } = useAppActions();
+
+  const actions = useAppActions();
   const [filters, setFilters] = useState<LogFilters>({
     levels: ['info', 'warn', 'error'],
     modules: [],
@@ -30,16 +31,16 @@ export const ConsoleTab: React.FC = () => {
   const handleFilterChange = (newFilters: Partial<LogFilters>) => {
     const updatedFilters = { ...filters, ...newFilters };
     setFilters(updatedFilters);
-    setLogFilters(updatedFilters);
+    actions.setLogFilters(updatedFilters);
   };
 
   const handlePauseToggle = () => {
     setIsPaused(!isPaused);
-    pauseLogs(!isPaused);
+    actions.pauseLogs(!isPaused);
   };
 
   const handleClearLogs = () => {
-    clearLogs();
+    actions.clearLogs();
   };
 
   const getLogLevelColor = (level: string) => {

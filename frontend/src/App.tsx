@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Toaster } from 'sonner';
 import { TopBar } from './components/common/TopBar';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -8,7 +8,6 @@ import { ConsoleTab } from './components/tabs/ConsoleTab';
 import { PerformanceDashboardTab } from './components/tabs/PerformanceDashboardTab';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useActiveTab } from './store';
-import { useAppActions } from './store';
 import { RealTimeNotifications } from './components/common/RealTimeNotifications';
 
 function App() {
@@ -16,14 +15,6 @@ function App() {
   useWebSocket();
   
   const activeTab = useActiveTab();
-  const { loadModules, loadSystemStats, loadLogs } = useAppActions();
-
-  // Load initial data
-  React.useEffect(() => {
-    loadModules();
-    loadSystemStats();
-    loadLogs();
-  }, [loadModules, loadSystemStats, loadLogs]);
 
   const renderTabContent = () => {
     switch (activeTab) {

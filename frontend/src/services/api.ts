@@ -7,7 +7,7 @@ import {
   InteractionConfig,
   MessageRoute,
   ApiResponse 
-} from '../types/api';
+} from '@/types/api';
 
 // Create axios instance with default configuration
 const apiClient = axios.create({

@@ -10,8 +10,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3002,
-    host: '0.0.0.0',
+    port: 3001, // Same port as backend
+    host: '0.0.0.0', // Allow network access
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
@@ -35,7 +35,6 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           ui: ['reactflow', 'framer-motion'],
-          charts: ['recharts'],
         },
       },
     },

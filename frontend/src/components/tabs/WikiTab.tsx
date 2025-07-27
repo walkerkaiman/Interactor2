@@ -1,19 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import { useModules, useAppActions } from '@/store';
+
+import { useModules } from '@/store';
 import { ModuleManifest } from '@/types/api';
 
 export const WikiTab: React.FC = () => {
   const modules = useModules();
-  const { loadModules } = useAppActions();
+
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  useEffect(() => {
-    loadModules();
-  }, [loadModules]);
 
   // Group modules by category
   const modulesByCategory = modules.reduce((acc, module) => {

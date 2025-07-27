@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useModules, useAppActions } from '@/store';
 import { ModuleManifest } from '@/types/api';
-import { ModulePaletteItem } from '@/types/ui';
+
 
 export const ModulePalette: React.FC = () => {
   const modules = useModules();
-  const { createModuleInstance } = useAppActions();
+
+  const actions = useAppActions();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -41,7 +42,7 @@ export const ModulePalette: React.FC = () => {
 
   const handleModuleClick = (module: ModuleManifest) => {
     // Create module instance at center of viewport
-    createModuleInstance(module.id, {
+    actions.createModuleInstance(module.id, {
       x: 400,
       y: 300,
     });
@@ -131,7 +132,7 @@ export const ModulePalette: React.FC = () => {
                 hover:shadow-md hover:scale-105
               `}
               draggable
-              onDragStart={(e) => handleModuleDrag(e, module)}
+              onDragStart={(e: any) => handleModuleDrag(e, module)}
               onClick={() => handleModuleClick(module)}
             >
               <div className="flex items-center space-x-3">

@@ -1,10 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useActiveTab, useAppActions } from '@/store';
+import { RealTimeNotifications } from './RealTimeNotifications';
 
 export const TopBar: React.FC = () => {
   const activeTab = useActiveTab();
-  const { switchTab } = useAppActions();
+
+  const actions = useAppActions();
 
   const tabs = [
     { id: 'wiki', label: '📚 Wiki', icon: '📚' },
@@ -29,7 +31,7 @@ export const TopBar: React.FC = () => {
             {tabs.map((tab) => (
               <motion.button
                 key={tab.id}
-                onClick={() => switchTab(tab.id)}
+                onClick={() => actions.switchTab(tab.id)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className={`

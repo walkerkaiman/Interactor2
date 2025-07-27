@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import {
   LineChart,
   Line,
-  AreaChart,
-  Area,
+
   BarChart,
   Bar,
   XAxis,
@@ -17,24 +16,25 @@ import {
   Cell,
 } from 'recharts';
 import { useSystemStats, useAppActions } from '@/store';
-import { SystemStats } from '@/types/api';
+
 
 export const PerformanceDashboardTab: React.FC = () => {
   const systemStats = useSystemStats();
-  const { loadSystemStats } = useAppActions();
+
+  const actions = useAppActions();
   const [timeRange, setTimeRange] = useState('1h');
   const [refreshInterval, setRefreshInterval] = useState(5000);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
 
   useEffect(() => {
-    loadSystemStats();
+    actions.loadSystemStats();
     
     const interval = setInterval(() => {
-      loadSystemStats();
+      actions.loadSystemStats();
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [loadSystemStats, refreshInterval]);
+  }, [refreshInterval, actions]); // Now actions is stable, so this is safe
 
   useEffect(() => {
     if (systemStats) {

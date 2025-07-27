@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { NodeEditor } from '../editor/NodeEditor';
+import { NodeEditor } from '@/components/editor/NodeEditor';
 
 export const ModuleEditorTab: React.FC = () => {
   return (

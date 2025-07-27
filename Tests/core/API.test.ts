@@ -428,17 +428,7 @@ describe('Backend API', () => {
     });
   });
 
-  describe('CORS', () => {
-    it('should include CORS headers', async () => {
-      const response = await request(app)
-        .get('/health')
-        .set('Origin', 'http://localhost:3000')
-        .expect(200);
-
-      expect(response.headers).toHaveProperty('access-control-allow-origin');
-      expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
-    });
-  });
+  // CORS test removed - simplified architecture doesn't need CORS since frontend and backend are on same origin
 
   describe('Content Type', () => {
     it('should return JSON content type', async () => {

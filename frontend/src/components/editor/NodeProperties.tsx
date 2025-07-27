@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useSelectedNode, useSelectedEdge, useAppActions } from '@/store';
-import { UINode, UIEdge } from '@/types/ui';
+import { useSelectedNode, useSelectedEdge, useAppStore, useAppActions } from '@/store';
+
 
 export const NodeProperties: React.FC = () => {
   const selectedNode = useSelectedNode();
   const selectedEdge = useSelectedEdge();
-  const { updateModuleInstance, deleteModuleInstance, startModuleInstance, stopModuleInstance } = useAppActions();
+
+  const actions = useAppActions();
   
   const [editingConfig, setEditingConfig] = useState<Record<string, any>>({});
 
@@ -23,33 +24,45 @@ export const NodeProperties: React.FC = () => {
 
   const handleSaveConfig = () => {
     if (selectedNode && Object.keys(editingConfig).length > 0) {
-      updateModuleInstance(selectedNode.id, editingConfig);
+      actions.updateModuleInstance(selectedNode, editingConfig);
       setEditingConfig({});
     }
   };
 
   const handleDeleteNode = () => {
     if (selectedNode) {
-      deleteModuleInstance(selectedNode.id);
+      actions.deleteModuleInstance(selectedNode);
     }
   };
 
   const handleStartNode = () => {
     if (selectedNode) {
-      startModuleInstance(selectedNode.id);
+      actions.startModuleInstance(selectedNode);
     }
   };
 
   const handleStopNode = () => {
     if (selectedNode) {
-      stopModuleInstance(selectedNode.id);
+      actions.stopModuleInstance(selectedNode);
     }
   };
 
   const renderNodeProperties = () => {
     if (!selectedNode) return null;
 
-    const { id, label, moduleType, status, config, inputs, outputs } = selectedNode;
+    // Get the actual node data from the store
+    const nodeData = useAppStore(state => state.ui.nodes.get(selectedNode));
+    if (!nodeData) return null;
+
+    // Extract data safely with defaults
+    const nodeInstance = useAppStore(state => state.moduleInstances.get(selectedNode));
+    const id = selectedNode;
+    const label = nodeInstance?.config?.label || nodeInstance?.moduleName || 'Unknown';
+    const moduleType = nodeInstance?.moduleName || 'Unknown';
+    const status = nodeInstance?.status || 'unknown';
+    const config = nodeInstance?.config || {};
+    const inputs = nodeInstance?.config?.inputs || [];
+    const outputs = nodeInstance?.config?.outputs || [];
 
     return (
       <div className="space-y-4">
@@ -120,7 +133,7 @@ export const NodeProperties: React.FC = () => {
               Status
             </label>
             <div className={`px-3 py-2 rounded-md text-white text-sm capitalize flex items-center space-x-2`}>
-              <div className={`w-2 h-2 rounded-full bg-${status === 'active' ? 'status-active' : status === 'error' ? 'status-error' : status === 'warning' ? 'status-warning' : 'status-inactive'}`} />
+              <div className={`w-2 h-2 rounded-full bg-${status === 'active' ? 'status-active' : status === 'error' ? 'status-error' : 'status-inactive'}`} />
               <span>{status}</span>
             </div>
           </div>
@@ -162,7 +175,7 @@ export const NodeProperties: React.FC = () => {
             <div>
               <h4 className="text-sm font-medium text-text-primary mb-2">Inputs</h4>
               <div className="space-y-1">
-                {inputs.map(port => (
+                {inputs.map((port: any) => (
                   <div key={port.id} className="text-xs text-text-secondary">
                     {port.label}
                   </div>
@@ -175,7 +188,7 @@ export const NodeProperties: React.FC = () => {
             <div>
               <h4 className="text-sm font-medium text-text-primary mb-2">Outputs</h4>
               <div className="space-y-1">
-                {outputs.map(port => (
+                {outputs.map((port: any) => (
                   <div key={port.id} className="text-xs text-text-secondary">
                     {port.label}
                   </div>
@@ -191,7 +204,11 @@ export const NodeProperties: React.FC = () => {
   const renderEdgeProperties = () => {
     if (!selectedEdge) return null;
 
-    const { id, source, target, type, label } = selectedEdge;
+    // Get the actual edge data from the store
+    const edgeData = useAppStore(state => state.ui.edges.get(selectedEdge));
+    if (!edgeData) return null;
+
+    const { id, source, target, type, label } = edgeData;
 
     return (
       <div className="space-y-4">
@@ -259,7 +276,7 @@ export const NodeProperties: React.FC = () => {
               <input
                 type="text"
                 value={label}
-                onChange={(e) => {/* TODO: Implement label update */}}
+                onChange={(_e) => {/* TODO: Implement label update */}}
                 className="w-full px-3 py-2 bg-bg-primary border border-border rounded-md text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>

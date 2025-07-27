@@ -1,11 +1,7 @@
 {
   "server": {
     "port": 3001,
-    "host": "localhost",
-    "cors": {
-      "origin": ["http://localhost:3000"],
-      "credentials": true
-    }
+    "host": "0.0.0.0"
   },
   "logging": {
     "level": "info",
@@ -25,7 +21,6 @@
   },
   "security": {
     "enableAuth": false,
-    "allowedOrigins": ["http://localhost:3000"],
     "rateLimit": {
       "windowMs": 15 * 60 * 1000,
       "max": 100

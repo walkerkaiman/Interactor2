@@ -1729,6 +1729,394 @@
       },
       "enabled": true,
       "createdAt": 1753567225364
+    },
+    {
+      "id": "DMX Output_1753577705870_v5q1fsdbi",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753577713081",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577713082
+    },
+    {
+      "id": "DMX Output_1753577719288_j8wd12mgx",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753577726595",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577726596
+    },
+    {
+      "id": "DMX Output_1753577728776_y6ns2fwcx",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753577736147",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577736147
+    },
+    {
+      "id": "DMX Output_1753577837391_97vdkxca1",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753577844912",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577844913
+    },
+    {
+      "id": "DMX Output_1753577896990_ub3f4s9rs",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753577904360",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577904361
+    },
+    {
+      "id": "test_state_module_1753577979196",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753577979197
+    },
+    {
+      "id": "DMX Output_1753578029208_dhmezdttu",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578033327",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578033328
+    },
+    {
+      "id": "DMX Output_1753578098692_xqymmmkz4",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578106089",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578106090
+    },
+    {
+      "id": "DMX Output_1753578368531_c04xetfmm",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578374643",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578374644
+    },
+    {
+      "id": "DMX Output_1753578395580_rhor23sbs",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578401934",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578401935
+    },
+    {
+      "id": "DMX Output_1753578429834_20wyot8c8",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578435992",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578435993
+    },
+    {
+      "id": "DMX Output_1753578452254_j7xbowcil",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578458570",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578458572
+    },
+    {
+      "id": "DMX Output_1753578465831_ctcm7g7nw",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578472096",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578472097
+    },
+    {
+      "id": "DMX Output_1753578478220_nz7gnmnqv",
+      "moduleName": "DMX Output",
+      "config": {
+        "universe": 999,
+        "brightness": 2,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454
+        },
+        "enabled": true
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "test_state_module_1753578485562",
+      "moduleName": "test_input",
+      "config": {
+        "enabled": true,
+        "name": "test_input",
+        "universe": 1
+      },
+      "enabled": true,
+      "createdAt": 1753578485562
     }
   ],
   "routes": [
@@ -3510,6 +3898,246 @@
     },
     {
       "id": "invalid_route"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test_route",
+      "name": "Test Route",
+      "source": "test_source",
+      "target": "test_target",
+      "event": "test_event",
+      "conditions": [],
+      "enabled": true
+    },
+    {
+      "id": "invalid_route"
+    },
+    {
+      "id": "test-route",
+      "source": "test-source",
+      "target": "test-target",
+      "event": "test-event"
     }
   ],
   "settings": {
@@ -3669,6 +4297,6 @@
       "startTime": 1753549904859
     }
   },
-  "lastSaved": 1753567225365,
+  "lastSaved": 1753578485564,
   "version": "1.0.0"
 }

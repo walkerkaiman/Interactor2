@@ -68,7 +68,7 @@ export class InteractorServer {
       await this.initializeServices();
       
       // Setup middleware
-      this.setupMiddleware();
+      await this.setupMiddleware();
       
       // Setup routes
       this.setupRoutes();
@@ -175,14 +175,10 @@ export class InteractorServer {
   /**
    * Setup Express middleware
    */
-  private setupMiddleware(): void {
+  private async setupMiddleware(): Promise<void> {
     // Security middleware
-    this.app.use(helmet());
-    
-    // CORS
-    this.app.use(cors({
-      origin: ['http://localhost:3000'],
-      credentials: true
+    this.app.use(helmet({
+      contentSecurityPolicy: false, // Disable CSP for development
     }));
     
     // Compression
@@ -211,6 +207,21 @@ export class InteractorServer {
       });
       next();
     });
+    
+    // Serve static files from frontend build
+    const frontendPath = path.join(process.cwd(), '..', 'frontend', 'dist');
+    if (await fs.pathExists(frontendPath)) {
+      this.app.use(express.static(frontendPath));
+      
+      // Serve index.html for all non-API routes (SPA routing)
+      this.app.get('*', (req, res, next) => {
+        if (!req.path.startsWith('/api') && !req.path.startsWith('/ws') && !req.path.startsWith('/health')) {
+          res.sendFile(path.join(frontendPath, 'index.html'));
+        } else {
+          next();
+        }
+      });
+    }
   }
 
   /**
@@ -219,12 +230,34 @@ export class InteractorServer {
   private setupRoutes(): void {
     // Health check
     this.app.get('/health', (req, res) => {
-      const health = this.systemStats.getHealthStatus();
-      res.json({
-        status: health.status,
-        uptime: this.systemStats.getUptimeFormatted(),
-        timestamp: Date.now()
-      });
+      try {
+        if (!this.systemStats) {
+          console.error('SystemStats not initialized');
+          return res.status(500).json({
+            status: 'error',
+            uptime: '0s',
+            timestamp: Date.now(),
+            error: 'SystemStats not initialized'
+          });
+        }
+        
+        const health = this.systemStats.getHealthStatus();
+        const uptime = this.systemStats.getUptimeFormatted();
+        
+        res.json({
+          status: health.status,
+          uptime: uptime,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        console.error('Health check error:', error);
+        res.status(500).json({
+          status: 'error',
+          uptime: '0s',
+          timestamp: Date.now(),
+          error: String(error)
+        });
+      }
     });
 
     // System stats

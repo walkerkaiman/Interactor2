@@ -19,8 +19,8 @@ import { CanvasToolbar } from './CanvasToolbar.tsx';
 import { ContextMenu } from './ContextMenu.tsx';
 import { ModuleNode } from './nodes/ModuleNode';
 import { CustomEdge } from './edges/CustomEdge';
-import { useNodes, useEdges, useSelectedNode, useSelectedEdge, useAppActions } from '../../store';
-import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useNodes, useEdges, useSelectedNode, useSelectedEdge, useAppActions } from '@/store';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 const nodeTypes: NodeTypes = {
   module: ModuleNode,
@@ -36,7 +36,8 @@ const ReactFlowContent: React.FC = () => {
   const edges = useEdges();
   const selectedNode = useSelectedNode();
   const selectedEdge = useSelectedEdge();
-  const { selectNode, selectEdge, updateNodePosition, createConnection } = useAppActions();
+
+  const actions = useAppActions();
 
   // Enable keyboard shortcuts inside ReactFlow context
   useKeyboardShortcuts();
@@ -68,10 +69,10 @@ const ReactFlowContent: React.FC = () => {
   const onNodesChange = useCallback((changes: any[]) => {
     changes.forEach(change => {
       if (change.type === 'position' && change.position) {
-        updateNodePosition(change.id, change.position);
+        actions.updateNodePosition(change.id, change.position);
       }
     });
-  }, [updateNodePosition]);
+  }, [actions]);
 
   const onEdgesChange = useCallback(() => {
     // Handle edge changes if needed
@@ -79,7 +80,7 @@ const ReactFlowContent: React.FC = () => {
 
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
-      createConnection({
+      actions.createConnection({
         id: `${connection.source}-${connection.target}`,
         source: connection.source,
         target: connection.target,
@@ -88,36 +89,22 @@ const ReactFlowContent: React.FC = () => {
         type: 'stream',
       });
     }
-  }, [createConnection]);
+  }, [actions]);
 
-  const onNodeClick = useCallback((event: any, node: Node) => {
-    selectNode(node.id);
-  }, [selectNode]);
+  const onNodeClick = useCallback((_event: any, node: Node) => {
+    actions.selectNode(node.id);
+  }, [actions]);
 
-  const onEdgeClick = useCallback((event: any, edge: Edge) => {
-    selectEdge(edge.id);
-  }, [selectEdge]);
+  const onEdgeClick = useCallback((_event: any, edge: Edge) => {
+    actions.selectEdge(edge.id);
+  }, [actions]);
 
   const onPaneClick = useCallback(() => {
-    selectNode(null);
-    selectEdge(null);
-  }, [selectNode, selectEdge]);
+    actions.selectNode(null);
+    actions.selectEdge(null);
+  }, [actions]);
 
-  // Context menu handlers
-  const onNodeContextMenu = useCallback((event: any, node: Node) => {
-    event.preventDefault();
-    // Context menu will be handled by parent component
-  }, []);
 
-  const onEdgeContextMenu = useCallback((event: any, edge: Edge) => {
-    event.preventDefault();
-    // Context menu will be handled by parent component
-  }, []);
-
-  const onPaneContextMenu = useCallback((event: any) => {
-    event.preventDefault();
-    // Context menu will be handled by parent component
-  }, []);
 
   return (
     <>
@@ -130,9 +117,6 @@ const ReactFlowContent: React.FC = () => {
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
-        onNodeContextMenu={onNodeContextMenu}
-        onEdgeContextMenu={onEdgeContextMenu}
-        onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -176,38 +160,7 @@ export const NodeEditor: React.FC = () => {
     type: 'canvas',
   });
 
-  // Context menu handlers for the parent component
-  const onNodeContextMenu = useCallback((event: any) => {
-    event.preventDefault();
-    setContextMenu({
-      show: true,
-      x: event.clientX,
-      y: event.clientY,
-      type: 'node',
-      data: { nodeId: event.target.id },
-    });
-  }, []);
 
-  const onEdgeContextMenu = useCallback((event: any) => {
-    event.preventDefault();
-    setContextMenu({
-      show: true,
-      x: event.clientX,
-      y: event.clientY,
-      type: 'edge',
-      data: { edgeId: event.target.id },
-    });
-  }, []);
-
-  const onPaneContextMenu = useCallback((event: any) => {
-    event.preventDefault();
-    setContextMenu({
-      show: true,
-      x: event.clientX,
-      y: event.clientY,
-      type: 'canvas',
-    });
-  }, []);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, show: false }));
