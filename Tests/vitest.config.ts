@@ -4,10 +4,15 @@ import { resolve } from 'path';
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     setupFiles: ['./setup.ts'],
     include: ['**/*.{test,spec}.ts'],
     exclude: ['node_modules', 'dist'],
+    
+    // React testing setup
+    deps: {
+      inline: ['react', 'react-dom']
+    },
     
     // Test execution settings - simplified architecture allows faster tests
     testTimeout: 15000, // 15 seconds for simplified integration tests
@@ -51,7 +56,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, '../backend/src'),
-      '@interactor/shared': resolve(__dirname, '../shared/src')
+      '@interactor/shared': resolve(__dirname, '../shared/src'),
     }
   }
 }); 

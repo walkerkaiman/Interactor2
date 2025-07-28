@@ -57,13 +57,67 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   
   const className = edgeClasses.join(' ');
   
+  // Generate label text based on event type
+  const getLabelText = () => {
+    if (!data?.route?.event) return '';
+    
+    // Only show labels for stream events
+    if (data.route.event === 'stream') {
+      // Try to get the current value from the source module instance
+      const sourceModuleId = data.route.source;
+      
+      // Check if we have interaction data with module instances
+      if (data.interaction?.modules) {
+        const sourceModule = data.interaction.modules.find((module: any) => module.id === sourceModuleId);
+        if (sourceModule) {
+          // Check for current value in the module instance
+          if (sourceModule.currentFrame !== undefined && sourceModule.currentFrame !== null) {
+            return String(sourceModule.currentFrame);
+          } else if (sourceModule.currentValue !== undefined && sourceModule.currentValue !== null) {
+            return String(sourceModule.currentValue);
+          } else if (sourceModule.lastValue !== undefined && sourceModule.lastValue !== null) {
+            return String(sourceModule.lastValue);
+          }
+        }
+      }
+      
+      // If no value is available, show "N/A"
+      return 'N/A';
+    }
+    
+    return '';
+  };
+  
+  const labelText = getLabelText();
+  
+  // Determine label CSS classes - only for stream events
+  const labelClasses = [styles.edgeLabel];
+  if (data?.route?.event === 'stream') {
+    labelClasses.push(styles.streamLabel);
+  }
+  const labelClassName = labelClasses.join(' ');
+  
   return (
-    <path
-      d={edgePath}
-      className={className}
-      fill="none"
-      strokeWidth="2"
-    />
+    <>
+      <path
+        d={edgePath}
+        className={className}
+        fill="none"
+        strokeWidth="2"
+      />
+      {labelText && (
+        <EdgeLabelRenderer>
+          <div
+            className={labelClassName}
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            }}
+          >
+            {labelText}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 };
 

@@ -1,6 +1,7 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, FramesInputConfig, FrameData, FrameTriggerPayload, FrameStreamPayload } from '@interactor/shared';
 import * as sacn from 'sacn';
+import { StateManager } from '../../../core/StateManager';
 
 export class FramesInputModule extends InputModuleBase {
   private receiver?: sacn.Receiver;
@@ -9,6 +10,7 @@ export class FramesInputModule extends InputModuleBase {
   private lastFrameNumber: number = 0;
   private frameCount: number = 0;
   private lastFrameData?: FrameData;
+  private stateManager: StateManager;
 
   constructor(config: FramesInputConfig) {
     super('frames_input', config, {
@@ -56,6 +58,7 @@ export class FramesInputModule extends InputModuleBase {
 
     this.universe = config.universe ?? 999;
     this.enabled = config.enabled !== false;
+    this.stateManager = StateManager.getInstance();
   }
 
   protected async onInit(): Promise<void> {
@@ -69,8 +72,19 @@ export class FramesInputModule extends InputModuleBase {
   }
 
   protected async onStart(): Promise<void> {
+    if (this.logger) {
+      this.logger.info(`Frames Input module onStart() called, enabled: ${this.enabled}`);
+    }
+    
     if (this.enabled) {
+      if (this.logger) {
+        this.logger.info(`Starting sACN listener for Frames Input module`);
+      }
       await this.initSacnListener();
+    } else {
+      if (this.logger) {
+        this.logger.info(`Frames Input module is disabled, skipping sACN listener`);
+      }
     }
   }
 
@@ -113,13 +127,25 @@ export class FramesInputModule extends InputModuleBase {
    */
   private async initSacnListener(): Promise<void> {
     try {
+      if (this.logger) {
+        this.logger.info(`Initializing sACN receiver for universe ${this.universe} on port 5568`);
+      }
+
+      // Create sACN receiver - use standard sACN port (5568)
       this.receiver = new sacn.Receiver({
         universes: [this.universe],
-        port: 5568
+        port: 5568  // Explicitly specify port 5568
       });
 
-      this.receiver.on('packet', (packet) => {
-        this.handleSacnPacket(packet);
+      if (this.logger) {
+        this.logger.info(`sACN receiver created successfully`);
+      }
+
+      this.receiver.on('packet', async (packet) => {
+        if (this.logger) {
+          this.logger.info(`sACN packet event triggered for universe ${packet.universe}`);
+        }
+        await this.handleSacnPacket(packet);
       });
 
       this.receiver.on('error', (error) => {
@@ -155,14 +181,32 @@ export class FramesInputModule extends InputModuleBase {
   /**
    * Handle incoming sACN packet
    */
-  private handleSacnPacket(packet: any): void {
+  private async handleSacnPacket(packet: any): Promise<void> {
     try {
-      // Extract channels 1 and 2 (MSB and LSB)
-      const msb = packet.slotsData[0] || 0; // Channel 1 (MSB)
-      const lsb = packet.slotsData[1] || 0; // Channel 2 (LSB)
+      if (this.logger) {
+        this.logger.info(`Received sACN packet for universe ${packet.universe}`);
+        this.logger.info(`Packet keys: ${Object.keys(packet).join(', ')}`);
+      }
 
-      // Combine MSB and LSB to form frame number
+      // Extract DMX data from the packet
+      // The Frame Conductor sends frame numbers in channels 1 and 2 (0-indexed)
+      const dmxData = packet.slotsData || packet.dmxData || [];
+      
+      if (this.logger) {
+        this.logger.info(`DMX data length: ${dmxData.length}`);
+        this.logger.info(`DMX data first 10 values: ${dmxData.slice(0, 10).join(', ')}`);
+      }
+
+      // Extract channels 1 and 2 (MSB and LSB) - same as Frame Conductor encoding
+      const msb = dmxData[0] || 0; // Channel 1 (MSB) - Most significant byte
+      const lsb = dmxData[1] || 0; // Channel 2 (LSB) - Least significant byte
+
+      // Combine MSB and LSB to form frame number - same as Frame Conductor decoding
       const frameNumber = (msb << 8) | lsb;
+
+      if (this.logger) {
+        this.logger.info(`Extracted frame data - MSB: ${msb}, LSB: ${lsb}, Frame: ${frameNumber}`);
+      }
 
       const frameData: FrameData = {
         frameNumber,
@@ -202,7 +246,7 @@ export class FramesInputModule extends InputModuleBase {
       }
 
       // Emit state update locally
-      this.emit('stateUpdate', {
+      const stateUpdate = {
         id: this.id,
         moduleName: this.name,
         status: 'listening',
@@ -213,21 +257,30 @@ export class FramesInputModule extends InputModuleBase {
         frameCount: this.frameCount,
         mode: this.mode,
         lastUpdate: frameData.timestamp
-      });
+      };
 
-      // Also emit to process for backend notification
-      process.emit('stateUpdate', {
-        id: this.id,
-        moduleName: this.name,
-        status: 'listening',
-        universe: this.universe,
-        currentFrame: frameNumber,
-        msb,
-        lsb,
-        frameCount: this.frameCount,
-        mode: this.mode,
-        lastUpdate: frameData.timestamp
-      });
+      // Update the state manager directly
+      try {
+        await this.stateManager.updateModuleInstance(stateUpdate);
+        if (this.logger) {
+          this.logger.debug(`Updated module instance state for ${this.name}:`, stateUpdate);
+        }
+        
+        // Also emit a custom event to trigger broadcast
+        this.emit('moduleStateChanged', {
+          moduleId: this.id,
+          currentFrame: frameNumber,
+          frameCount: this.frameCount,
+          timestamp: frameData.timestamp
+        });
+      } catch (error) {
+        if (this.logger) {
+          this.logger.error(`Failed to update module instance state: ${error}`);
+        }
+      }
+
+      // Emit stateUpdate event for the frontend
+      this.emit('stateUpdate', stateUpdate);
 
     } catch (error) {
       if (this.logger) {

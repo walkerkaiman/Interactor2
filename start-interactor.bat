@@ -1,5 +1,5 @@
 @echo off
-echo Starting Interactor V2...
+echo Starting Interactor...
 echo.
 
 echo Installing dependencies...
@@ -63,7 +63,7 @@ REM Open browser to frontend
 start http://localhost:3000
 
 echo.
-echo Interactor V2 is starting up!
+echo Interactor is starting up!
 echo.
 echo Backend: http://localhost:3001
 echo Frontend: http://localhost:3000

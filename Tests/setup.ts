@@ -1,7 +1,12 @@
-import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
+import '@testing-library/jest-dom';
+
+// React testing setup
+import React from 'react';
+import { render } from '@testing-library/react';
 
 // Increase event emitter limit for tests
 EventEmitter.defaultMaxListeners = 50;
@@ -66,6 +71,11 @@ afterAll(() => {
 
 // Global test utilities
 export const testUtils = {
+  // React testing utilities
+  renderWithProviders: (component: React.ReactElement) => {
+    return render(component);
+  },
+  
   // Create a temporary test module
   createTestModule: (name: string, manifest: any) => {
     const moduleDir = join(__dirname, 'test-modules', name);
@@ -96,7 +106,7 @@ export const testUtils = {
 
 // Global test configuration
 export const testConfig = {
-  server: { port: 3001, host: 'localhost' },
+        server: { port: 3003, host: 'localhost' },
   logging: { level: 'debug', file: 'test.log' },
   modules: { autoLoad: false, hotReload: false }
 }; 

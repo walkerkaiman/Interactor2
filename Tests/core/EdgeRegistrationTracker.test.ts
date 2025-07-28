@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EdgeRegistrationTrackerImpl } from '../../frontend/src/utils/edgeRegistrationTracker';
+import { edgeRegistrationTracker } from '../../frontend/src/utils/edgeRegistrationTracker';
 import { InteractionConfig } from '@interactor/shared';
 
 describe('EdgeRegistrationTracker', () => {
-  let tracker: EdgeRegistrationTrackerImpl;
-
   beforeEach(() => {
-    tracker = new EdgeRegistrationTrackerImpl();
+    edgeRegistrationTracker.clear();
   });
 
   it('should track registered and unregistered edges', () => {
@@ -14,23 +12,23 @@ describe('EdgeRegistrationTracker', () => {
     const edgeId2 = 'edge-2';
 
     // Initially no edges should be registered
-    expect(tracker.isEdgeRegistered(edgeId1)).toBe(false);
-    expect(tracker.isEdgeRegistered(edgeId2)).toBe(false);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId1)).toBe(false);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId2)).toBe(false);
 
     // Register an edge
-    tracker.registerEdge(edgeId1);
-    expect(tracker.isEdgeRegistered(edgeId1)).toBe(true);
-    expect(tracker.isEdgeRegistered(edgeId2)).toBe(false);
+    edgeRegistrationTracker.registerEdge(edgeId1);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId1)).toBe(true);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId2)).toBe(false);
 
     // Unregister an edge
-    tracker.unregisterEdge(edgeId2);
-    expect(tracker.isEdgeRegistered(edgeId1)).toBe(true);
-    expect(tracker.isEdgeRegistered(edgeId2)).toBe(false);
+    edgeRegistrationTracker.unregisterEdge(edgeId2);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId1)).toBe(true);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId2)).toBe(false);
 
     // Register the unregistered edge
-    tracker.registerEdge(edgeId2);
-    expect(tracker.isEdgeRegistered(edgeId1)).toBe(true);
-    expect(tracker.isEdgeRegistered(edgeId2)).toBe(true);
+    edgeRegistrationTracker.registerEdge(edgeId2);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId1)).toBe(true);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId2)).toBe(true);
   });
 
   it('should update from interactions correctly', () => {
@@ -70,33 +68,46 @@ describe('EdgeRegistrationTracker', () => {
       }
     ];
 
-    tracker.updateFromInteractions(registeredInteractions, localInteractions);
+    edgeRegistrationTracker.updateFromInteractions(registeredInteractions, localInteractions);
 
     // Check that registered interaction edges are registered
-    expect(tracker.isEdgeRegistered('route-1')).toBe(true);
+    expect(edgeRegistrationTracker.isEdgeRegistered('route-1')).toBe(true);
     
     // Check that local interaction edges are unregistered
-    expect(tracker.isEdgeRegistered('route-2')).toBe(false);
+    expect(edgeRegistrationTracker.isEdgeRegistered('route-2')).toBe(false);
   });
 
   it('should clear all edge states', () => {
     const edgeId = 'edge-1';
-    tracker.registerEdge(edgeId);
-    expect(tracker.isEdgeRegistered(edgeId)).toBe(true);
+    edgeRegistrationTracker.registerEdge(edgeId);
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId)).toBe(true);
 
-    tracker.clear();
-    expect(tracker.isEdgeRegistered(edgeId)).toBe(false);
+    edgeRegistrationTracker.clear();
+    expect(edgeRegistrationTracker.isEdgeRegistered(edgeId)).toBe(false);
   });
 
-  it('should generate edge IDs correctly', () => {
-    const edgeId1 = tracker.getEdgeIdFromConnection('node-1', 'node-2', 'trigger');
-    expect(edgeId1).toBe('edge-node-1-node-2-trigger');
+  it('should register new backend edges correctly', () => {
+    const registeredInteractions: InteractionConfig[] = [
+      {
+        id: 'interaction-1',
+        name: 'Backend Interaction',
+        description: 'Test backend interaction',
+        enabled: true,
+        modules: [],
+        routes: [
+          {
+            id: 'route-1',
+            source: 'node-1',
+            target: 'node-2',
+            event: 'trigger'
+          }
+        ]
+      }
+    ];
 
-    const edgeId2 = tracker.getEdgeIdFromConnection('node-3', 'node-4');
-    expect(edgeId2).toBe('edge-node-3-node-4-default');
+    edgeRegistrationTracker.registerNewBackendEdges(registeredInteractions);
 
-    const route = { id: 'route-1', source: 'node-1', target: 'node-2' };
-    const edgeId3 = tracker.getEdgeIdFromRoute(route, 'interaction-1');
-    expect(edgeId3).toBe('route-1');
+    // Check that the edge is registered
+    expect(edgeRegistrationTracker.isEdgeRegistered('route-1')).toBe(true);
   });
 }); 

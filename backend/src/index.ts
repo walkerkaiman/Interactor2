@@ -264,6 +264,39 @@ export class InteractorServer {
       }
     });
 
+    // Update module instance configuration
+    this.app.put('/api/modules/instances/:id', async (req, res) => {
+      try {
+        const moduleInstances = this.stateManager.getModuleInstances();
+        const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
+        
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Update module configuration
+        if (req.body.config) {
+          moduleInstance.config = { ...moduleInstance.config, ...req.body.config };
+        }
+        
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Update state
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast state update
+        this.broadcastStateUpdate();
+        
+        res.json({ 
+          success: true, 
+          message: 'Module configuration updated successfully',
+          data: moduleInstance
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
     this.app.get('/api/modules/:name', (req, res) => {
       const manifest = this.moduleLoader.getManifest(req.params.name as string);
       if (manifest) {
@@ -424,6 +457,84 @@ export class InteractorServer {
       }
     });
 
+    // Start module instance
+    this.app.post('/api/modules/instances/:id/start', async (req, res) => {
+      try {
+        const moduleInstances = this.stateManager.getModuleInstances();
+        const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
+        
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Get the actual module instance from the module loader
+        const actualModule = this.moduleLoader.getInstance(req.params.id as string);
+        if (actualModule) {
+          // Call the module's onStart method
+          await actualModule.start();
+          this.logger.info(`Module ${moduleInstance.moduleName} started successfully`);
+        }
+        
+        // Update module status to running
+        moduleInstance.status = 'running';
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Update state
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast state update
+        this.broadcastStateUpdate();
+        
+        res.json({ 
+          success: true, 
+          message: 'Module started successfully',
+          data: moduleInstance
+        });
+      } catch (error) {
+        this.logger.error(`Failed to start module: ${error}`);
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
+    // Stop module instance
+    this.app.post('/api/modules/instances/:id/stop', async (req, res) => {
+      try {
+        const moduleInstances = this.stateManager.getModuleInstances();
+        const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
+        
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Get the actual module instance from the module loader
+        const actualModule = this.moduleLoader.getInstance(req.params.id as string);
+        if (actualModule) {
+          // Call the module's onStop method
+          await actualModule.stop();
+          this.logger.info(`Module ${moduleInstance.moduleName} stopped successfully`);
+        }
+        
+        // Update module status to stopped
+        moduleInstance.status = 'stopped';
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Update state
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast state update
+        this.broadcastStateUpdate();
+        
+        res.json({ 
+          success: true, 
+          message: 'Module stopped successfully',
+          data: moduleInstance
+        });
+      } catch (error) {
+        this.logger.error(`Failed to stop module: ${error}`);
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
     // Settings management
     this.app.get('/api/settings', (req, res) => {
       const settings = this.stateManager.getSettings();
@@ -529,17 +640,28 @@ export class InteractorServer {
    */
   private setupModuleStateListeners(): void {
     // Listen for stateUpdate events from any module
-    process.on('stateUpdate', (data: any) => {
-      this.logger.debug('Received stateUpdate event from module:', data);
-      
-      // Update the module instance in state manager
-      if (data.id) {
-        this.stateManager.updateModuleInstance(data);
+    // Note: This approach doesn't work because modules emit events on their own instances
+    // We need to handle this differently by updating the state manager directly
+    // when modules emit stateUpdate events
+    
+    // For now, we'll rely on the modules to update their state through the state manager
+    // The frames input module should call this.stateManager.updateModuleInstance() directly
+    
+    // We'll also set up a periodic broadcast to ensure frontend gets updates
+    setInterval(() => {
+      if (this.wss.clients.size > 0) {
+        this.broadcastStateUpdate();
       }
-      
-      // Broadcast the update to all connected clients
+    }, 1000); // Broadcast every second
+    
+    // Also broadcast when module instances are updated
+    // We'll override the state manager's updateModuleInstance method to broadcast
+    const originalUpdateModuleInstance = this.stateManager.updateModuleInstance.bind(this.stateManager);
+    this.stateManager.updateModuleInstance = async (moduleInstance: any) => {
+      await originalUpdateModuleInstance(moduleInstance);
+      // Broadcast state update after module instance is updated
       this.broadcastStateUpdate();
-    });
+    };
   }
 
   /**
@@ -616,4 +738,4 @@ if (require.main === module) {
     });
 }
 
-export default InteractorServer; 
+export default InteractorServer;

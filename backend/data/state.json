@@ -7,110 +7,80 @@
       "enabled": true,
       "modules": [
         {
-          "id": "node-1753654407379",
-          "moduleName": "Audio Output",
-          "config": {},
-          "status": "stopped",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1753654407379,
+          "id": "5e614c45-4e1a-48a9-84c8-1897e41725f2",
+          "moduleName": "Frames Input",
+          "config": {
+            "universe": 999,
+            "enabled": true
+          },
           "position": {
-            "x": 449.73547686330096,
-            "y": 920.3813578767739
+            "x": 310.20991908222663,
+            "y": 194.91603236710932
           }
         },
         {
-          "id": "node-1753654410664",
-          "moduleName": "Time Input",
-          "config": {},
-          "status": "stopped",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1753654410664,
-          "position": {
-            "x": 70.64065761675067,
-            "y": 923.3622569352226
-          }
-        },
-        {
-          "id": "node-1753655534644",
-          "moduleName": "Time Input",
-          "config": {},
-          "status": "stopped",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1753655534644,
-          "position": {
-            "x": 64,
-            "y": 1144
-          }
-        },
-        {
-          "id": "node-1753655537668",
+          "id": "cc40b0d0-15be-4f14-8cac-3194a055a324",
           "moduleName": "DMX Output",
-          "config": {},
-          "status": "stopped",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1753655537668,
+          "config": {
+            "universe": 1,
+            "brightness": 1,
+            "enabled": true,
+            "enableFileUpload": true,
+            "uploadPort": 3001,
+            "uploadHost": "localhost",
+            "maxFileSize": 10485760,
+            "allowedExtensions": [
+              ".csv"
+            ]
+          },
           "position": {
-            "x": 452.3757654064608,
-            "y": 1151.5071365198603
+            "x": 879.6646248090394,
+            "y": 198.8114012018752
           }
         }
       ],
       "routes": [
         {
-          "id": "route-1753656126998",
-          "source": "node-1753655534644",
-          "target": "node-1753655537668",
+          "id": "route-1753676755297",
+          "source": "5e614c45-4e1a-48a9-84c8-1897e41725f2",
+          "target": "cc40b0d0-15be-4f14-8cac-3194a055a324",
           "event": "stream"
-        },
-        {
-          "id": "route-1753656276371",
-          "source": "node-1753654410664",
-          "target": "node-1753654407379",
-          "event": "trigger"
         }
       ]
     }
   ],
   "modules": [
     {
-      "id": "node-1753654407379",
-      "moduleName": "Audio Output",
-      "config": {},
+      "id": "5e614c45-4e1a-48a9-84c8-1897e41725f2",
+      "moduleName": "Frames Input",
+      "config": {
+        "universe": 999,
+        "enabled": true
+      },
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656282434
+      "lastUpdate": 1753676757088
     },
     {
-      "id": "node-1753654410664",
-      "moduleName": "Time Input",
-      "config": {},
-      "status": "stopped",
-      "messageCount": 0,
-      "frameCount": 0,
-      "lastUpdate": 1753656282434
-    },
-    {
-      "id": "node-1753655534644",
-      "moduleName": "Time Input",
-      "config": {},
-      "status": "stopped",
-      "messageCount": 0,
-      "frameCount": 0,
-      "lastUpdate": 1753656282434
-    },
-    {
-      "id": "node-1753655537668",
+      "id": "cc40b0d0-15be-4f14-8cac-3194a055a324",
       "moduleName": "DMX Output",
-      "config": {},
+      "config": {
+        "universe": 1,
+        "brightness": 1,
+        "enabled": true,
+        "enableFileUpload": true,
+        "uploadPort": 3001,
+        "uploadHost": "localhost",
+        "maxFileSize": 10485760,
+        "allowedExtensions": [
+          ".csv"
+        ]
+      },
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753656282434
+      "lastUpdate": 1753676757088
     }
   ],
   "routes": [],

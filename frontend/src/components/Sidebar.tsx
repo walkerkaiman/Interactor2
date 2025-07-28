@@ -11,13 +11,6 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange }) => {
   const handleDragStart = (event: React.DragEvent, module: ModuleManifest) => {
-    console.log('🔍 [DEBUG] handleDragStart called', { 
-      moduleName: module.name,
-      moduleType: module.type,
-      clientX: event.clientX,
-      clientY: event.clientY
-    });
-
     const dragData = {
       moduleName: module.name,
       manifest: module,
@@ -26,13 +19,9 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
       offsetY: event.clientY - event.currentTarget.getBoundingClientRect().top,
     };
     
-    console.log('🔍 [DEBUG] Setting drag data:', dragData);
-    
     event.dataTransfer.setData('application/json', JSON.stringify(dragData));
     event.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
     event.dataTransfer.effectAllowed = 'copy';
-    
-    console.log('✅ [DEBUG] Drag data set successfully');
   };
 
   const inputModules = modules.filter(m => m.type === 'input');
