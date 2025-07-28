@@ -652,7 +652,7 @@ export class InteractorServer {
       if (this.wss.clients.size > 0) {
         this.broadcastStateUpdate();
       }
-    }, 1000); // Broadcast every second
+    }, 5000); // Broadcast every 5 seconds instead of every second
     
     // Also broadcast when module instances are updated
     // We'll override the state manager's updateModuleInstance method to broadcast

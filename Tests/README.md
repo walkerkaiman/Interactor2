@@ -1,6 +1,6 @@
-# Interactor2 Simplified Test Suite
+# Interactor Simplified Test Suite
 
-This directory contains the test suite for the simplified Interactor2 backend architecture. The tests have been updated to reflect the new headless singleton service design with minimal complexity.
+This directory contains the test suite for the simplified Interactor backend architecture. The tests have been updated to reflect the new headless singleton service design with minimal complexity.
 
 ## Test Structure
 

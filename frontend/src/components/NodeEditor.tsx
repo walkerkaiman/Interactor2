@@ -49,8 +49,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [draggedHandle, setDraggedHandle] = useState<{ nodeId: string; handleId: string } | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-
-
+  const isUpdatingFromInteractions = useRef(false);
 
   // Handle ReactFlow instance
   const onInit = useCallback((instance: any) => {
@@ -59,6 +58,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle node deletion
   const handleDeleteNode = useCallback((nodeId: string) => {
+    // Set flag to prevent useEffect from running during this operation
+    isUpdatingFromInteractions.current = true;
+
     // Update local interactions state
     const updatedInteractions = interactions.map(interaction => ({
       ...interaction,
@@ -84,6 +86,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       
       return filtered;
     });
+
+    // Reset flag after a short delay to allow the state updates to complete
+    setTimeout(() => {
+      isUpdatingFromInteractions.current = false;
+    }, 100);
   }, [setNodes, setEdges, interactions, onInteractionsChange]);
 
     // Handle module drop
@@ -170,6 +177,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         },
       };
 
+      // Set flag to prevent useEffect from running during this operation
+      isUpdatingFromInteractions.current = true;
+
       // Add the new node to local interactions
       const updatedInteractions = [...interactions];
       
@@ -195,6 +205,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
       // Add the node to ReactFlow
       setNodes((nds) => [...nds, newNode]);
+
+      // Reset flag after a short delay to allow the state updates to complete
+      setTimeout(() => {
+        isUpdatingFromInteractions.current = false;
+      }, 100);
     },
     [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
   );
@@ -208,6 +223,10 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
+    if (isUpdatingFromInteractions.current) {
+      return;
+    }
+
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
@@ -277,9 +296,37 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       });
     });
 
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode]); // Use interactions directly
+    // Only update nodes and edges if there are actual changes to prevent unnecessary rebuilds
+    setNodes((currentNodes) => {
+      // Check if we need to update nodes
+      const currentNodeIds = new Set(currentNodes.map(n => n.id));
+      const newNodeIds = new Set(newNodes.map(n => n.id));
+      
+      // If the sets are different, update nodes
+      if (currentNodeIds.size !== newNodeIds.size || 
+          !Array.from(currentNodeIds).every(id => newNodeIds.has(id))) {
+        return newNodes;
+      }
+      
+      // If nodes are the same, preserve current nodes to maintain local state
+      return currentNodes;
+    });
+
+    setEdges((currentEdges) => {
+      // Check if we need to update edges
+      const currentEdgeIds = new Set(currentEdges.map(e => e.id));
+      const newEdgeIds = new Set(newEdges.map(e => e.id));
+      
+      // If the sets are different, update edges
+      if (currentEdgeIds.size !== newEdgeIds.size || 
+          !Array.from(currentEdgeIds).every(id => newEdgeIds.has(id))) {
+        return newEdges;
+      }
+      
+      // If edges are the same, preserve current edges to maintain local state
+      return currentEdges;
+    });
+  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode, isUpdatingFromInteractions]); // Use interactions directly
 
   // Update node data with current edges for handle coloring
   useEffect(() => {
@@ -312,6 +359,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle node position changes
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Set flag to prevent useEffect from running during this operation
+    isUpdatingFromInteractions.current = true;
+
     // Update local interactions state with new position
     const updatedInteractions = interactions.map(interaction => ({
       ...interaction,
@@ -324,11 +374,19 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     
     // Notify parent of local changes
     onInteractionsChange(updatedInteractions);
+
+    // Reset flag after a short delay to allow the state updates to complete
+    setTimeout(() => {
+      isUpdatingFromInteractions.current = false;
+    }, 100);
   }, [interactions, onInteractionsChange]);
 
   // Handle pane click to disconnect
   const onPaneClick = useCallback((_event: React.MouseEvent) => {
     if (draggedHandle) {
+      // Set flag to prevent useEffect from running during this operation
+      isUpdatingFromInteractions.current = true;
+
       // Update local interactions state to remove the route
       const updatedInteractions = interactions.map(interaction => ({
         ...interaction,
@@ -355,12 +413,19 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         return filtered;
       });
       setDraggedHandle(null);
+
+      // Reset flag after a short delay to allow the state updates to complete
+      setTimeout(() => {
+        isUpdatingFromInteractions.current = false;
+      }, 100);
     }
     onNodeSelect(null);
   }, [draggedHandle, setEdges, onNodeSelect, interactions, onInteractionsChange]);
 
   const onConnect = useCallback(
     (params: Connection) => {
+      // Set flag to prevent useEffect from running during this operation
+      isUpdatingFromInteractions.current = true;
       
       // Determine the event type based on the source handle
       let eventType = 'default';
@@ -436,6 +501,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         // Add the new edge
         return [...filteredEdges, newEdge];
       });
+
+      // Reset flag after a short delay to allow the state updates to complete
+      setTimeout(() => {
+        isUpdatingFromInteractions.current = false;
+      }, 100);
     },
     [setEdges, interactions, onInteractionsChange]
   );

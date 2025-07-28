@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": false,
+        "amount": 5
+    },
+    "auditLog": "C:\\Users\\Kaiman\\Desktop\\Interactor\\Tests\\core\\test-logs\\.1c09925b2f3d45a08fc627efaec307d3eef6f2fb-audit.json",
+    "files": [
+        {
+            "date": 1753708936845,
+            "name": "C:\\Users\\Kaiman\\Desktop\\Interactor\\Tests\\core\\test-logs\\test.log.2025-07-28",
+            "hash": "c08126db40b2efaec53d7a805fa123b3b8dedd2b2f4177aa70717d841e7ea22e"
+        }
+    ],
+    "hashType": "sha256"
+}

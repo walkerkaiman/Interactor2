@@ -1,6 +1,6 @@
-# Interactor2 Integration Test Suite
+# Interactor Integration Test Suite
 
-This directory contains comprehensive integration tests for the Interactor2 backend system. These tests verify that all components work together correctly in a realistic environment.
+This directory contains comprehensive integration tests for the Interactor backend system. These tests verify that all components work together correctly in a realistic environment.
 
 ## Test Overview
 

@@ -1,6 +1,6 @@
-# Interactor2 - Simplified Headless Service
+# Interactor - Simplified Headless Service
 
-Interactor2 is a simplified, headless singleton service for building interactive art installations. It provides a streamlined architecture focused on module-based interactions with minimal complexity.
+Interactor is a simplified, headless singleton service for building interactive art installations. It provides a streamlined architecture focused on module-based interactions with minimal complexity.
 
 ## Architecture Overview
 
@@ -136,7 +136,7 @@ modules/
 
 ### Project Structure
 ```
-Interactor2/
+Interactor/
 ├── backend/           # Headless singleton service
 │   ├── src/
 │   │   ├── core/     # Singleton services

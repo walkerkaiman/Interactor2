@@ -38,7 +38,7 @@ class IntegrationTestRunner {
   private startTime: number = 0;
 
   async run(): Promise<void> {
-    console.log('🚀 Starting Interactor2 Integration Test Suite\n');
+    console.log('🚀 Starting Interactor Integration Test Suite\n');
     this.startTime = Date.now();
 
     // Create test directories
