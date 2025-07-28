@@ -1,27 +1,45 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
+import { StateManager } from '../../../core/StateManager';
 
 export class TimeInputModule extends InputModuleBase {
   private intervalId?: NodeJS.Timeout;
+  private metronomeIntervalId?: NodeJS.Timeout;
   private targetTime: string;
   private enabled: boolean;
   private currentTime: string = '';
   private countdown: string = '';
+  private timeMode: 'clock' | 'metronome' = 'clock';
+  private millisecondDelay: number = 1000;
+  private stateManager: StateManager;
 
   constructor(config: TimeInputConfig) {
     super('time_input', config, {
       name: 'Time Input',
       type: 'input',
       version: '1.0.0',
-      description: 'Triggers events at a specific time of day',
+      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals',
       author: 'Interactor Team',
       configSchema: {
         type: 'object',
         properties: {
+          mode: {
+            type: 'string',
+            description: 'Operating mode',
+            enum: ['clock', 'metronome'],
+            default: 'clock'
+          },
           targetTime: {
             type: 'string',
-            description: 'Target time in HH:MM format',
-            pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+            description: 'Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only',
+            pattern: '^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$'
+          },
+          millisecondDelay: {
+            type: 'number',
+            description: 'Delay between pulses in milliseconds - Metronome mode only',
+            minimum: 100,
+            maximum: 60000,
+            default: 1000
           },
           enabled: {
             type: 'boolean',
@@ -29,31 +47,50 @@ export class TimeInputModule extends InputModuleBase {
             default: true
           }
         },
-        required: ['targetTime']
+        required: ['mode']
       },
       events: [
         {
           name: 'timeTrigger',
           type: 'output',
-          description: 'Emitted when target time is reached'
+          description: 'Emitted when target time is reached (Clock mode) or on pulse (Metronome mode)'
+        },
+        {
+          name: 'stateUpdate',
+          type: 'output',
+          description: 'Emitted when module state changes'
         }
       ]
     });
 
     this.targetTime = config.targetTime || '12:00 PM';
     this.enabled = config.enabled !== false;
+    this.timeMode = config.mode || 'clock';
+    this.millisecondDelay = config.millisecondDelay || 1000;
+    this.stateManager = StateManager.getInstance();
   }
 
   protected async onInit(): Promise<void> {
-    // Validate time format
-    if (!this.isValidTimeFormat(this.targetTime)) {
-      throw new Error(`Invalid time format: ${this.targetTime}. Expected 12-hour format (e.g., 2:30 PM).`);
+    if (this.timeMode === 'clock') {
+      // Validate time format for clock mode
+      if (!this.isValidTimeFormat(this.targetTime)) {
+        throw new Error(`Invalid time format: ${this.targetTime}. Expected 12-hour format (e.g., 2:30 PM).`);
+      }
+    } else if (this.timeMode === 'metronome') {
+      // Validate millisecond delay for metronome mode
+      if (this.millisecondDelay < 100 || this.millisecondDelay > 60000) {
+        throw new Error(`Invalid millisecond delay: ${this.millisecondDelay}. Must be between 100 and 60000.`);
+      }
     }
   }
 
   protected async onStart(): Promise<void> {
     if (this.enabled) {
-      this.startTimeCheck();
+      if (this.timeMode === 'clock') {
+        this.startTimeCheck();
+      } else if (this.timeMode === 'metronome') {
+        this.startMetronome();
+      }
     }
     // Start updating current time and countdown immediately
     this.updateTimeDisplay();
@@ -61,48 +98,150 @@ export class TimeInputModule extends InputModuleBase {
 
   protected async onStop(): Promise<void> {
     this.stopTimeCheck();
+    this.stopMetronome();
   }
 
   protected async onDestroy(): Promise<void> {
     this.stopTimeCheck();
+    this.stopMetronome();
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     const newTimeConfig = newConfig as TimeInputConfig;
     
+    if (newTimeConfig.mode !== this.timeMode) {
+      this.timeMode = newTimeConfig.mode || 'clock';
+      // Restart with new mode
+      if (this.enabled && this.isRunning) {
+        this.stopTimeCheck();
+        this.stopMetronome();
+        if (this.timeMode === 'clock') {
+          this.startTimeCheck();
+        } else if (this.timeMode === 'metronome') {
+          this.startMetronome();
+        }
+      }
+    }
+    
     if (newTimeConfig.targetTime !== this.targetTime) {
-      this.targetTime = newTimeConfig.targetTime;
-      if (!this.isValidTimeFormat(this.targetTime)) {
+      this.targetTime = newTimeConfig.targetTime || this.targetTime;
+      if (this.timeMode === 'clock' && !this.isValidTimeFormat(this.targetTime)) {
         throw new Error(`Invalid time format: ${this.targetTime}. Expected 12-hour format (e.g., 2:30 PM).`);
       }
     }
     
+    if (newTimeConfig.millisecondDelay !== this.millisecondDelay) {
+      this.millisecondDelay = newTimeConfig.millisecondDelay || 1000;
+      if (this.timeMode === 'metronome' && (this.millisecondDelay < 100 || this.millisecondDelay > 60000)) {
+        throw new Error(`Invalid millisecond delay: ${this.millisecondDelay}. Must be between 100 and 60000.`);
+      }
+      // Restart metronome with new delay if running
+      if (this.timeMode === 'metronome' && this.enabled && this.isRunning) {
+        this.stopMetronome();
+        this.startMetronome();
+      }
+    }
+    
     if (newTimeConfig.enabled !== this.enabled) {
-      this.enabled = newTimeConfig.enabled;
+      this.enabled = newTimeConfig.enabled ?? this.enabled;
       if (this.enabled && this.isRunning) {
-        this.startTimeCheck();
+        if (this.timeMode === 'clock') {
+          this.startTimeCheck();
+        } else if (this.timeMode === 'metronome') {
+          this.startMetronome();
+        }
       } else {
         this.stopTimeCheck();
+        this.stopMetronome();
       }
     }
   }
 
   protected handleInput(data: any): void {
-    // This module doesn't handle external input
+    // Handle manual trigger
+    if (data && data.type === 'manualTrigger') {
+      this.manualTrigger();
+    }
   }
 
   protected async onStartListening(): Promise<void> {
-    // Start the time checking interval
-    this.startTimeCheck();
+    if (this.timeMode === 'clock') {
+      this.startTimeCheck();
+    } else if (this.timeMode === 'metronome') {
+      this.startMetronome();
+    }
   }
 
   protected async onStopListening(): Promise<void> {
-    // Stop the time checking interval
     this.stopTimeCheck();
+    this.stopMetronome();
   }
 
   /**
-   * Start checking for target time
+   * Manual trigger function
+   */
+  public manualTrigger(): void {
+    if (!this.enabled) return;
+
+    this.logger?.info('Manual trigger activated');
+    
+    // Emit trigger event
+    this.emitTrigger('timeTrigger', {
+      mode: this.timeMode,
+      targetTime: this.targetTime,
+      millisecondDelay: this.millisecondDelay,
+      currentTime: new Date().toISOString(),
+      timestamp: Date.now(),
+      manual: true
+    });
+  }
+
+  /**
+   * Start metronome mode
+   */
+  private startMetronome(): void {
+    if (this.metronomeIntervalId) {
+      clearInterval(this.metronomeIntervalId);
+    }
+
+    this.logger?.info(`Starting metronome with ${this.millisecondDelay}ms delay`);
+    
+    // Emit initial trigger
+    this.emitTrigger('timeTrigger', {
+      mode: 'metronome',
+      millisecondDelay: this.millisecondDelay,
+      currentTime: new Date().toISOString(),
+      timestamp: Date.now()
+    });
+
+    // Set up interval for metronome pulses
+    this.metronomeIntervalId = setInterval(() => {
+      if (!this.enabled || this.timeMode !== 'metronome') {
+        this.stopMetronome();
+        return;
+      }
+      
+      this.emitTrigger('timeTrigger', {
+        mode: 'metronome',
+        millisecondDelay: this.millisecondDelay,
+        currentTime: new Date().toISOString(),
+        timestamp: Date.now()
+      });
+    }, this.millisecondDelay);
+  }
+
+  /**
+   * Stop metronome mode
+   */
+  private stopMetronome(): void {
+    if (this.metronomeIntervalId) {
+      clearInterval(this.metronomeIntervalId);
+      this.metronomeIntervalId = undefined as any;
+    }
+  }
+
+  /**
+   * Start checking for target time (Clock mode)
    */
   private startTimeCheck(): void {
     if (this.intervalId) {
@@ -113,8 +252,9 @@ export class TimeInputModule extends InputModuleBase {
     this.intervalId = setInterval(() => {
       this.updateTimeDisplay();
       
-      if (this.enabled && this.checkTime()) {
+      if (this.enabled && this.timeMode === 'clock' && this.checkTime()) {
         this.emitTrigger('timeTrigger', {
+          mode: 'clock',
           targetTime: this.targetTime,
           currentTime: new Date().toISOString(),
           timestamp: Date.now()
@@ -134,7 +274,7 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   /**
-   * Check if current time matches target time
+   * Check if current time matches target time (Clock mode)
    */
   private checkTime(): boolean {
     const now = new Date();
@@ -157,14 +297,18 @@ export class TimeInputModule extends InputModuleBase {
    * Get trigger parameters for UI display
    */
   public getTriggerParameters(): { 
+    mode: 'clock' | 'metronome';
     targetTime: string; 
+    millisecondDelay: number;
     enabled: boolean; 
     currentTime: string; 
     countdown: string;
     targetTime12Hour: string;
   } {
     return {
+      mode: this.timeMode,
       targetTime: this.targetTime,
+      millisecondDelay: this.millisecondDelay,
       enabled: this.enabled,
       currentTime: this.currentTime,
       countdown: this.countdown,
@@ -232,43 +376,82 @@ export class TimeInputModule extends InputModuleBase {
     const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
     this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
     
-    // Calculate countdown to target time
-    const targetTime24 = this.convertTo24Hour(this.targetTime);
-    const parts = targetTime24.split(':').map(Number);
-    const targetHours = parts[0];
-    const targetMinutes = parts[1];
-    
-    if (targetHours === undefined || targetMinutes === undefined) {
-      this.countdown = 'Invalid time';
-      return;
+    // Calculate countdown based on mode
+    if (this.timeMode === 'clock') {
+      // Calculate countdown to target time
+      const targetTime24 = this.convertTo24Hour(this.targetTime);
+      const parts = targetTime24.split(':').map(Number);
+      const targetHours = parts[0];
+      const targetMinutes = parts[1];
+      
+      if (targetHours === undefined || targetMinutes === undefined) {
+        this.countdown = 'Invalid time';
+        return;
+      }
+      
+      const targetDate = new Date();
+      targetDate.setHours(targetHours, targetMinutes, 0, 0);
+      
+      // If target time has passed today, set it for tomorrow
+      if (targetDate <= now) {
+        targetDate.setDate(targetDate.getDate() + 1);
+      }
+      
+      const diffMs = targetDate.getTime() - now.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+      
+      if (diffHours > 0) {
+        this.countdown = `${diffHours}h ${diffMinutes}m ${diffSeconds}s`;
+      } else if (diffMinutes > 0) {
+        this.countdown = `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        this.countdown = `${diffSeconds}s`;
+      }
+    } else if (this.timeMode === 'metronome') {
+      // For metronome mode, show the delay interval
+      const seconds = this.millisecondDelay / 1000;
+      this.countdown = `${seconds}s interval`;
     }
     
-    const targetDate = new Date();
-    targetDate.setHours(targetHours, targetMinutes, 0, 0);
-    
-    // If target time has passed today, set it for tomorrow
-    if (targetDate <= now) {
-      targetDate.setDate(targetDate.getDate() + 1);
-    }
-    
-    const diffMs = targetDate.getTime() - now.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-    
-    if (diffHours > 0) {
-      this.countdown = `${diffHours}h ${diffMinutes}m ${diffSeconds}s`;
-    } else if (diffMinutes > 0) {
-      this.countdown = `${diffMinutes}m ${diffSeconds}s`;
-    } else {
-      this.countdown = `${diffSeconds}s`;
+    // Create state update for UI sync
+    const stateUpdate = {
+      id: this.id,
+      moduleName: this.name || 'Time Input',
+      status: this.enabled ? 'listening' : 'stopped',
+      mode: this.timeMode,
+      currentTime: this.currentTime,
+      countdown: this.countdown,
+      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
+      millisecondDelay: this.millisecondDelay,
+      enabled: this.enabled || false,
+      lastUpdate: Date.now()
+    };
+
+    // Update the state manager directly
+    try {
+      // Check if the module instance exists in the state manager
+      const existingInstance = this.stateManager.getModuleInstance(this.id);
+      if (existingInstance) {
+        // Update existing instance
+        this.stateManager.updateModuleInstance(stateUpdate);
+      } else {
+        // Add new instance if it doesn't exist
+        this.stateManager.addModuleInstance(stateUpdate);
+      }
+    } catch (error) {
+      this.logger?.error(`Failed to update module instance state: ${error}`);
     }
     
     // Emit state update for UI sync
     this.emit('stateUpdate', {
+      mode: this.timeMode,
       currentTime: this.currentTime,
       countdown: this.countdown,
-      targetTime12Hour: this.convertTo12Hour(this.targetTime)
+      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
+      millisecondDelay: this.millisecondDelay,
+      enabled: this.enabled
     });
   }
 } 

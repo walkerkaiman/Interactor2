@@ -118,124 +118,230 @@
 }
 
 /* Special styling for Trigger and Stream handles */
-.handle[data-handleid="trigger"] {
-  background: #dc2626;
-  border-color: #991b1b;
+.handleContainer:has(.handle) {
+  margin-right: 12px;
 }
 
-.handle[data-handleid="trigger"]:hover {
-  background: #b91c1c;
-  border-color: #7f1d1d;
-}
-
-.handle[data-handleid="stream"] {
-  background: #059669;
-  border-color: #047857;
-}
-
-.handle[data-handleid="stream"]:hover {
-  background: #047857;
-  border-color: #065f46;
-}
-
-/* Input handle colors for output modules */
-.handle[data-handleid="input"].triggerConnected {
-  background: #dc2626;
-  border-color: #991b1b;
-}
-
-.handle[data-handleid="input"].triggerConnected:hover {
-  background: #b91c1c;
-  border-color: #7f1d1d;
-}
-
-.handle[data-handleid="input"].streamConnected {
-  background: #059669;
-  border-color: #047857;
-}
-
-.handle[data-handleid="input"].streamConnected:hover {
-  background: #047857;
-  border-color: #065f46;
+.handleContainer:has(.handle) .handleLabel {
+  margin-right: 16px;
 }
 
 .handleLabel {
   font-size: 10px;
   color: #9ca3af;
-  margin: 0 4px;
+  font-weight: 500;
+}
+
+/* Input handles on the left */
+.inputHandles {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.inputHandles .handleContainer {
+  justify-content: flex-start;
+}
+
+.inputHandles .handle {
+  left: -4px;
+  right: auto;
 }
 
 .inputHandles .handleLabel {
-  margin-left: 8px;
+  margin-left: 16px;
+  margin-right: 0;
 }
 
-.outputHandles .handleLabel {
-  margin-right: 16px;
-  text-align: right;
+/* Output handles on the right */
+.outputHandles {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Handle connection states */
+.triggerConnected {
+  background: #059669 !important;
+  border-color: #047857 !important;
+}
+
+.streamConnected {
+  background: #3b82f6 !important;
+  border-color: #1d4ed8 !important;
 }
 
 .config {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #374151;
+  margin: 8px 0;
+  padding: 8px;
+  background: #111827;
+  border-radius: 4px;
+  border: 1px solid #374151;
 }
 
 .configTitle {
   font-size: 10px;
   font-weight: 600;
-  color: #d1d5db;
+  color: #9ca3af;
   margin-bottom: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .configItems {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .configItem {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .configKey {
-  color: #9ca3af;
+  color: #d1d5db;
   font-weight: 500;
+  margin-right: 8px;
 }
 
 .configValue {
-  color: #d1d5db;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
 }
 
 .configMore {
-  font-size: 10px;
   color: #6b7280;
+  font-size: 10px;
   font-style: italic;
   text-align: center;
   margin-top: 2px;
 }
 
-.meta {
+/* Time input specific styles */
+.timeInputContainer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.timeInput {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 4px 6px;
+  width: 100px;
+  font-family: 'Courier New', monospace;
+}
+
+.timeInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.timeFormatHint {
+  font-size: 9px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.selectInput {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 4px 6px;
+  width: 100px;
+}
+
+.selectInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.numberInput {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 4px 6px;
+  width: 100px;
+}
+
+.numberInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.triggerButton {
+  background: #059669;
+  border: 1px solid #047857;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.triggerButton:hover {
+  background: #047857;
+}
+
+.stopButton {
+  background: #dc2626;
+  border: 1px solid #b91c1c;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
+}
+
+.stopButton:hover {
+  background: #b91c1c;
+}
+
+.meta {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #374151;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 10px;
+  color: #6b7280;
 }
 
 .version {
-  background: #1f2937;
   color: #9ca3af;
-  padding: 2px 4px;
-  border-radius: 3px;
+  font-weight: 500;
 }
 
 .author {
@@ -247,41 +353,33 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
 }
 
 .statusDot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  display: inline-block;
+  background: #6b7280;
 }
 
-.statusDot.running {
-  background-color: #10b981;
+.statusDot.listening {
+  background: #10b981;
+}
+
+.statusDot.playing {
+  background: #3b82f6;
 }
 
 .statusDot.stopped {
-  background-color: #6b7280;
+  background: #6b7280;
 }
 
 .statusDot.error {
-  background-color: #ef4444;
-}
-
-.statusDot.initializing {
-  background-color: #f59e0b;
+  background: #ef4444;
 }
 
 .statusText {
-  color: #6b7280;
+  font-size: 9px;
   text-transform: uppercase;
-  font-weight: 500;
-}
-
-.frameInfo {
-  color: #3b82f6;
-  font-family: monospace;
-  font-weight: 600;
+  letter-spacing: 0.5px;
 } 

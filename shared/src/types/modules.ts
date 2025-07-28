@@ -249,10 +249,14 @@ export interface SerialStreamPayload {
  * @extends {ModuleConfig}
  */
 export interface TimeInputConfig extends ModuleConfig {
-  /** Target time in HH:MM format (24-hour) */
-  targetTime: string;
+  /** Operating mode */
+  mode?: 'clock' | 'metronome';
+  /** Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only */
+  targetTime?: string;
+  /** Delay between pulses in milliseconds - Metronome mode only */
+  millisecondDelay?: number;
   /** Enable/disable the time trigger */
-  enabled: boolean;
+  enabled?: boolean;
 }
 
 /**
@@ -260,12 +264,18 @@ export interface TimeInputConfig extends ModuleConfig {
  * @interface TimeTriggerPayload
  */
 export interface TimeTriggerPayload {
-  /** Target time in HH:MM format */
-  targetTime: string;
+  /** Operating mode */
+  mode: 'clock' | 'metronome';
+  /** Target time in HH:MM format - Clock mode only */
+  targetTime?: string;
+  /** Delay between pulses in milliseconds - Metronome mode only */
+  millisecondDelay?: number;
   /** Current time in HH:MM format */
   currentTime: string;
   /** Timestamp when trigger occurred */
   timestamp: number;
+  /** Whether this was a manual trigger */
+  manual?: boolean;
 }
 
 /**
@@ -273,12 +283,18 @@ export interface TimeTriggerPayload {
  * @interface TimeState
  */
 export interface TimeState {
+  /** Operating mode */
+  mode: 'clock' | 'metronome';
   /** Current time in HH:MM format */
   currentTime: string;
   /** Countdown string (e.g., "2h 30m") */
   countdown: string;
-  /** Target time in 12-hour format for display */
+  /** Target time in 12-hour format for display - Clock mode only */
   targetTime12Hour: string;
+  /** Delay between pulses in milliseconds - Metronome mode only */
+  millisecondDelay: number;
+  /** Whether module is enabled */
+  enabled: boolean;
 }
 
 // Frames Input Module

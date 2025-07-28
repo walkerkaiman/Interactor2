@@ -2,16 +2,28 @@
   "name": "Time Input",
   "type": "input",
   "version": "1.0.0",
-  "description": "Triggers events at a specific time of day",
+  "description": "Clock mode triggers at specific time, Metronome mode pulses at intervals",
   "author": "Interactor Team",
   "configSchema": {
     "type": "object",
     "properties": {
+      "mode": {
+        "type": "string",
+        "description": "Operating mode",
+        "enum": ["clock", "metronome"],
+        "default": "clock"
+      },
       "targetTime": {
         "type": "string",
-        "description": "Target time in 12-hour format (e.g., 2:30 PM)",
-        "pattern": "^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$",
-        "uiType": "time12Hour"
+        "description": "Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only",
+        "pattern": "^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$"
+      },
+      "millisecondDelay": {
+        "type": "number",
+        "description": "Delay between pulses in milliseconds - Metronome mode only",
+        "minimum": 100,
+        "maximum": 60000,
+        "default": 1000
       },
       "enabled": {
         "type": "boolean",
@@ -19,13 +31,18 @@
         "default": true
       }
     },
-    "required": ["targetTime"]
+    "required": ["mode"]
   },
   "events": [
     {
       "name": "timeTrigger",
       "type": "output",
-      "description": "Emitted when target time is reached"
+      "description": "Emitted when target time is reached (Clock mode) or on pulse (Metronome mode)"
+    },
+    {
+      "name": "stateUpdate",
+      "type": "output",
+      "description": "Emitted when module state changes"
     }
   ]
 } 

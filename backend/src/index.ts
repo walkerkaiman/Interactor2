@@ -297,6 +297,42 @@ export class InteractorServer {
       }
     });
 
+    // Update module instance configuration (specific endpoint)
+    this.app.put('/api/modules/instances/:id/config', async (req, res) => {
+      try {
+        const moduleInstances = this.stateManager.getModuleInstances();
+        const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
+        
+        if (!moduleInstance) {
+          return res.status(404).json({ success: false, error: 'Module instance not found' });
+        }
+        
+        // Update module configuration
+        if (req.body.config) {
+          moduleInstance.config = { ...moduleInstance.config, ...req.body.config };
+          
+                          // Note: Module instances are managed by StateManager, not ModuleLoader
+                // The configuration update is handled through the state update mechanism
+        }
+        
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Update state
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast state update
+        this.broadcastStateUpdate();
+        
+        res.json({ 
+          success: true, 
+          message: 'Module configuration updated successfully',
+          data: moduleInstance
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+
     this.app.get('/api/modules/:name', (req, res) => {
       const manifest = this.moduleLoader.getManifest(req.params.name as string);
       if (manifest) {
@@ -446,6 +482,24 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
+        const payload = req.body?.payload || {};
+        
+        // Handle time input module specific functionality
+        if (moduleInstance.name === 'Time Input') {
+          if (payload.type === 'manualTrigger') {
+            if ('manualTrigger' in moduleInstance && typeof moduleInstance.manualTrigger === 'function') {
+              await moduleInstance.manualTrigger();
+              return res.json({ success: true, message: 'Time trigger activated' });
+            }
+          } else if (payload.type === 'stopStream') {
+            if ('stopStream' in moduleInstance && typeof moduleInstance.stopStream === 'function') {
+              await moduleInstance.stopStream();
+              return res.json({ success: true, message: 'Time stream stopped' });
+            }
+          }
+        }
+        
+        // Handle general manual trigger
         if ('onManualTrigger' in moduleInstance && typeof moduleInstance.onManualTrigger === 'function') {
           await moduleInstance.onManualTrigger();
           return res.json({ success: true });
@@ -585,6 +639,12 @@ export class InteractorServer {
       
       ws.on('error', (error) => {
         this.logger.error('WebSocket error:', String(error));
+        // Don't let the error break the connection
+      });
+      
+      // Handle ping/pong to keep connection alive
+      ws.on('ping', () => {
+        ws.pong();
       });
     });
   }
@@ -604,6 +664,19 @@ export class InteractorServer {
       ws.send(JSON.stringify(state));
     } catch (error) {
       this.logger.error('Error sending state to client:', String(error));
+      // Send a minimal state if there's an error
+      try {
+        const minimalState = {
+          type: 'state_update',
+          data: {
+            interactions: [],
+            moduleInstances: []
+          }
+        };
+        ws.send(JSON.stringify(minimalState));
+      } catch (sendError) {
+        this.logger.error('Error sending minimal state to client:', String(sendError));
+      }
     }
   }
 

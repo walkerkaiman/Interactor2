@@ -37,6 +37,35 @@
             "x": 879.6646248090394,
             "y": 198.8114012018752
           }
+        },
+        {
+          "id": "node-1753713303763",
+          "moduleName": "Time Input",
+          "config": {
+            "mode": "metronome",
+            "millisecondDelay": 3000
+          },
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1753713303763,
+          "position": {
+            "x": 359.2592869751585,
+            "y": 509.4781853676751
+          }
+        },
+        {
+          "id": "node-1753713348029",
+          "moduleName": "Audio Output",
+          "config": {},
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1753713348029,
+          "position": {
+            "x": 954.8824741024607,
+            "y": 601.8534538813026
+          }
         }
       ],
       "routes": [
@@ -45,6 +74,12 @@
           "source": "5e614c45-4e1a-48a9-84c8-1897e41725f2",
           "target": "cc40b0d0-15be-4f14-8cac-3194a055a324",
           "event": "stream"
+        },
+        {
+          "id": "route-1753714543666",
+          "source": "node-1753713303763",
+          "target": "node-1753713348029",
+          "event": "trigger"
         }
       ]
     }
@@ -60,7 +95,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753676757088
+      "lastUpdate": 1753715393518
     },
     {
       "id": "cc40b0d0-15be-4f14-8cac-3194a055a324",
@@ -80,7 +115,28 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753676757088
+      "lastUpdate": 1753715393518
+    },
+    {
+      "id": "node-1753713303763",
+      "moduleName": "Time Input",
+      "config": {
+        "mode": "metronome",
+        "millisecondDelay": 3000
+      },
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1753715393518
+    },
+    {
+      "id": "node-1753713348029",
+      "moduleName": "Audio Output",
+      "config": {},
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1753715393518
     }
   ],
   "routes": [],

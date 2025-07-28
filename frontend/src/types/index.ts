@@ -12,6 +12,7 @@ export interface FrontendNodeData {
   isSelected?: boolean;
   onSelect?: () => void;
   onDelete?: (nodeId: string) => void;
+  onConfigChange?: (nodeId: string, config: any) => void;
   edges?: any[]; // Array of edges for handle coloring
 }
 

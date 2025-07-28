@@ -1,5 +1,5 @@
-const { FramesInputModule } = require('./dist/modules/input/frames_input/index.js');
-const { StateManager } = require('./dist/core/StateManager.js');
+const { FramesInputModule } = require('../backend/dist/modules/input/frames_input/index.js');
+const { StateManager } = require('../backend/dist/core/StateManager.js');
 const dgram = require('dgram');
 
 // sACN packet sender

@@ -18,12 +18,14 @@ import 'reactflow/dist/style.css';
 import { apiService } from '../api';
 import { ModuleManifest, InteractionConfig } from '@interactor/shared';
 import CustomNode from './CustomNode';
+import TimeInputNode from './TimeInputNode';
 import CustomEdge from './CustomEdge';
 import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
 import styles from './NodeEditor.module.css';
 
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
+  timeInput: TimeInputNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -93,7 +95,22 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     }, 100);
   }, [setNodes, setEdges, interactions, onInteractionsChange]);
 
-    // Handle module drop
+  // Handle config changes from nodes
+  const handleNodeConfigChange = useCallback((nodeId: string, config: any) => {
+    // Update the interaction data with the new config
+    const updatedInteractions = interactions.map(interaction => ({
+      ...interaction,
+      modules: interaction.modules?.map(module => 
+        module.id === nodeId 
+          ? { ...module, config }
+          : module
+      ) || []
+    }));
+    
+    onInteractionsChange(updatedInteractions);
+  }, [interactions, onInteractionsChange]);
+
+  // Handle module drop
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
@@ -154,16 +171,24 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
       const newNodeId = `node-${Date.now()}`;
       
+      // Determine node type based on module
+      const nodeType = moduleName === 'Time Input' ? 'timeInput' : 'custom';
+      
       const newNode = {
         id: newNodeId,
-        type: 'custom',
+        type: nodeType,
         position,
         data: {
           module,
           instance: {
             id: newNodeId,
             moduleName: module.name,
-            config: {},
+            config: moduleName === 'Time Input' ? {
+              mode: 'clock',
+              targetTime: '12:00 PM',
+              millisecondDelay: 1000,
+              enabled: true
+            } : {},
             status: 'stopped',
             messageCount: 0,
             currentFrame: undefined,
@@ -239,9 +264,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           if (manifest) {
             const nodeId = moduleInstance.id;
             
+            // Determine node type based on module name
+            const nodeType = manifest.name === 'Time Input' ? 'timeInput' : 'custom';
+            
             moduleInstancesMap.set(nodeId, {
               id: nodeId,
-              type: 'custom',
+              type: nodeType,
               position: moduleInstance.position || { x: 100, y: 100 },
               data: {
                 module: manifest,
@@ -249,6 +277,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
                 isSelected: selectedNodeId === nodeId,
                 onSelect: () => onNodeSelect(nodeId),
                 onDelete: handleDeleteNode,
+                onConfigChange: handleNodeConfigChange,
                 edges: [], // Will be updated after edges are created
               },
             });

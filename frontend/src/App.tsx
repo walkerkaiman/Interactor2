@@ -72,50 +72,88 @@ function App() {
 
   // WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3001');
-    
-    ws.onopen = () => {
-      // WebSocket connected
-    };
-    
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'state_update') {
-        // Only update registered interactions if we're not in the middle of local changes
-        // This prevents WebSocket updates from interfering with drag and drop operations
-        const newRegisteredInteractions = message.data.interactions || [];
-        const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: any) => i.id));
-        
-        // Only update if the registered interactions have actually changed
-        // and we're not in the middle of local operations
-        setRegisteredInteractions(prev => {
-          // Check if the interactions have actually changed
-          const prevIds = new Set(prev.map(i => i.id));
-          const newIds = new Set(newRegisteredInteractions.map(i => i.id));
-          
-          if (prevIds.size !== newIds.size || 
-              !Array.from(prevIds).every(id => newIds.has(id))) {
-            return newRegisteredInteractions;
+    const connectWebSocket = () => {
+      const ws = new WebSocket('ws://localhost:3001');
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'state_update') {
+            // Update module instances with real-time data
+            const moduleInstances = message.data.moduleInstances || [];
+            if (moduleInstances.length > 0) {
+              setRegisteredInteractions(prev => {
+                return prev.map(interaction => ({
+                  ...interaction,
+                  modules: interaction.modules?.map(module => {
+                    // Find matching module instance update
+                    const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
+                    if (instanceUpdate) {
+                      return {
+                        ...module,
+                        ...instanceUpdate, // Merge in the real-time data
+                      };
+                    }
+                    return module;
+                  }) || []
+                }));
+              });
+            }
+
+            // Only update registered interactions if we're not in the middle of local changes
+            // This prevents WebSocket updates from interfering with drag and drop operations
+            const newRegisteredInteractions = message.data.interactions || [];
+            const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: any) => i.id));
+            
+            // Only update if the registered interactions have actually changed
+            // and we're not in the middle of local operations
+            setRegisteredInteractions(prev => {
+              // Check if the interactions have actually changed
+              const prevIds = new Set(prev.map(i => i.id));
+              const newIds = new Set(newRegisteredInteractions.map(i => i.id));
+              
+              if (prevIds.size !== newIds.size || 
+                  !Array.from(prevIds).every(id => newIds.has(id))) {
+                return newRegisteredInteractions;
+              }
+              
+              // If no change, preserve current state to prevent unnecessary re-renders
+              return prev;
+            });
+            
+            setOriginalRegisteredIds(newOriginalIds);
           }
-          
-          // If no change, preserve current state to prevent unnecessary re-renders
-          return prev;
-        });
-        
-        setOriginalRegisteredIds(newOriginalIds);
-      }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+      
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+          console.log('Attempting to reconnect WebSocket...');
+          connectWebSocket();
+        }, 1000);
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+      
+      return ws;
     };
     
-    ws.onclose = () => {
-      // WebSocket disconnected
-    };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+    const ws = connectWebSocket();
     
     return () => {
-      ws.close();
+      if (ws) {
+        ws.close();
+      }
     };
   }, []);
 

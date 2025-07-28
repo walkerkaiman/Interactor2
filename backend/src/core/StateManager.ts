@@ -91,12 +91,17 @@ export class StateManager {
    */
   private async saveState(): Promise<void> {
     try {
+      // Ensure the directory exists
+      const dataDir = path.dirname(this.stateFile);
+      await fs.ensureDir(dataDir);
+      
       await fs.writeJson(this.stateFile, this.state, { spaces: 2 });
       this.lastSaved = Date.now();
       this.logger.debug('State saved to file', 'StateManager');
     } catch (error) {
       this.logger.error('Error saving state to file', 'StateManager', { error: String(error) });
-      throw error;
+      // Don't throw the error to prevent breaking WebSocket connections
+      // Just log it and continue
     }
   }
 
