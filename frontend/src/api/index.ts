@@ -9,6 +9,19 @@ import {
 const API_BASE = '/api';
 
 class ApiService {
+  private static instance: ApiService;
+
+  private constructor() {
+    // Private constructor to enforce singleton pattern
+  }
+
+  public static getInstance(): ApiService {
+    if (!ApiService.instance) {
+      ApiService.instance = new ApiService();
+    }
+    return ApiService.instance;
+  }
+
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       headers: {
@@ -115,4 +128,4 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService(); 
+export const apiService = ApiService.getInstance(); 

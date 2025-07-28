@@ -1,10 +1,11 @@
 import React from 'react';
+import { ModuleInstance } from '@interactor/shared';
 import { apiService } from '../api';
-import { InteractionConfig, ModuleInstance } from '@interactor/shared';
+import { triggerEventTracker } from '../utils/triggerEventTracker';
 import styles from './TriggerPanel.module.css';
 
 interface TriggerPanelProps {
-  interactions: InteractionConfig[];
+  interactions: any[];
   onClose: () => void;
 }
 
@@ -15,7 +16,7 @@ const TriggerPanel: React.FC<TriggerPanelProps> = ({ interactions, onClose }) =>
   const outputModules = React.useMemo(() => {
     const modules: ModuleInstance[] = [];
     interactions.forEach(interaction => {
-      interaction.modules.forEach(module => {
+      interaction.modules.forEach((module: ModuleInstance) => {
         // For now, we'll assume all modules can be triggered
         // In a real implementation, you'd check the module type
         modules.push(module);
@@ -28,6 +29,9 @@ const TriggerPanel: React.FC<TriggerPanelProps> = ({ interactions, onClose }) =>
     setTriggering(moduleId);
     try {
       await apiService.triggerModule(moduleId);
+      
+      // Record the trigger event to trigger pulse animation
+      triggerEventTracker.recordTriggerEvent(moduleId, 'manual');
     } catch (error) {
       console.error('Failed to trigger module:', error);
     } finally {

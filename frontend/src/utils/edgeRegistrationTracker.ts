@@ -12,8 +12,20 @@ export interface EdgeRegistrationTracker {
 }
 
 class EdgeRegistrationTrackerImpl implements EdgeRegistrationTracker {
+  private static instance: EdgeRegistrationTrackerImpl;
   public registeredEdges: Set<string> = new Set();
   public unregisteredEdges: Set<string> = new Set();
+
+  private constructor() {
+    // Private constructor to enforce singleton pattern
+  }
+
+  public static getInstance(): EdgeRegistrationTrackerImpl {
+    if (!EdgeRegistrationTrackerImpl.instance) {
+      EdgeRegistrationTrackerImpl.instance = new EdgeRegistrationTrackerImpl();
+    }
+    return EdgeRegistrationTrackerImpl.instance;
+  }
 
   isEdgeRegistered(edgeId: string): boolean {
     const isRegistered = this.registeredEdges.has(edgeId);
@@ -80,4 +92,4 @@ class EdgeRegistrationTrackerImpl implements EdgeRegistrationTracker {
   }
 }
 
-export const edgeRegistrationTracker = new EdgeRegistrationTrackerImpl(); 
+export const edgeRegistrationTracker = EdgeRegistrationTrackerImpl.getInstance(); 

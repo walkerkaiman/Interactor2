@@ -2,11 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { apiService } from './api';
-import { AppState, UIState, AppPage, WikisPageState, PerformancePageState, ConsolePageState, ModulesPageState } from './types';
-import { InteractionConfig } from '@interactor/shared';
-import { edgeRegistrationTracker } from './utils/edgeRegistrationTracker';
-
 import Sidebar from './components/Sidebar';
 import NodeEditor from './components/NodeEditor';
 import Toolbar from './components/Toolbar';
@@ -16,6 +11,19 @@ import Notification from './components/Notification';
 import WikisPage from './components/WikisPage';
 import PerformancePage from './components/PerformancePage';
 import ConsolePage from './components/ConsolePage';
+import { apiService } from './api';
+import { triggerEventTracker } from './utils/triggerEventTracker';
+import { 
+  AppState, 
+  UIState, 
+  AppPage, 
+  WikisPageState, 
+  PerformancePageState, 
+  ConsolePageState, 
+  ModulesPageState 
+} from './types';
+import { InteractionConfig } from '@interactor/shared';
+import { edgeRegistrationTracker } from './utils/edgeRegistrationTracker';
 
 import styles from './App.module.css';
 
@@ -107,14 +115,14 @@ function App() {
             // Only update registered interactions if we're not in the middle of local changes
             // This prevents WebSocket updates from interfering with drag and drop operations
             const newRegisteredInteractions = message.data.interactions || [];
-            const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: any) => i.id));
+            const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
             
             // Only update if the registered interactions have actually changed
             // and we're not in the middle of local operations
-            setRegisteredInteractions(prev => {
+            setRegisteredInteractions((prev: InteractionConfig[]) => {
               // Check if the interactions have actually changed
-              const prevIds = new Set(prev.map(i => i.id));
-              const newIds = new Set(newRegisteredInteractions.map(i => i.id));
+              const prevIds = new Set(prev.map((i: InteractionConfig) => i.id));
+              const newIds = new Set(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
               
               if (prevIds.size !== newIds.size || 
                   !Array.from(prevIds).every(id => newIds.has(id))) {
@@ -126,6 +134,13 @@ function App() {
             });
             
             setOriginalRegisteredIds(newOriginalIds);
+          } else if (message.type === 'trigger_event') {
+            // Handle trigger events from backend
+            const { moduleId, type } = message.data;
+            console.log(`Received trigger event for module ${moduleId} of type ${type}`);
+            
+            // Record the trigger event to trigger pulse animation
+            triggerEventTracker.recordTriggerEvent(moduleId, type);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
