@@ -24,26 +24,19 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Register an output handler
+   * Add output handler
    */
-  public onOutput(handler: EventHandler): void {
+  public addOutputHandler(handler: EventHandler): void {
     this.outputHandlers.push(handler);
   }
 
   /**
-   * Send data to the output with typed parameter
+   * Remove output handler
    */
-  public async send<T = unknown>(data: T): Promise<void> {
-    try {
-      this.logger?.debug(`Sending data from ${this.name}:`, data);
-      await this.onSend(data);
-      this.lastSentValue = data;
-      this.incrementMessageCount();
-      
-      this.logger?.debug(`Data sent successfully from ${this.name}`);
-    } catch (error) {
-      this.logger?.error(`Failed to send data from ${this.name}:`, error);
-      throw error;
+  public removeOutputHandler(handler: EventHandler): void {
+    const index = this.outputHandlers.indexOf(handler);
+    if (index > -1) {
+      this.outputHandlers.splice(index, 1);
     }
   }
 
@@ -55,6 +48,13 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
       this.logger?.debug(`Handling trigger event in ${this.name}:`, event);
       await this.handleTriggerEvent(event);
       this.incrementMessageCount();
+      
+      // Emit trigger event to frontend for pulse animation
+      this.emit('triggerEvent', {
+        moduleId: this.id,
+        type: 'auto',
+        timestamp: Date.now()
+      });
     } catch (error) {
       this.logger?.error(`Error handling trigger event in ${this.name}:`, error);
       throw error;
@@ -76,13 +76,20 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Manual trigger - for testing and manual control
+   * Handle manual trigger
    */
-  public async manualTrigger(): Promise<void> {
+  public async onManualTrigger(): Promise<void> {
     try {
-      this.logger?.info(`Manual trigger activated for ${this.name}`);
-      await this.onManualTrigger();
+      this.logger?.debug(`Manual trigger for ${this.name}`);
+      await this.handleManualTrigger();
       this.incrementMessageCount();
+      
+      // Emit trigger event to frontend for pulse animation
+      this.emit('triggerEvent', {
+        moduleId: this.id,
+        type: 'manual',
+        timestamp: Date.now()
+      });
     } catch (error) {
       this.logger?.error(`Error in manual trigger for ${this.name}:`, error);
       throw error;
@@ -90,31 +97,17 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Get the last sent value
+   * Get last sent value
    */
   public getLastSentValue(): unknown {
     return this.lastSentValue;
   }
 
   /**
-   * Check if the output is connected/ready
+   * Check if module is connected
    */
-  public isOutputConnected(): boolean {
+  public isModuleConnected(): boolean {
     return this.isConnected;
-  }
-
-  /**
-   * Set connection status
-   */
-  protected setConnectionStatus(connected: boolean): void {
-    if (this.isConnected !== connected) {
-      this.isConnected = connected;
-      this.emit('connectionChanged', { 
-        moduleId: this.id, 
-        moduleName: this.name, 
-        connected 
-      });
-    }
   }
 
   /**
@@ -148,33 +141,18 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   }
 
   /**
-   * Emit error event with typed error parameter
+   * Set connection status
    */
-  protected emitError(error: Error, context?: string): void {
-    this.logger?.error(`Error in ${this.name}${context ? ` (${context})` : ''}:`, error);
-    
-    this.emit('error', {
-      moduleId: this.id,
-      moduleName: this.name,
-      error: error.message,
-      context,
-      timestamp: Date.now()
-    });
+  protected setConnected(connected: boolean): void {
+    this.isConnected = connected;
+    this.logger?.debug(`Connection status for ${this.name}: ${connected}`);
   }
 
   /**
-   * Emit status update with typed details
+   * Set last sent value
    */
-  protected emitStatus<T = unknown>(status: string, details?: T): void {
-    this.logger?.debug(`Status update for ${this.name}: ${status}`, details);
-    
-    this.emit('status', {
-      moduleId: this.id,
-      moduleName: this.name,
-      status,
-      details,
-      timestamp: Date.now()
-    });
+  protected setLastSentValue(value: unknown): void {
+    this.lastSentValue = value;
   }
 
   // Abstract methods that must be implemented by subclasses
@@ -197,7 +175,7 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   /**
    * Handle manual trigger
    */
-  protected abstract onManualTrigger(): Promise<void>;
+  protected abstract handleManualTrigger(): Promise<void>;
 
   /**
    * Override onDestroy to clean up output handlers

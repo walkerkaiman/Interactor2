@@ -1,6 +1,7 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
 import { StateManager } from '../../../core/StateManager';
+import WebSocket from 'ws';
 
 export class TimeInputModule extends InputModuleBase {
   private intervalId?: NodeJS.Timeout;
@@ -12,13 +13,23 @@ export class TimeInputModule extends InputModuleBase {
   private timeMode: 'clock' | 'metronome' = 'clock';
   private millisecondDelay: number = 1000;
   private stateManager: StateManager;
+  
+  // WebSocket properties
+  private ws: WebSocket | null = null;
+  private wsUrl?: string;
+  private wsReconnectInterval: NodeJS.Timeout | null = null;
+  private wsReconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 5000; // 5 seconds
+  private apiEnabled = false;
+  private apiEndpoint?: string;
 
   constructor(config: TimeInputConfig) {
     super('time_input', config, {
       name: 'Time Input',
       type: 'input',
       version: '1.0.0',
-      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals',
+      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals. Supports WebSocket API for external time sources.',
       author: 'Interactor Team',
       configSchema: {
         type: 'object',
@@ -45,6 +56,16 @@ export class TimeInputModule extends InputModuleBase {
             type: 'boolean',
             description: 'Enable/disable the time trigger',
             default: true
+          },
+          apiEnabled: {
+            type: 'boolean',
+            description: 'Enable WebSocket API for external time sources',
+            default: false
+          },
+          apiEndpoint: {
+            type: 'string',
+            description: 'WebSocket endpoint for external time API (e.g., wss://api.example.com/time)',
+            pattern: '^wss?://.+'
           }
         },
         required: ['mode']
@@ -59,6 +80,16 @@ export class TimeInputModule extends InputModuleBase {
           name: 'stateUpdate',
           type: 'output',
           description: 'Emitted when module state changes'
+        },
+        {
+          name: 'apiConnected',
+          type: 'output',
+          description: 'Emitted when WebSocket API connection is established'
+        },
+        {
+          name: 'apiDisconnected',
+          type: 'output',
+          description: 'Emitted when WebSocket API connection is lost'
         }
       ]
     });
@@ -68,6 +99,10 @@ export class TimeInputModule extends InputModuleBase {
     this.timeMode = config.mode || 'clock';
     this.millisecondDelay = config.millisecondDelay || 1000;
     this.stateManager = StateManager.getInstance();
+    
+    // WebSocket configuration
+    this.apiEnabled = config.apiEnabled || false;
+    this.apiEndpoint = config.apiEndpoint;
   }
 
   protected async onInit(): Promise<void> {
@@ -82,6 +117,16 @@ export class TimeInputModule extends InputModuleBase {
         throw new Error(`Invalid millisecond delay: ${this.millisecondDelay}. Must be between 100 and 60000.`);
       }
     }
+
+    // Validate WebSocket configuration if enabled
+    if (this.apiEnabled) {
+      if (!this.apiEndpoint) {
+        throw new Error('API endpoint is required when apiEnabled is true');
+      }
+      if (!this.apiEndpoint.match(/^wss?:\/\/.+/)) {
+        throw new Error('API endpoint must be a valid WebSocket URL (ws:// or wss://)');
+      }
+    }
   }
 
   protected async onStart(): Promise<void> {
@@ -92,6 +137,12 @@ export class TimeInputModule extends InputModuleBase {
         this.startMetronome();
       }
     }
+    
+    // Start WebSocket connection if API is enabled
+    if (this.apiEnabled && this.apiEndpoint) {
+      this.connectWebSocket();
+    }
+    
     // Start updating current time and countdown immediately
     this.updateTimeDisplay();
   }
@@ -99,11 +150,13 @@ export class TimeInputModule extends InputModuleBase {
   protected async onStop(): Promise<void> {
     this.stopTimeCheck();
     this.stopMetronome();
+    this.disconnectWebSocket();
   }
 
   protected async onDestroy(): Promise<void> {
     this.stopTimeCheck();
     this.stopMetronome();
+    this.disconnectWebSocket();
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
@@ -155,12 +208,30 @@ export class TimeInputModule extends InputModuleBase {
         this.stopMetronome();
       }
     }
+
+    // Handle WebSocket configuration changes
+    if (newTimeConfig.apiEnabled !== this.apiEnabled || newTimeConfig.apiEndpoint !== this.apiEndpoint) {
+      this.apiEnabled = newTimeConfig.apiEnabled || false;
+      this.apiEndpoint = newTimeConfig.apiEndpoint;
+      
+      if (this.apiEnabled && this.apiEndpoint) {
+        this.disconnectWebSocket();
+        this.connectWebSocket();
+      } else {
+        this.disconnectWebSocket();
+      }
+    }
   }
 
   protected handleInput(data: any): void {
     // Handle manual trigger
     if (data && data.type === 'manualTrigger') {
       this.manualTrigger();
+    }
+    
+    // Handle WebSocket API data
+    if (data && data.type === 'apiTime' && this.apiEnabled) {
+      this.handleApiTimeData(data.payload);
     }
   }
 
@@ -170,11 +241,17 @@ export class TimeInputModule extends InputModuleBase {
     } else if (this.timeMode === 'metronome') {
       this.startMetronome();
     }
+    
+    // Connect to WebSocket API if enabled
+    if (this.apiEnabled && this.apiEndpoint) {
+      this.connectWebSocket();
+    }
   }
 
   protected async onStopListening(): Promise<void> {
     this.stopTimeCheck();
     this.stopMetronome();
+    this.disconnectWebSocket();
   }
 
   /**
@@ -453,5 +530,139 @@ export class TimeInputModule extends InputModuleBase {
       millisecondDelay: this.millisecondDelay,
       enabled: this.enabled
     });
+  }
+
+  /**
+   * Connect to WebSocket API
+   */
+  private connectWebSocket(): void {
+    if (!this.apiEndpoint || !this.apiEnabled) {
+      return;
+    }
+
+    try {
+      this.logger?.info(`Connecting to WebSocket API: ${this.apiEndpoint}`);
+      
+      this.ws = new WebSocket(this.apiEndpoint);
+      
+      this.ws.onopen = () => {
+        this.logger?.info('WebSocket API connected');
+        this.wsReconnectAttempts = 0;
+        this.emit('apiConnected', {
+          endpoint: this.apiEndpoint,
+          timestamp: Date.now()
+        });
+      };
+      
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data.toString());
+          this.handleApiTimeData(data);
+        } catch (error) {
+          this.logger?.error('Failed to parse WebSocket message:', error);
+        }
+      };
+      
+      this.ws.onclose = (event) => {
+        this.logger?.warn(`WebSocket API disconnected: ${event.code} ${event.reason}`);
+        this.emit('apiDisconnected', {
+          endpoint: this.apiEndpoint,
+          code: event.code,
+          reason: event.reason,
+          timestamp: Date.now()
+        });
+        
+        // Attempt to reconnect
+        this.scheduleReconnect();
+      };
+      
+      this.ws.onerror = (error) => {
+        this.logger?.error('WebSocket API error:', error);
+      };
+      
+    } catch (error) {
+      this.logger?.error('Failed to connect to WebSocket API:', error);
+      this.scheduleReconnect();
+    }
+  }
+
+  /**
+   * Disconnect from WebSocket API
+   */
+  private disconnectWebSocket(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    
+    if (this.wsReconnectInterval) {
+      clearTimeout(this.wsReconnectInterval);
+      this.wsReconnectInterval = null;
+    }
+    
+    this.wsReconnectAttempts = 0;
+  }
+
+  /**
+   * Schedule WebSocket reconnection
+   */
+  private scheduleReconnect(): void {
+    if (this.wsReconnectAttempts >= this.maxReconnectAttempts) {
+      this.logger?.error('Max WebSocket reconnection attempts reached');
+      return;
+    }
+    
+    this.wsReconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1); // Exponential backoff
+    
+    this.logger?.info(`Scheduling WebSocket reconnection attempt ${this.wsReconnectAttempts} in ${delay}ms`);
+    
+    this.wsReconnectInterval = setTimeout(() => {
+      if (this.apiEnabled && this.apiEndpoint) {
+        this.connectWebSocket();
+      }
+    }, delay);
+  }
+
+  /**
+   * Handle time data from WebSocket API
+   */
+  private handleApiTimeData(data: any): void {
+    try {
+      // Extract time information from API data
+      // Expected format: { time: "2:30 PM", timestamp: 1234567890, ... }
+      if (data.time) {
+        // Update target time if provided by API
+        if (this.isValidTimeFormat(data.time)) {
+          this.targetTime = data.time;
+          this.logger?.info(`Updated target time from API: ${this.targetTime}`);
+        }
+      }
+      
+      if (data.currentTime) {
+        // Update current time display
+        this.currentTime = data.currentTime;
+      }
+      
+      if (data.countdown) {
+        // Update countdown display
+        this.countdown = data.countdown;
+      }
+      
+      // Emit state update with API data
+      this.emit('stateUpdate', {
+        mode: this.timeMode,
+        currentTime: this.currentTime,
+        countdown: this.countdown,
+        targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
+        millisecondDelay: this.millisecondDelay,
+        enabled: this.enabled,
+        apiConnected: this.ws?.readyState === 1,
+        apiData: data
+      });
+      
+    } catch (error) {
+      this.logger?.error('Failed to handle API time data:', error);
+    }
   }
 } 

@@ -417,6 +417,9 @@ export class InteractorServer {
           modules: moduleInstances 
         });
         
+        // Set up trigger event listeners for output modules
+        this.setupTriggerEventListeners();
+        
         // Broadcast state update to all connected clients
         this.broadcastStateUpdate();
         
@@ -489,6 +492,10 @@ export class InteractorServer {
           if (payload.type === 'manualTrigger') {
             if ('manualTrigger' in moduleInstance && typeof moduleInstance.manualTrigger === 'function') {
               await moduleInstance.manualTrigger();
+              
+              // Emit trigger event to frontend
+              this.broadcastTriggerEvent(req.params.moduleId as string, 'manual');
+              
               return res.json({ success: true, message: 'Time trigger activated' });
             }
           } else if (payload.type === 'stopStream') {
@@ -502,6 +509,10 @@ export class InteractorServer {
         // Handle general manual trigger
         if ('onManualTrigger' in moduleInstance && typeof moduleInstance.onManualTrigger === 'function') {
           await moduleInstance.onManualTrigger();
+          
+          // Emit trigger event to frontend
+          this.broadcastTriggerEvent(req.params.moduleId as string, 'manual');
+          
           return res.json({ success: true });
         } else {
           return res.status(400).json({ success: false, error: 'Module does not support manual triggering' });
@@ -709,6 +720,56 @@ export class InteractorServer {
   }
 
   /**
+   * Broadcast a trigger event to all connected WebSocket clients
+   */
+  private broadcastTriggerEvent(moduleId: string, type: 'manual' | 'auto'): void {
+    if (this.wss.clients.size === 0) return;
+
+    try {
+      const event = {
+        type: 'trigger_event',
+        data: {
+          moduleId,
+          type
+        }
+      };
+      const message = JSON.stringify(event);
+
+      this.wss.clients.forEach((client) => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(message);
+        }
+      });
+      this.logger.debug(`Broadcasted trigger event for module ${moduleId} of type ${type}`);
+    } catch (error) {
+      this.logger.error('Error broadcasting trigger event:', String(error));
+    }
+  }
+
+  /**
+   * Setup trigger event listeners for output modules
+   */
+  private setupTriggerEventListeners(): void {
+    // Get all module instances and set up trigger event listeners for output modules
+    const moduleInstances = this.stateManager.getModuleInstances();
+    
+    moduleInstances.forEach(moduleInstance => {
+      const manifest = this.moduleLoader.getManifest(moduleInstance.moduleName);
+      if (manifest?.type === 'output') {
+        // Get the actual module instance from the module loader
+        const actualModule = this.moduleLoader.getInstance(moduleInstance.id);
+        if (actualModule) {
+          // Set up trigger event listener for this output module
+          actualModule.on('triggerEvent', (event: any) => {
+            this.logger.debug(`Received trigger event from module: ${event.moduleId}`, event);
+            this.broadcastTriggerEvent(event.moduleId, event.type);
+          });
+        }
+      }
+    });
+  }
+
+  /**
    * Setup listeners for module state updates
    */
   private setupModuleStateListeners(): void {
@@ -735,6 +796,9 @@ export class InteractorServer {
       // Broadcast state update after module instance is updated
       this.broadcastStateUpdate();
     };
+    
+    // Set up trigger event listeners for output modules
+    this.setupTriggerEventListeners();
   }
 
   /**

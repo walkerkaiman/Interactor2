@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { FrontendNodeData } from '../types';
 import { triggerEventTracker } from '../utils/triggerEventTracker';
+import { connectionStateTracker } from '../utils/connectionStateTracker';
 import { useNodeConfig, useInstanceData } from '../hooks/useNodeConfig';
 import styles from './CustomNode.module.css';
 
@@ -22,7 +23,7 @@ export interface ModuleNodeConfig {
   renderHeader?: (moduleName: string, manifest: any) => React.ReactNode;
   renderConfig?: (config: any, updateConfig: (key: string, value: any) => void) => React.ReactNode;
   renderInputHandles?: (manifest: any, edges: any[]) => React.ReactNode;
-  renderOutputHandles?: (manifest: any) => React.ReactNode;
+  renderOutputHandles?: (manifest: any, edges: any[], nodeId: string) => React.ReactNode;
   renderActions?: (instance: any) => React.ReactNode;
   
   // Custom event handlers
@@ -44,6 +45,7 @@ export function useBaseModuleNode(
   const instance = props.data.instance;
   const edges = props.data.edges || [];
   const [isPulsing, setIsPulsing] = useState(false);
+  const [connectionStateVersion, setConnectionStateVersion] = useState(0);
 
   // Pulse animation handling
   useEffect(() => {
@@ -71,6 +73,20 @@ export function useBaseModuleNode(
       triggerEventTracker.off('pulseEnded', handlePulseEnded);
     };
   }, [nodeId, config.enablePulseAnimation, config.pulseAnimationDuration]);
+
+  // Connection state change handling
+  useEffect(() => {
+    const checkConnectionState = () => {
+      setConnectionStateVersion(prev => prev + 1);
+    };
+
+    // Check connection state periodically to trigger re-renders
+    const interval = setInterval(checkConnectionState, 100);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [nodeId]);
 
   // Shared event handlers
   const handleDelete = useCallback((e: React.MouseEvent) => {
@@ -100,23 +116,23 @@ export function useBaseModuleNode(
   const getInputHandleClass = useCallback(() => {
     if (manifest.type !== 'output') return '';
     
-    // Find edges that connect to this node's input handle
-    const connectedEdges = edges.filter((edge: any) => 
-      edge.target === nodeId && edge.targetHandle === 'input'
+    // Check if this node has any input connections using the connection state tracker
+    const connections = connectionStateTracker.getConnectionsForNode(nodeId);
+    const inputConnection = connections.find(conn => 
+      conn.targetNodeId === nodeId && conn.targetHandleId === 'input'
     );
     
-    if (connectedEdges.length === 0) return '';
+    if (!inputConnection) return '';
     
-    // Get the source handle type from the first connected edge
-    const sourceHandle = connectedEdges[0].sourceHandle;
-    if (sourceHandle === 'trigger') {
+    // Return the appropriate CSS class based on connection type
+    if (inputConnection.connectionType === 'trigger') {
       return isPulsing ? styles.triggerConnectedPulse : styles.triggerConnected;
-    } else if (sourceHandle === 'stream') {
+    } else if (inputConnection.connectionType === 'stream') {
       return styles.streamConnected;
     }
     
     return '';
-  }, [manifest.type, edges, nodeId, isPulsing]);
+  }, [manifest.type, nodeId, isPulsing, connectionStateVersion]);
 
   // Shared layout components
   const renderDeleteButton = useCallback((): React.ReactNode => {
@@ -169,7 +185,9 @@ export function useBaseModuleNode(
               id="input"
               className={`${styles.handle} ${getInputHandleClass()}`}
             />
-            <span className={styles.handleLabel}>Input</span>
+            <span className={styles.handleLabel}>
+              {getInputHandleLabel()}
+            </span>
           </div>
         ) : (
           // For input modules, show all input events
@@ -190,9 +208,62 @@ export function useBaseModuleNode(
     );
   }, [config.renderInputHandles, manifest, edges, getInputHandleClass]);
 
+  // Helper function to get input handle label based on connection type
+  const getInputHandleLabel = useCallback((): string => {
+    // Only apply dynamic labels to output modules
+    if (manifest.type !== 'output') return 'Input';
+    
+    // Check if this node has any input connections using the connection state tracker
+    const connections = connectionStateTracker.getConnectionsForNode(nodeId);
+    const inputConnection = connections.find(conn => 
+      conn.targetNodeId === nodeId && conn.targetHandleId === 'input'
+    );
+    
+    if (!inputConnection) {
+      // No connections, show default label
+      return 'Input';
+    }
+    
+    // Return the connection type with proper capitalization
+    return inputConnection.connectionType.charAt(0).toUpperCase() + inputConnection.connectionType.slice(1);
+  }, [manifest.type, nodeId, connectionStateVersion]);
+
+  // Helper function to get handle label based on connection type
+  const getHandleLabel = useCallback((handleId: string): string => {
+    // Check if this handle has any connections using the connection state tracker
+    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+    
+    if (!connectionType) {
+      // No connections, show default label
+      return handleId === 'trigger' ? 'Trigger' : 'Stream';
+    }
+    
+    // Return the connection type with proper capitalization
+    return connectionType.charAt(0).toUpperCase() + connectionType.slice(1);
+  }, [nodeId, connectionStateVersion]);
+
+  // Helper function to get output handle class based on connection type
+  const getOutputHandleClass = useCallback((handleId: string): string => {
+    if (manifest.type !== 'input') return '';
+    
+    // Check if this handle has any connections using the connection state tracker
+    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+    
+    if (!connectionType) return '';
+    
+    // Return the appropriate CSS class based on connection type
+    if (connectionType === 'trigger') {
+      return isPulsing ? styles.triggerConnectedPulse : styles.triggerConnected;
+    } else if (connectionType === 'stream') {
+      return styles.streamConnected;
+    }
+    
+    return '';
+  }, [manifest.type, nodeId, isPulsing, connectionStateVersion]);
+
   const renderOutputHandles = useCallback((): React.ReactNode => {
     if (config.renderOutputHandles) {
-      return config.renderOutputHandles(manifest);
+      return config.renderOutputHandles(manifest, edges, nodeId);
     }
 
     return (
@@ -201,21 +272,25 @@ export function useBaseModuleNode(
           // For input modules, show Trigger and Stream handles
           <>
             <div className={styles.handleContainer}>
-              <span className={styles.handleLabel}>Trigger</span>
+              <span className={styles.handleLabel}>
+                {getHandleLabel('trigger')}
+              </span>
               <Handle
                 type="source"
                 position={Position.Right}
                 id="trigger"
-                className={styles.handle}
+                className={`${styles.handle} ${getOutputHandleClass('trigger')}`}
               />
             </div>
             <div className={styles.handleContainer}>
-              <span className={styles.handleLabel}>Stream</span>
+              <span className={styles.handleLabel}>
+                {getHandleLabel('stream')}
+              </span>
               <Handle
                 type="source"
                 position={Position.Right}
                 id="stream"
-                className={styles.handle}
+                className={`${styles.handle} ${getOutputHandleClass('stream')}`}
               />
             </div>
           </>
@@ -225,7 +300,7 @@ export function useBaseModuleNode(
         )}
       </div>
     );
-  }, [config.renderOutputHandles, manifest]);
+  }, [config.renderOutputHandles, manifest, edges, getHandleLabel, getOutputHandleClass]);
 
   const renderHandles = useCallback((): React.ReactNode => {
     return (

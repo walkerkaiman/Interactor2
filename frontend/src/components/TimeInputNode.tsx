@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { apiService } from '../api';
 import { createModuleNode } from './BaseModuleNode';
+import { connectionStateTracker } from '../utils/connectionStateTracker';
 import styles from './CustomNode.module.css';
 
 const TimeInputNodeConfig = {
@@ -26,6 +27,9 @@ const TimeInputNodeConfig = {
     const currentTime = config.currentTime || '';
     const countdown = config.countdown || '';
 
+
+
+
     const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const newMode = e.target.value as 'clock' | 'metronome';
       updateConfig('mode', newMode);
@@ -40,6 +44,8 @@ const TimeInputNodeConfig = {
       const newDelay = parseInt(e.target.value) || 1000;
       updateConfig('millisecondDelay', newDelay);
     };
+
+
 
     return (
       <>
@@ -74,6 +80,8 @@ const TimeInputNodeConfig = {
             </div>
           </div>
         </div>
+
+
 
         {/* Clock Mode Settings */}
         {mode === 'clock' && (
@@ -121,40 +129,48 @@ const TimeInputNodeConfig = {
       </>
     );
   },
-  renderActions: (instance: any) => {
-    const handleManualTrigger = async () => {
-      try {
-        await apiService.triggerModule(instance.id, { type: 'manualTrigger' });
-      } catch (error) {
-        console.error('Failed to trigger module:', error);
+
+  renderOutputHandles: (manifest: any, edges: any[], nodeId: string) => {
+    // Helper function to get handle label based on connection type
+    const getHandleLabel = (handleId: string): string => {
+      // Check if this handle has any connections using the connection state tracker
+      const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+      
+      if (!connectionType) {
+        // No connections, show default label
+        return 'Trigger';
       }
+      
+      // Return the connection type with proper capitalization
+      return connectionType.charAt(0).toUpperCase() + connectionType.slice(1);
+    };
+
+    // Helper function to get handle class based on connection type
+    const getHandleClass = (handleId: string): string => {
+      // Check if this handle has any connections using the connection state tracker
+      const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+      
+      if (!connectionType) return '';
+      
+      // Return the appropriate CSS class based on connection type
+      if (connectionType === 'trigger') {
+        return styles.triggerConnected;
+      } else if (connectionType === 'stream') {
+        return styles.streamConnected;
+      }
+      
+      return '';
     };
 
     return (
-      <div className={styles.config}>
-        <div className={styles.configTitle}>Controls:</div>
-        <div className={styles.configItems}>
-          <button
-            onClick={handleManualTrigger}
-            className={styles.triggerButton}
-            title="Manually trigger the timer"
-          >
-            Trigger Now
-          </button>
-        </div>
-      </div>
-    );
-  },
-  renderOutputHandles: () => {
-    return (
       <div className={styles.outputHandles}>
         <div className={styles.handleContainer}>
-          <span className={styles.handleLabel}>Trigger</span>
+          <span className={styles.handleLabel}>{getHandleLabel('trigger')}</span>
           <Handle
             type="source"
             position={Position.Right}
             id="trigger"
-            className={styles.handle}
+            className={`${styles.handle} ${getHandleClass('trigger')}`}
           />
         </div>
       </div>

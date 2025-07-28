@@ -257,6 +257,10 @@ export interface TimeInputConfig extends ModuleConfig {
   millisecondDelay?: number;
   /** Enable/disable the time trigger */
   enabled?: boolean;
+  /** Enable WebSocket API for external time sources */
+  apiEnabled?: boolean;
+  /** WebSocket endpoint for external time API (e.g., wss://api.example.com/time) */
+  apiEndpoint?: string;
 }
 
 /**

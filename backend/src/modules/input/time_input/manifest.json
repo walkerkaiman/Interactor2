@@ -2,7 +2,7 @@
   "name": "Time Input",
   "type": "input",
   "version": "1.0.0",
-  "description": "Clock mode triggers at specific time, Metronome mode pulses at intervals",
+  "description": "Clock mode triggers at specific time, Metronome mode pulses at intervals. Supports WebSocket API for external time sources.",
   "author": "Interactor Team",
   "configSchema": {
     "type": "object",
@@ -29,6 +29,16 @@
         "type": "boolean",
         "description": "Enable/disable the time trigger",
         "default": true
+      },
+      "apiEnabled": {
+        "type": "boolean",
+        "description": "Enable WebSocket API for external time sources",
+        "default": false
+      },
+      "apiEndpoint": {
+        "type": "string",
+        "description": "WebSocket endpoint for external time API (e.g., wss://api.example.com/time)",
+        "pattern": "^wss?://.+"
       }
     },
     "required": ["mode"]
@@ -43,6 +53,16 @@
       "name": "stateUpdate",
       "type": "output",
       "description": "Emitted when module state changes"
+    },
+    {
+      "name": "apiConnected",
+      "type": "output",
+      "description": "Emitted when WebSocket API connection is established"
+    },
+    {
+      "name": "apiDisconnected",
+      "type": "output",
+      "description": "Emitted when WebSocket API connection is lost"
     }
   ]
 } 

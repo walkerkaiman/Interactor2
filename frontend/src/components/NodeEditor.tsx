@@ -21,6 +21,7 @@ import CustomNode from './CustomNode';
 import TimeInputNode from './TimeInputNode';
 import CustomEdge from './CustomEdge';
 import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
+import { connectionStateTracker } from '../utils/connectionStateTracker';
 import styles from './NodeEditor.module.css';
 
 const nodeTypes: NodeTypes = {
@@ -83,6 +84,13 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       eds.forEach(edge => {
         if (edge.source === nodeId || edge.target === nodeId) {
           edgeRegistrationTracker.unregisterEdge(edge.id);
+          // Remove from connection state tracker
+          connectionStateTracker.removeConnection(
+            edge.source,
+            edge.sourceHandle!,
+            edge.target,
+            edge.targetHandle!
+          );
         }
       });
       
@@ -187,7 +195,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
               mode: 'clock',
               targetTime: '12:00 PM',
               millisecondDelay: 1000,
-              enabled: true
+              enabled: true,
+              apiEnabled: false,
+              apiEndpoint: ''
             } : {},
             status: 'stopped',
             messageCount: 0,
@@ -316,6 +326,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             },
           });
           
+          // Track connection state for handle labels
+          connectionStateTracker.addConnection(
+            sourceNode.id,
+            route.event,
+            targetNode.id,
+            'input', // Output modules have 'input' as their target handle
+            route.event
+          );
+          
           // Don't automatically register edges - let the tracker maintain individual states
           // Only register if not already tracked
           if (!edgeRegistrationTracker.isEdgeRegistered(edgeId) && !edgeRegistrationTracker.unregisteredEdges.has(edgeId)) {
@@ -436,6 +455,13 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         eds.forEach(edge => {
           if (edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) {
             edgeRegistrationTracker.unregisterEdge(edge.id);
+            // Remove from connection state tracker
+            connectionStateTracker.removeConnection(
+              edge.source,
+              edge.sourceHandle!,
+              edge.target,
+              edge.targetHandle!
+            );
           }
         });
         
@@ -490,6 +516,18 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       
       // Register the new edge as unregistered
       edgeRegistrationTracker.unregisterEdge(edgeId);
+      
+      // Track connection state for handle labels
+      connectionStateTracker.addConnection(
+        params.source!,
+        params.sourceHandle!,
+        params.target!,
+        params.targetHandle!,
+        eventType
+      );
+      
+      // Debug log
+      console.log(`Connection made: ${params.source}:${params.sourceHandle} -> ${params.target}:${params.targetHandle} (${eventType})`);
   
       // Update local interactions state
       const updatedInteractions = [...interactions];
@@ -523,6 +561,13 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           if (shouldRemove) {
             // Remove from tracker
             edgeRegistrationTracker.unregisterEdge(edge.id);
+            // Remove from connection state tracker
+            connectionStateTracker.removeConnection(
+              edge.source,
+              edge.sourceHandle!,
+              edge.target,
+              edge.targetHandle!
+            );
           }
           return !shouldRemove;
         });

@@ -24,6 +24,7 @@ import {
 } from './types';
 import { InteractionConfig } from '@interactor/shared';
 import { edgeRegistrationTracker } from './utils/edgeRegistrationTracker';
+import { webSocketService } from './services/WebSocketService';
 
 import styles from './App.module.css';
 
@@ -177,6 +178,13 @@ function App() {
   // Load initial data
   useEffect(() => {
     loadInitialData();
+  }, []);
+
+  // Cleanup WebSocket service on unmount
+  useEffect(() => {
+    return () => {
+      webSocketService.shutdown();
+    };
   }, []);
 
   const loadInitialData = async () => {
