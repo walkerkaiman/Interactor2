@@ -21,7 +21,7 @@ export interface ModuleNodeConfig {
   
   // Custom render functions
   renderHeader?: (moduleName: string, manifest: any) => React.ReactNode;
-  renderConfig?: (config: any, updateConfig: (key: string, value: any) => void) => React.ReactNode;
+  renderConfig?: (config: any, updateConfig: (key: string, value: any) => void, instance?: any) => React.ReactNode;
   renderInputHandles?: (manifest: any, edges: any[]) => React.ReactNode;
   renderOutputHandles?: (manifest: any, edges: any[], nodeId: string) => React.ReactNode;
   renderActions?: (instance: any) => React.ReactNode;
@@ -76,15 +76,16 @@ export function useBaseModuleNode(
 
   // Connection state change handling
   useEffect(() => {
-    const checkConnectionState = () => {
+    const handleConnectionChange = () => {
+  
       setConnectionStateVersion(prev => prev + 1);
     };
 
-    // Check connection state periodically to trigger re-renders
-    const interval = setInterval(checkConnectionState, 100);
+    // Subscribe to connection state changes
+    connectionStateTracker.on('connectionChanged', handleConnectionChange);
 
     return () => {
-      clearInterval(interval);
+      connectionStateTracker.off('connectionChanged', handleConnectionChange);
     };
   }, [nodeId]);
 
@@ -128,6 +129,59 @@ export function useBaseModuleNode(
     if (inputConnection.connectionType === 'trigger') {
       return isPulsing ? styles.triggerConnectedPulse : styles.triggerConnected;
     } else if (inputConnection.connectionType === 'stream') {
+      return styles.streamConnected;
+    }
+    
+    return '';
+  }, [manifest.type, nodeId, isPulsing, connectionStateVersion]);
+
+  // Helper function to get input handle label based on connection type
+  const getInputHandleLabel = useCallback((): string => {
+    // Only apply dynamic labels to output modules
+    if (manifest.type !== 'output') return 'Input';
+    
+    // Check if this node has any input connections using the connection state tracker
+    const connections = connectionStateTracker.getConnectionsForNode(nodeId);
+    const inputConnection = connections.find(conn => 
+      conn.targetNodeId === nodeId && conn.targetHandleId === 'input'
+    );
+    
+    if (!inputConnection) {
+      // No connections, show default label
+      return 'Input';
+    }
+    
+    // Return the connection type with proper capitalization
+    return inputConnection.connectionType.charAt(0).toUpperCase() + inputConnection.connectionType.slice(1);
+  }, [manifest.type, nodeId, connectionStateVersion]);
+
+  // Helper function to get handle label based on connection type
+  const getHandleLabel = useCallback((handleId: string): string => {
+    // Check if this handle has any connections using the connection state tracker
+    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+    
+    if (!connectionType) {
+      // No connections, show default label
+      return handleId === 'trigger' ? 'Trigger' : 'Stream';
+    }
+    
+    // Return the connection type with proper capitalization
+    return connectionType.charAt(0).toUpperCase() + connectionType.slice(1);
+  }, [nodeId, connectionStateVersion]);
+
+  // Helper function to get output handle class based on connection type
+  const getOutputHandleClass = useCallback((handleId: string): string => {
+    if (manifest.type !== 'input') return '';
+    
+    // Check if this handle has any connections using the connection state tracker
+    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
+    
+    if (!connectionType) return '';
+    
+    // Return the appropriate CSS class based on connection type
+    if (connectionType === 'trigger') {
+      return isPulsing ? styles.triggerConnectedPulse : styles.triggerConnected;
+    } else if (connectionType === 'stream') {
       return styles.streamConnected;
     }
     
@@ -206,93 +260,46 @@ export function useBaseModuleNode(
         )}
       </div>
     );
-  }, [config.renderInputHandles, manifest, edges, getInputHandleClass]);
-
-  // Helper function to get input handle label based on connection type
-  const getInputHandleLabel = useCallback((): string => {
-    // Only apply dynamic labels to output modules
-    if (manifest.type !== 'output') return 'Input';
-    
-    // Check if this node has any input connections using the connection state tracker
-    const connections = connectionStateTracker.getConnectionsForNode(nodeId);
-    const inputConnection = connections.find(conn => 
-      conn.targetNodeId === nodeId && conn.targetHandleId === 'input'
-    );
-    
-    if (!inputConnection) {
-      // No connections, show default label
-      return 'Input';
-    }
-    
-    // Return the connection type with proper capitalization
-    return inputConnection.connectionType.charAt(0).toUpperCase() + inputConnection.connectionType.slice(1);
-  }, [manifest.type, nodeId, connectionStateVersion]);
-
-  // Helper function to get handle label based on connection type
-  const getHandleLabel = useCallback((handleId: string): string => {
-    // Check if this handle has any connections using the connection state tracker
-    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
-    
-    if (!connectionType) {
-      // No connections, show default label
-      return handleId === 'trigger' ? 'Trigger' : 'Stream';
-    }
-    
-    // Return the connection type with proper capitalization
-    return connectionType.charAt(0).toUpperCase() + connectionType.slice(1);
-  }, [nodeId, connectionStateVersion]);
-
-  // Helper function to get output handle class based on connection type
-  const getOutputHandleClass = useCallback((handleId: string): string => {
-    if (manifest.type !== 'input') return '';
-    
-    // Check if this handle has any connections using the connection state tracker
-    const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
-    
-    if (!connectionType) return '';
-    
-    // Return the appropriate CSS class based on connection type
-    if (connectionType === 'trigger') {
-      return isPulsing ? styles.triggerConnectedPulse : styles.triggerConnected;
-    } else if (connectionType === 'stream') {
-      return styles.streamConnected;
-    }
-    
-    return '';
-  }, [manifest.type, nodeId, isPulsing, connectionStateVersion]);
+  }, [config.renderInputHandles, manifest, edges, getInputHandleClass, getInputHandleLabel, connectionStateVersion]);
 
   const renderOutputHandles = useCallback((): React.ReactNode => {
     if (config.renderOutputHandles) {
       return config.renderOutputHandles(manifest, edges, nodeId);
     }
 
+
+
     return (
       <div className={styles.outputHandles}>
         {manifest.type === 'input' ? (
-          // For input modules, show Trigger and Stream handles
+          // For input modules, show Trigger and Stream handles based on manifest settings
           <>
-            <div className={styles.handleContainer}>
-              <span className={styles.handleLabel}>
-                {getHandleLabel('trigger')}
-              </span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="trigger"
-                className={`${styles.handle} ${getOutputHandleClass('trigger')}`}
-              />
-            </div>
-            <div className={styles.handleContainer}>
-              <span className={styles.handleLabel}>
-                {getHandleLabel('stream')}
-              </span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="stream"
-                className={`${styles.handle} ${getOutputHandleClass('stream')}`}
-              />
-            </div>
+            {!(manifest as any).hideTriggerHandle && (
+              <div className={styles.handleContainer}>
+                <span className={styles.handleLabel}>
+                  {getHandleLabel('trigger')}
+                </span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="trigger"
+                  className={`${styles.handle} ${getOutputHandleClass('trigger')}`}
+                />
+              </div>
+            )}
+            {!(manifest as any).hideStreamHandle && (
+              <div className={styles.handleContainer}>
+                <span className={styles.handleLabel}>
+                  {getHandleLabel('stream')}
+                </span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="stream"
+                  className={`${styles.handle} ${getOutputHandleClass('stream')}`}
+                />
+              </div>
+            )}
           </>
         ) : (
           // For output modules, show no output handles
@@ -300,7 +307,7 @@ export function useBaseModuleNode(
         )}
       </div>
     );
-  }, [config.renderOutputHandles, manifest, edges, getHandleLabel, getOutputHandleClass]);
+  }, [config.renderOutputHandles, manifest, edges, getHandleLabel, getOutputHandleClass, connectionStateVersion]);
 
   const renderHandles = useCallback((): React.ReactNode => {
     return (
@@ -390,7 +397,7 @@ export function createModuleNode(config: ModuleNodeConfig) {
             }
           }
         };
-        return config.renderConfig(instance?.config || {}, updateConfig);
+        return config.renderConfig(instance?.config || {}, updateConfig, instance);
       }
       return null; // Override in specific implementations
     }, [config.renderConfig, instance, props.data.onConfigChange]);

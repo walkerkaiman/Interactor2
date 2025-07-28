@@ -88,51 +88,84 @@ function App() {
         console.log('WebSocket connected');
       };
       
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === 'state_update') {
-            // Update module instances with real-time data
-            const moduleInstances = message.data.moduleInstances || [];
-            if (moduleInstances.length > 0) {
-              setRegisteredInteractions(prev => {
-                return prev.map(interaction => ({
-                  ...interaction,
-                  modules: interaction.modules?.map(module => {
-                    // Find matching module instance update
-                    const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
-                    if (instanceUpdate) {
-                      return {
-                        ...module,
-                        ...instanceUpdate, // Merge in the real-time data
-                      };
-                    }
-                    return module;
-                  }) || []
-                }));
-              });
-            }
-
-            // Only update registered interactions if we're not in the middle of local changes
-            // This prevents WebSocket updates from interfering with drag and drop operations
-            const newRegisteredInteractions = message.data.interactions || [];
-            const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
-            
-            // Only update if the registered interactions have actually changed
-            // and we're not in the middle of local operations
-            setRegisteredInteractions((prev: InteractionConfig[]) => {
-              // Check if the interactions have actually changed
-              const prevIds = new Set(prev.map((i: InteractionConfig) => i.id));
-              const newIds = new Set(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
-              
-              if (prevIds.size !== newIds.size || 
-                  !Array.from(prevIds).every(id => newIds.has(id))) {
-                return newRegisteredInteractions;
-              }
-              
-              // If no change, preserve current state to prevent unnecessary re-renders
-              return prev;
-            });
+                ws.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              if (message.type === 'state_update') {
+                // Update module instances with real-time data
+                const moduleInstances = message.data.moduleInstances || [];
+                
+                // Debug logging for Time Input modules
+                const timeInputInstances = moduleInstances.filter((instance: any) =>
+                  instance.moduleName === 'Time Input'
+                );
+                if (timeInputInstances.length > 0) {
+                  console.log('Received Time Input module updates:', timeInputInstances);
+                  console.log('Full WebSocket message data:', message.data);
+                  console.log('All moduleInstances:', moduleInstances);
+                }
+                
+                // Merge real-time data from moduleInstances into the interactions
+                const newRegisteredInteractions = message.data.interactions || [];
+                const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
+                
+                                 // Update interactions with real-time data from moduleInstances
+                 setRegisteredInteractions((prev: InteractionConfig[]) => {
+                   // Check if the interactions have actually changed
+                   const prevIds = new Set(prev.map((i: InteractionConfig) => i.id));
+                   const newIds = new Set(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
+                   
+                   console.log('WebSocket update - prev interactions:', prev);
+                   console.log('WebSocket update - new interactions:', newRegisteredInteractions);
+                   console.log('WebSocket update - moduleInstances:', moduleInstances);
+                   
+                   if (prevIds.size !== newIds.size || 
+                       !Array.from(prevIds).every(id => newIds.has(id))) {
+                     console.log('WebSocket update - interactions structure changed');
+                     // If interactions structure changed, use new interactions but merge real-time data
+                     const updatedInteractions = newRegisteredInteractions.map((interaction: InteractionConfig) => ({
+                       ...interaction,
+                       modules: interaction.modules?.map((module: any) => {
+                         // Find matching module instance update with real-time data
+                         const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
+                         if (instanceUpdate) {
+                           console.log('WebSocket update - merging data for module:', module.id, instanceUpdate);
+                           return {
+                             ...module,
+                             ...instanceUpdate, // Merge in the real-time data
+                           };
+                         }
+                         return module;
+                       }) || []
+                     }));
+                     console.log('WebSocket update - final updated interactions:', updatedInteractions);
+                     console.log('WebSocket update - Time Input module in final interactions:', 
+                       updatedInteractions[0]?.modules?.find((m: any) => m.moduleName === 'Time Input'));
+                     return updatedInteractions;
+                   }
+                   
+                   console.log('WebSocket update - no structural change, merging real-time data');
+                   // If no structural change, just merge real-time data into existing interactions
+                   const updatedInteractions = prev.map((interaction: InteractionConfig) => ({
+                     ...interaction,
+                     modules: interaction.modules?.map((module: any) => {
+                       // Find matching module instance update with real-time data
+                       const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
+                       if (instanceUpdate) {
+                         console.log('WebSocket update - merging data for module:', module.id, instanceUpdate);
+                         return {
+                           ...module,
+                           ...instanceUpdate, // Merge in the real-time data
+                         };
+                       }
+                       return module;
+                     }) || []
+                   }));
+                   console.log('WebSocket update - final updated interactions:', updatedInteractions);
+                   console.log('WebSocket update - Time Input module in final interactions:', 
+                     updatedInteractions[0]?.modules?.find((m: any) => m.moduleName === 'Time Input'));
+                   return updatedInteractions;
+                 });
             
             setOriginalRegisteredIds(newOriginalIds);
           } else if (message.type === 'trigger_event') {

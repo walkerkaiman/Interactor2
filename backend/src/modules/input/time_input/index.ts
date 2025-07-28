@@ -29,7 +29,7 @@ export class TimeInputModule extends InputModuleBase {
       name: 'Time Input',
       type: 'input',
       version: '1.0.0',
-      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals. Supports WebSocket API for external time sources.',
+      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals.',
       author: 'Interactor Team',
       configSchema: {
         type: 'object',
@@ -130,12 +130,19 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   protected async onStart(): Promise<void> {
+    console.log(`[DEBUG] Time Input module ${this.id} onStart() called`);
+    this.logger?.info(`Time Input module ${this.id} starting...`);
+    
     if (this.enabled) {
       if (this.timeMode === 'clock') {
+        this.logger?.info(`Starting clock mode with target time: ${this.targetTime}`);
         this.startTimeCheck();
       } else if (this.timeMode === 'metronome') {
+        this.logger?.info(`Starting metronome mode with delay: ${this.millisecondDelay}ms`);
         this.startMetronome();
       }
+    } else {
+      this.logger?.warn(`Time Input module ${this.id} is disabled`);
     }
     
     // Start WebSocket connection if API is enabled
@@ -144,6 +151,8 @@ export class TimeInputModule extends InputModuleBase {
     }
     
     // Start updating current time and countdown immediately
+    console.log(`[DEBUG] Time Input module ${this.id} calling updateTimeDisplay`);
+    this.logger?.info(`Time Input module ${this.id} calling updateTimeDisplay`);
     this.updateTimeDisplay();
   }
 
@@ -444,6 +453,7 @@ export class TimeInputModule extends InputModuleBase {
    * Update current time and countdown display
    */
   private updateTimeDisplay(): void {
+    console.log(`[DEBUG] Time Input module ${this.id} updateTimeDisplay() called`);
     const now = new Date();
     
     // Update current time in 12-hour format
@@ -452,6 +462,10 @@ export class TimeInputModule extends InputModuleBase {
     const period = hours >= 12 ? 'PM' : 'AM';
     const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
     this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    
+    // Debug logging
+    console.log(`[DEBUG] Time Input module ${this.id}: Current time = ${this.currentTime}, Mode = ${this.timeMode}, Enabled = ${this.enabled}`);
+    this.logger?.info(`Time Input ${this.id || 'unknown'}: Current time = ${this.currentTime}, Mode = ${this.timeMode}, Enabled = ${this.enabled}, Countdown = ${this.countdown}`);
     
     // Calculate countdown based on mode
     if (this.timeMode === 'clock') {
@@ -506,17 +520,28 @@ export class TimeInputModule extends InputModuleBase {
       lastUpdate: Date.now()
     };
 
+    // Debug logging
+    this.logger?.info(`Time Input ${this.id || 'unknown'}: State update object:`, stateUpdate);
+
     // Update the state manager directly
     try {
       // Check if the module instance exists in the state manager
       const existingInstance = this.stateManager.getModuleInstance(this.id);
+      this.logger?.info(`Time Input ${this.id || 'unknown'}: Existing instance found: ${!!existingInstance}`);
+      
       if (existingInstance) {
         // Update existing instance
+        this.logger?.info(`Time Input ${this.id || 'unknown'}: Updating existing instance`);
         this.stateManager.updateModuleInstance(stateUpdate);
       } else {
         // Add new instance if it doesn't exist
+        this.logger?.info(`Time Input ${this.id || 'unknown'}: Adding new instance`);
         this.stateManager.addModuleInstance(stateUpdate);
       }
+      
+      // Verify the update worked
+      const updatedInstance = this.stateManager.getModuleInstance(this.id);
+      this.logger?.info(`Time Input ${this.id || 'unknown'}: Updated instance currentTime: ${updatedInstance?.currentTime}, countdown: ${updatedInstance?.countdown}`);
     } catch (error) {
       this.logger?.error(`Failed to update module instance state: ${error}`);
     }

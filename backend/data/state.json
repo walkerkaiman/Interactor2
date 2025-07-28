@@ -20,7 +20,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1753715393518
+          "lastUpdate": 1753740545332
         },
         {
           "id": "cc40b0d0-15be-4f14-8cac-3194a055a324",
@@ -44,7 +44,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1753715393518
+          "lastUpdate": 1753740545332
         },
         {
           "id": "node-1753713303763",
@@ -56,11 +56,13 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1753715393518,
+          "lastUpdate": 1753740545332,
           "position": {
-            "x": 359.2592869751585,
-            "y": 509.4781853676751
-          }
+            "x": 306.94793149553004,
+            "y": 511.80313450010306
+          },
+          "currentTime": "5:09 PM",
+          "countdown": "3s interval"
         },
         {
           "id": "node-1753713348029",
@@ -69,7 +71,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1753715393518,
+          "lastUpdate": 1753740545332,
           "position": {
             "x": 954.8824741024607,
             "y": 601.8534538813026
@@ -78,16 +80,16 @@
       ],
       "routes": [
         {
-          "id": "route-1753729249887",
-          "source": "node-1753713303763",
-          "target": "node-1753713348029",
-          "event": "trigger"
-        },
-        {
-          "id": "route-1753729256625",
+          "id": "route-1753735483435",
           "source": "5e614c45-4e1a-48a9-84c8-1897e41725f2",
           "target": "cc40b0d0-15be-4f14-8cac-3194a055a324",
           "event": "stream"
+        },
+        {
+          "id": "route-1753735507763",
+          "source": "node-1753713303763",
+          "target": "node-1753713348029",
+          "event": "trigger"
         }
       ]
     }
@@ -103,7 +105,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753729265020
+      "lastUpdate": 1753740715939
     },
     {
       "id": "cc40b0d0-15be-4f14-8cac-3194a055a324",
@@ -123,7 +125,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753729265020
+      "lastUpdate": 1753740715939
     },
     {
       "id": "node-1753713303763",
@@ -135,7 +137,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753729265020
+      "lastUpdate": 1753740715939
     },
     {
       "id": "node-1753713348029",
@@ -144,7 +146,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1753729265020
+      "lastUpdate": 1753740715939
     }
   ],
   "routes": [],

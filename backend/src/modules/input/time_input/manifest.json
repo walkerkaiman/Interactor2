@@ -2,7 +2,7 @@
   "name": "Time Input",
   "type": "input",
   "version": "1.0.0",
-  "description": "Clock mode triggers at specific time, Metronome mode pulses at intervals. Supports WebSocket API for external time sources.",
+  "description": "Clock mode triggers at specific time, Metronome mode pulses at intervals.",
   "author": "Interactor Team",
   "configSchema": {
     "type": "object",
@@ -64,5 +64,7 @@
       "type": "output",
       "description": "Emitted when WebSocket API connection is lost"
     }
-  ]
+  ],
+  "hideTriggerHandle": false,
+  "hideStreamHandle": true
 } 

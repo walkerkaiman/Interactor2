@@ -52,5 +52,7 @@
       "type": "output",
       "description": "Emitted when module state changes"
     }
-  ]
+  ],
+  "hideTriggerHandle": false,
+  "hideStreamHandle": false
 } 

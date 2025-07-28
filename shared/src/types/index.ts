@@ -12,6 +12,8 @@ export interface ModuleManifest {
   configSchema: ConfigSchema;
   events: EventDefinition[];
   assets?: AssetReference[];
+  hideTriggerHandle?: boolean;
+  hideStreamHandle?: boolean;
 }
 
 export interface ConfigSchema {

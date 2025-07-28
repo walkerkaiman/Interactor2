@@ -1,9 +1,41 @@
-import { memo } from 'react';
-import { Handle, Position } from 'reactflow';
+import { memo, useState, useEffect } from 'react';
 import { apiService } from '../api';
 import { createModuleNode } from './BaseModuleNode';
-import { connectionStateTracker } from '../utils/connectionStateTracker';
+import { useInstanceData } from '../hooks/useNodeConfig';
 import styles from './CustomNode.module.css';
+
+// Countdown display component
+function CountdownDisplay({ countdown }: { countdown: string }) {
+  const [countdownTimer, setCountdownTimer] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (countdown && typeof countdown === 'string' && countdown.includes('s interval')) {
+      // Extract the number of seconds from "3s interval"
+      const seconds = parseInt(countdown.split('s')[0]);
+      if (!isNaN(seconds)) {
+        setCountdownTimer(seconds);
+        
+        // Start countdown timer
+        const interval = setInterval(() => {
+          setCountdownTimer(prev => {
+            if (prev === null || prev <= 0) {
+              return seconds; // Reset to original value
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        return () => clearInterval(interval);
+      }
+    }
+  }, [countdown]);
+  
+  return (
+    <span className={styles.configValue}>
+      {countdownTimer !== null ? `${countdownTimer}s` : (countdown || '--')}
+    </span>
+  );
+}
 
 const TimeInputNodeConfig = {
   enablePulseAnimation: false, // Time input doesn't need pulse animation
@@ -20,12 +52,27 @@ const TimeInputNodeConfig = {
   onManualTrigger: async (nodeId: string) => {
     await apiService.triggerModule(nodeId, { type: 'manualTrigger' });
   },
-  renderConfig: (config: any, updateConfig: (key: string, value: any) => void) => {
+  renderConfig: (config: any, updateConfig: (key: string, value: any) => void, instance: any) => {
     const mode = config.mode || 'clock';
     const targetTime = config.targetTime || '12:00 PM';
     const millisecondDelay = config.millisecondDelay || 1000;
-    const currentTime = config.currentTime || '';
-    const countdown = config.countdown || '';
+    
+    // Get real-time data from instance (updated via WebSocket)
+    const currentTime = useInstanceData<string>(instance, 'currentTime', '');
+    const countdown = useInstanceData<string>(instance, 'countdown', '');
+    
+    // Debug logging to see what data we're receiving
+    console.log('TimeInputNode instance data:', {
+      instanceId: instance?.id,
+      currentTime,
+      countdown,
+      mode: instance?.mode,
+      enabled: instance?.enabled,
+      fullInstance: instance
+    });
+    console.log('TimeInputNode - raw instance object:', instance);
+    console.log('TimeInputNode - instance.currentTime:', instance?.currentTime);
+    console.log('TimeInputNode - instance.countdown:', instance?.countdown);
 
 
 
@@ -76,7 +123,7 @@ const TimeInputNodeConfig = {
             </div>
             <div className={styles.configItem}>
               <span className={styles.configKey}>Countdown:</span>
-              <span className={styles.configValue}>{countdown || '--'}</span>
+              <CountdownDisplay countdown={countdown} />
             </div>
           </div>
         </div>
@@ -127,53 +174,6 @@ const TimeInputNodeConfig = {
           </div>
         )}
       </>
-    );
-  },
-
-  renderOutputHandles: (manifest: any, edges: any[], nodeId: string) => {
-    // Helper function to get handle label based on connection type
-    const getHandleLabel = (handleId: string): string => {
-      // Check if this handle has any connections using the connection state tracker
-      const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
-      
-      if (!connectionType) {
-        // No connections, show default label
-        return 'Trigger';
-      }
-      
-      // Return the connection type with proper capitalization
-      return connectionType.charAt(0).toUpperCase() + connectionType.slice(1);
-    };
-
-    // Helper function to get handle class based on connection type
-    const getHandleClass = (handleId: string): string => {
-      // Check if this handle has any connections using the connection state tracker
-      const connectionType = connectionStateTracker.getConnectionType(nodeId, handleId);
-      
-      if (!connectionType) return '';
-      
-      // Return the appropriate CSS class based on connection type
-      if (connectionType === 'trigger') {
-        return styles.triggerConnected;
-      } else if (connectionType === 'stream') {
-        return styles.streamConnected;
-      }
-      
-      return '';
-    };
-
-    return (
-      <div className={styles.outputHandles}>
-        <div className={styles.handleContainer}>
-          <span className={styles.handleLabel}>{getHandleLabel('trigger')}</span>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="trigger"
-            className={`${styles.handle} ${getHandleClass('trigger')}`}
-          />
-        </div>
-      </div>
     );
   }
 };

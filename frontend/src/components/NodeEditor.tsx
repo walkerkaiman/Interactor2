@@ -256,6 +256,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  // Reset the flag when interactions change (e.g., from WebSocket updates)
+  useEffect(() => {
+    isUpdatingFromInteractions.current = false;
+  }, [interactions]);
+
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
     if (isUpdatingFromInteractions.current) {
@@ -374,7 +379,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // If edges are the same, preserve current edges to maintain local state
       return currentEdges;
     });
-  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode, isUpdatingFromInteractions]); // Use interactions directly
+  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode]); // Use interactions directly
 
   // Update node data with current edges for handle coloring
   useEffect(() => {
@@ -448,12 +453,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       
       setEdges((eds) => {
         const filtered = eds.filter(edge => 
-          !(edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId)
+          !(edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) &&
+          !(edge.target === draggedHandle.nodeId && edge.targetHandle === draggedHandle.handleId)
         );
         
         // Remove edges from tracker
         eds.forEach(edge => {
-          if (edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) {
+          if ((edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) ||
+              (edge.target === draggedHandle.nodeId && edge.targetHandle === draggedHandle.handleId)) {
+            
             edgeRegistrationTracker.unregisterEdge(edge.id);
             // Remove from connection state tracker
             connectionStateTracker.removeConnection(
@@ -555,19 +563,37 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       }
   
       setEdges((eds) => {
+        // Check if there's an existing edge between these nodes
+        const existingEdge = eds.find(edge => 
+          edge.source === params.source && edge.target === params.target
+        );
+        
+        if (existingEdge) {
+          // Update existing connection type
+          connectionStateTracker.updateConnection(
+            params.source!,
+            params.sourceHandle!,
+            params.target!,
+            params.targetHandle!,
+            eventType
+          );
+        } else {
+          // Add new connection
+          connectionStateTracker.addConnection(
+            params.source!,
+            params.sourceHandle!,
+            params.target!,
+            params.targetHandle!,
+            eventType
+          );
+        }
+        
         // Remove any existing edges from the same source to the same target
         const filteredEdges = eds.filter(edge => {
           const shouldRemove = edge.source === params.source && edge.target === params.target;
           if (shouldRemove) {
             // Remove from tracker
             edgeRegistrationTracker.unregisterEdge(edge.id);
-            // Remove from connection state tracker
-            connectionStateTracker.removeConnection(
-              edge.source,
-              edge.sourceHandle!,
-              edge.target,
-              edge.targetHandle!
-            );
           }
           return !shouldRemove;
         });

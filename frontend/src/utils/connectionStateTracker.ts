@@ -9,6 +9,7 @@ interface ConnectionState {
 class ConnectionStateTracker {
   private static instance: ConnectionStateTracker;
   private connections: Map<string, ConnectionState> = new Map();
+  private listeners: Map<string, Set<() => void>> = new Map();
 
   private constructor() {}
 
@@ -37,6 +38,7 @@ class ConnectionStateTracker {
       targetHandleId,
       connectionType
     });
+    this.emit('connectionChanged');
   }
 
   /**
@@ -49,7 +51,31 @@ class ConnectionStateTracker {
     targetHandleId: string
   ): void {
     const connectionKey = `${sourceNodeId}:${sourceHandleId}:${targetNodeId}:${targetHandleId}`;
+
     this.connections.delete(connectionKey);
+    this.emit('connectionChanged');
+  }
+
+  /**
+   * Update an existing connection's type
+   */
+  public updateConnection(
+    sourceNodeId: string,
+    sourceHandleId: string,
+    targetNodeId: string,
+    targetHandleId: string,
+    newConnectionType: string
+  ): void {
+    const connectionKey = `${sourceNodeId}:${sourceHandleId}:${targetNodeId}:${targetHandleId}`;
+    const existingConnection = this.connections.get(connectionKey);
+    
+    if (existingConnection && existingConnection.connectionType !== newConnectionType) {
+      this.connections.set(connectionKey, {
+        ...existingConnection,
+        connectionType: newConnectionType
+      });
+      this.emit('connectionChanged');
+    }
   }
 
   /**
@@ -85,6 +111,37 @@ class ConnectionStateTracker {
    */
   public getAllConnections(): ConnectionState[] {
     return Array.from(this.connections.values());
+  }
+
+  /**
+   * Subscribe to connection state changes
+   */
+  public on(event: string, callback: () => void): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(callback);
+  }
+
+  /**
+   * Unsubscribe from connection state changes
+   */
+  public off(event: string, callback: () => void): void {
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.delete(callback);
+    }
+  }
+
+  /**
+   * Emit connection state change event
+   */
+  private emit(event: string): void {
+    const eventListeners = this.listeners.get(event);
+
+    if (eventListeners) {
+      eventListeners.forEach(callback => callback());
+    }
   }
 }
 

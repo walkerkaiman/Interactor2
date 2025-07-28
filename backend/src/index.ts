@@ -345,7 +345,21 @@ export class InteractorServer {
     // Interaction management - atomic updates only
     this.app.get('/api/interactions', (req, res) => {
       const interactions = this.stateManager.getInteractions();
-      const response: InteractionListResponse = { interactions };
+      const moduleInstances = this.stateManager.getModuleInstances();
+      
+      // Merge real-time module data into interactions
+      const enrichedInteractions = interactions.map(interaction => ({
+        ...interaction,
+        modules: interaction.modules?.map(module => {
+          const instanceUpdate = moduleInstances.find(instance => instance.id === module.id);
+          if (instanceUpdate) {
+            return { ...module, ...instanceUpdate };
+          }
+          return module;
+        }) || []
+      }));
+      
+      const response: InteractionListResponse = { interactions: enrichedInteractions };
       res.json({ success: true, data: response });
     });
 
@@ -544,6 +558,32 @@ export class InteractorServer {
         moduleInstance.status = 'running';
         moduleInstance.lastUpdate = Date.now();
         
+        // Handle Time Input module specific logic
+        if (moduleInstance.moduleName === 'Time Input') {
+          const now = new Date();
+          
+          // Calculate current time in 12-hour format
+          const hours = now.getHours();
+          const minutes = now.getMinutes();
+          const period = hours >= 12 ? 'PM' : 'AM';
+          const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+          moduleInstance.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+          
+          // Calculate countdown based on mode
+          const mode = moduleInstance.config?.mode || 'clock';
+          if (mode === 'metronome') {
+            const millisecondDelay = moduleInstance.config?.millisecondDelay || 1000;
+            const seconds = millisecondDelay / 1000;
+            moduleInstance.countdown = `${seconds}s interval`;
+          } else if (mode === 'clock') {
+            const targetTime = moduleInstance.config?.targetTime || '12:00 PM';
+            // For now, just show a placeholder for clock mode
+            moduleInstance.countdown = 'Clock mode - target time calculation needed';
+          }
+          
+          this.logger.info(`Time Input module ${moduleInstance.id}: currentTime = ${moduleInstance.currentTime}, countdown = ${moduleInstance.countdown}`);
+        }
+        
         // Update state
         await this.stateManager.replaceState({ modules: moduleInstances });
         
@@ -698,11 +738,61 @@ export class InteractorServer {
     if (this.wss.clients.size === 0) return;
     
     try {
+      // Update current time for Time Input modules
+      const moduleInstances = this.stateManager.getModuleInstances();
+      let hasTimeInputUpdates = false;
+      
+      moduleInstances.forEach(moduleInstance => {
+        if (moduleInstance.moduleName === 'Time Input' && moduleInstance.status === 'running') {
+          const now = new Date();
+          
+          // Update current time in 12-hour format
+          const hours = now.getHours();
+          const minutes = now.getMinutes();
+          const period = hours >= 12 ? 'PM' : 'AM';
+          const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+          const newCurrentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+          
+          // Update countdown based on mode
+          let newCountdown = '';
+          const mode = moduleInstance.config?.mode || 'clock';
+          if (mode === 'metronome') {
+            const millisecondDelay = moduleInstance.config?.millisecondDelay || 1000;
+            const seconds = millisecondDelay / 1000;
+            newCountdown = `${seconds}s interval`;
+          } else if (mode === 'clock') {
+            newCountdown = 'Clock mode - target time calculation needed';
+          }
+          
+          // Only update if the time or countdown has changed
+          if (moduleInstance.currentTime !== newCurrentTime || moduleInstance.countdown !== newCountdown) {
+            moduleInstance.currentTime = newCurrentTime;
+            moduleInstance.countdown = newCountdown;
+            moduleInstance.lastUpdate = Date.now();
+            hasTimeInputUpdates = true;
+            this.logger.info(`Updated Time Input module ${moduleInstance.id}: currentTime = ${moduleInstance.currentTime}, countdown = ${moduleInstance.countdown}`);
+          }
+        }
+      });
+      
+      // Update state if there were changes
+      if (hasTimeInputUpdates) {
+        this.stateManager.replaceState({ modules: moduleInstances });
+        this.logger.info(`Updated state with Time Input changes`);
+      }
+      
+      // Get the updated instances for the WebSocket message
+      const updatedModuleInstances = this.stateManager.getModuleInstances();
+      const timeInputInstance = updatedModuleInstances.find(m => m.moduleName === 'Time Input');
+      if (timeInputInstance) {
+        this.logger.info(`Time Input module in WebSocket message: currentTime = ${timeInputInstance.currentTime}, countdown = ${timeInputInstance.countdown}`);
+      }
+      
       const state = {
         type: 'state_update',
         data: {
           interactions: this.stateManager.getInteractions(),
-          moduleInstances: this.stateManager.getModuleInstances()
+          moduleInstances: updatedModuleInstances
         }
       };
       

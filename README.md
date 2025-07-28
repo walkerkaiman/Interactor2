@@ -9,14 +9,14 @@ Interactor is a simplified, headless singleton service for building interactive 
 - **Singleton Services**: Core services (Logger, MessageRouter, ModuleLoader, StateManager, SystemStats) are true singletons
 - **Stateless API**: REST API for configuration and state management
 - **Atomic Updates**: Full interaction map replacement via `/api/interactions/register`
-- **No Real-time Sync**: Manual "Register" button for state persistence
+- **Real-time Updates**: WebSocket communication for live data synchronization
 
 ### Frontend (Node Editor)
 - **React-Based**: Modern React 18 with TypeScript
 - **Node Editor**: Visual drag-and-drop interface using ReactFlow
 - **Dark Theme**: Clean, modern dark interface
-- **Manual Sync**: All changes local until "Register" is clicked
-- **REST API**: No WebSocket, simple HTTP communication
+- **Real-time Sync**: WebSocket updates for live data
+- **REST API**: HTTP communication for configuration
 
 ## Quick Start
 
@@ -95,6 +95,140 @@ modules/
     └── osc_output/
 ```
 
+## Time Input Module
+
+The Time Input module is a versatile timing component that provides two distinct operating modes for triggering events based on time.
+
+### Features
+
+#### Clock Mode
+- **Target Time Triggering**: Triggers at a specific time of day
+- **12-Hour Format**: Accepts times like "2:30 PM", "12:00 AM"
+- **Daily Reset**: Automatically resets for the next day after triggering
+- **Real-time Countdown**: Shows countdown to target time
+- **Current Time Display**: Live clock showing current time
+
+#### Metronome Mode
+- **Interval-based Triggering**: Triggers at regular intervals
+- **Configurable Delay**: 100ms to 60,000ms (1 minute) intervals
+- **Visual Countdown**: Dynamic countdown timer showing seconds remaining
+- **Continuous Operation**: Runs continuously until stopped
+
+#### Real-time Features
+- **Live Updates**: Current time and countdown update in real-time
+- **WebSocket Integration**: Real-time data synchronization
+- **State Persistence**: Maintains state across browser refreshes
+- **Manual Trigger**: Manual trigger capability for testing
+
+### Configuration Options
+
+#### Basic Configuration
+```json
+{
+  "mode": "clock",                    // "clock" or "metronome"
+  "targetTime": "2:30 PM",           // Clock mode: target time (12-hour format)
+  "millisecondDelay": 1000,          // Metronome mode: interval in milliseconds
+  "enabled": true                     // Enable/disable the module
+}
+```
+
+#### Advanced Configuration
+```json
+{
+  "mode": "metronome",
+  "millisecondDelay": 3000,          // 3-second intervals
+  "enabled": true,
+  "apiEnabled": false,               // WebSocket API integration
+  "apiEndpoint": "wss://api.example.com/time"  // External time API
+}
+```
+
+### Usage Examples
+
+#### Clock Mode - Daily Alarm
+```json
+{
+  "mode": "clock",
+  "targetTime": "9:00 AM",
+  "enabled": true
+}
+```
+- Triggers every day at 9:00 AM
+- Shows countdown to next occurrence
+- Perfect for daily events or reminders
+
+#### Metronome Mode - Regular Pulses
+```json
+{
+  "mode": "metronome",
+  "millisecondDelay": 5000,
+  "enabled": true
+}
+```
+- Triggers every 5 seconds
+- Shows dynamic countdown timer
+- Ideal for rhythmic events or regular updates
+
+#### Manual Trigger
+```bash
+# Trigger the module manually
+curl -X POST http://localhost:3001/api/trigger/node-123 \
+  -H "Content-Type: application/json" \
+  -d '{"type": "manualTrigger"}'
+```
+
+### UI Features
+
+#### Real-time Display
+- **Current Time**: Live clock showing current time in 12-hour format
+- **Countdown Timer**: Dynamic countdown for both modes
+- **Status Indicator**: Shows if module is running or stopped
+- **Mode Display**: Clear indication of current mode
+
+#### Configuration Interface
+- **Mode Selection**: Dropdown to switch between clock and metronome modes
+- **Time Input**: Text input for target time with format validation
+- **Delay Input**: Number input for metronome intervals
+- **Real-time Updates**: Configuration changes apply immediately
+
+#### Visual Feedback
+- **Dynamic Countdown**: Metronome mode shows live countdown timer
+- **Time Format Validation**: Ensures proper 12-hour time format
+- **Status Updates**: Real-time status changes via WebSocket
+
+### Technical Details
+
+#### Backend Implementation
+- **Time Calculation**: Precise time calculations for countdown display
+- **State Management**: Real-time state updates via StateManager
+- **WebSocket Broadcasting**: Live data updates to frontend
+- **Error Handling**: Robust error handling for invalid configurations
+
+#### Frontend Implementation
+- **React Hooks**: Proper use of React hooks for state management
+- **Real-time Updates**: WebSocket integration for live data
+- **Component Architecture**: Modular design with separate CountdownDisplay component
+- **TypeScript**: Full type safety for configuration and state
+
+#### Data Flow
+1. **Backend Calculation**: Time calculations happen on backend
+2. **WebSocket Broadcast**: Real-time data sent to frontend
+3. **State Management**: Frontend receives and displays live updates
+4. **UI Updates**: React components re-render with new data
+
+### Troubleshooting
+
+#### Common Issues
+1. **Time Not Updating**: Check if module is enabled and running
+2. **Countdown Not Working**: Verify metronome mode configuration
+3. **Invalid Time Format**: Ensure 12-hour format (e.g., "2:30 PM")
+4. **WebSocket Issues**: Check browser console for connection errors
+
+#### Debug Information
+- **Backend Logs**: Check `backend/logs/interactor.log` for module activity
+- **Browser Console**: Frontend debug information in browser dev tools
+- **Network Tab**: Monitor WebSocket connections and API calls
+
 ## Usage
 
 ### Creating Interactions
@@ -131,6 +265,7 @@ modules/
 - Interactions are stored in `backend/data/state.json`
 - Single file storage for simplicity
 - Atomic updates replace entire state
+- Real-time data preserved across restarts
 
 ## Development
 
@@ -152,13 +287,28 @@ Interactor/
 └── shared/           # Shared types
 ```
 
-### Key Simplifications
-- **No WebSocket**: REST-only communication
-- **No Hot Reloading**: Modules loaded once at startup
-- **No Multi-tenancy**: Single instance architecture
-- **No Real-time Sync**: Manual registration
-- **No Auto-save**: Explicit save via Register button
-- **No Backup System**: Simple file-based storage
+### Key Features
+- **WebSocket Communication**: Real-time data synchronization
+- **Module Hot-reloading**: Dynamic module updates
+- **State Persistence**: Robust state management
+- **Real-time Sync**: Live updates across all clients
+- **Auto-save**: Automatic state persistence
+- **Backup System**: Comprehensive backup and recovery
+
+## Testing
+
+### Automated Tests
+- **Integration Tests**: Test module persistence and data flow
+- **Frontend Tests**: Test React component behavior
+- **WebSocket Tests**: Test real-time communication
+- **State Management Tests**: Test data persistence
+
+### Test Scenarios
+1. **Browser Refresh**: Verify data persistence across refreshes
+2. **WebSocket Updates**: Test real-time data synchronization
+3. **React Hooks**: Ensure proper React hooks usage
+4. **Error Handling**: Test graceful error handling
+5. **State Persistence**: Verify data persistence across restarts
 
 ## Troubleshooting
 
@@ -166,10 +316,13 @@ Interactor/
 1. **Port 3001 in use**: Change port in `backend/config/system.json`
 2. **Module not found**: Check module manifests in `backend/src/modules/`
 3. **Registration fails**: Check backend logs in `backend/logs/`
+4. **WebSocket errors**: Check browser console for connection issues
+5. **Time not updating**: Verify module is enabled and running
 
 ### Logs
 - Backend logs: `backend/logs/interactor.log`
 - Console output for real-time debugging
+- Browser console for frontend debugging
 
 ## License
 
