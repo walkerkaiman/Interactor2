@@ -363,6 +363,12 @@ export class InteractorServer {
       moduleInstance.config = newConfig;
       moduleInstance.lastUpdate = Date.now();
       
+      this.logger.info(`Updating module config for ${moduleInstance.moduleName} (${req.params.id}):`, {
+        oldConfig: moduleInstance.config,
+        newConfig: newConfig,
+        changes: req.body.config
+      });
+      
       // CRITICAL: Also update the live module instance if it exists
       const liveInstance = this.moduleInstances.get(req.params.id);
       if (liveInstance) {
@@ -379,6 +385,9 @@ export class InteractorServer {
       
       // Update state
       await this.stateManager.replaceState({ modules: moduleInstances });
+      
+      // Sync interactions with updated module instances
+      await this.syncInteractionsWithModules();
       
       // Broadcast state update
       this.broadcastStateUpdate();
@@ -1076,6 +1085,33 @@ export class InteractorServer {
     
     // Set up trigger event listeners for output modules
     this.setupTriggerEventListeners();
+  }
+
+  /**
+   * Sync interactions with current module instances
+   */
+  private async syncInteractionsWithModules(): Promise<void> {
+    const interactions = this.stateManager.getInteractions();
+    const moduleInstances = this.stateManager.getModuleInstances();
+    let interactionsUpdated = false;
+    
+    interactions.forEach(interaction => {
+      interaction.modules?.forEach((module: any) => {
+        const matchingInstance = moduleInstances.find(instance => instance.id === module.id);
+        if (matchingInstance && JSON.stringify(module.config) !== JSON.stringify(matchingInstance.config)) {
+          // Update the module configuration in the interaction
+          module.config = matchingInstance.config;
+          interactionsUpdated = true;
+          this.logger.info(`Synced interaction module config for ${module.moduleName} (${module.id})`);
+        }
+      });
+    });
+    
+    // Save updated interactions if any were modified
+    if (interactionsUpdated) {
+      await this.stateManager.replaceState({ interactions });
+      this.logger.info('Synced interactions with module instances');
+    }
   }
 
   /**

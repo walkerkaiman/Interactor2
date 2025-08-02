@@ -10,9 +10,9 @@
           "id": "node-1754108542080",
           "moduleName": "Time Input",
           "config": {
-            "mode": "clock",
-            "targetTime": "12:00 PM",
-            "millisecondDelay": 1000,
+            "mode": "metronome",
+            "targetTime": "3:45 PM",
+            "millisecondDelay": 3000,
             "enabled": true,
             "apiEnabled": false,
             "apiEndpoint": ""
@@ -20,7 +20,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754108558847,
+          "lastUpdate": 1754145404125,
           "position": {
             "x": 125,
             "y": 207.9375
@@ -33,7 +33,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754108558847,
+          "lastUpdate": 1754145069661,
           "position": {
             "x": 626.2022920033513,
             "y": 322.96767080327237
@@ -55,9 +55,9 @@
       "id": "node-1754108542080",
       "moduleName": "Time Input",
       "config": {
-        "mode": "clock",
-        "targetTime": "12:00 PM",
-        "millisecondDelay": 1000,
+        "mode": "metronome",
+        "targetTime": "3:45 PM",
+        "millisecondDelay": 3000,
         "enabled": true,
         "apiEnabled": false,
         "apiEndpoint": ""
@@ -65,7 +65,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754108575664
+      "lastUpdate": 1754145554018
     },
     {
       "id": "node-1754108556182",
@@ -74,7 +74,7 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754108575664
+      "lastUpdate": 1754145554018
     }
   ],
   "routes": [],

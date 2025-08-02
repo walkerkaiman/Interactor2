@@ -8,6 +8,7 @@ interface ToolbarProps {
   onToggleSettings: () => void;
   onToggleTrigger: () => void;
   sidebarOpen: boolean;
+  hasUnregisteredChanges: boolean;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -17,7 +18,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onToggleSettings,
   onToggleTrigger,
   sidebarOpen,
+  hasUnregisteredChanges,
 }) => {
+  console.log('Toolbar render:', { hasUnregisteredChanges });
+  
   return (
     <div className={styles.toolbar}>
       <div className={styles.left}>
@@ -50,6 +54,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           ⚙️
         </button>
+
+        {hasUnregisteredChanges && (
+          <div className={styles.unregisteredIndicator}>
+            <span className={styles.indicatorText}>Unregistered Interactions</span>
+          </div>
+        )}
 
         <button
           className={`${styles.registerButton} ${isRegistering ? styles.registering : ''}`}

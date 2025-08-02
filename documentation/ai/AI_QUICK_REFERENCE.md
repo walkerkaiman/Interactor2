@@ -99,6 +99,25 @@ export class MyOutput extends OutputModuleBase {
 
 ---
 
+## 🚨 **Troubleshooting Common Issues**
+
+### **Configuration Not Updating in Frontend**
+**Symptoms**: Backend works correctly, frontend shows old settings
+**Solution**: Check if `modules` and `interactions` in state.json are in sync
+**Fix**: Add sync logic to update interactions when module instances change
+
+### **State Persistence Issues**
+**Symptoms**: Settings reset on backend restart
+**Solution**: Use `saveState()` instead of `debouncedSaveState()` for critical updates
+**Pattern**: Always sync both data structures after configuration changes
+
+### **WebSocket Race Conditions**
+**Symptoms**: Initial load overridden by WebSocket updates
+**Solution**: Add `initialDataLoaded` flag to prevent WebSocket updates before initial load
+**Pattern**: Only process WebSocket updates after initial data is loaded
+
+---
+
 ## ✅ **Testing Your Module**
 
 1. **Module loads**: Check backend logs for errors

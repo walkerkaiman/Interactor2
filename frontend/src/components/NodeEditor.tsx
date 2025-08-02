@@ -63,7 +63,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       modules: i.modules?.map(m => ({ id: m.id, position: m.position })) || [],
       routes: i.routes || []
     })));
-    console.log('NodeEditor: Generated hash:', hash.substring(0, 100) + '...');
     return hash;
   }, []);
 
@@ -92,19 +91,21 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     setEdges((eds) => {
       const filtered = eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
       
-      // Remove edges from tracker
-      eds.forEach(edge => {
-        if (edge.source === nodeId || edge.target === nodeId) {
-          // Edge registration now handled through interactions data
-          // Remove from connection state tracker
-          connectionStateTracker.removeConnection(
-            edge.source,
-            edge.sourceHandle!,
-            edge.target,
-            edge.targetHandle!
-          );
-        }
-      });
+      // Defer connection state tracker updates to next tick to avoid React state race conditions
+      setTimeout(() => {
+        eds.forEach(edge => {
+          if (edge.source === nodeId || edge.target === nodeId) {
+            // Edge registration now handled through interactions data
+            // Remove from connection state tracker
+            connectionStateTracker.removeConnection(
+              edge.source,
+              edge.sourceHandle!,
+              edge.target,
+              edge.targetHandle!
+            );
+          }
+        });
+      }, 0);
       
       return filtered;
     });
@@ -131,10 +132,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      console.log('NodeEditor: onDrop triggered');
 
       if (!reactFlowInstance) {
-        console.log('NodeEditor: No ReactFlow instance, skipping drop');
         return;
       }
 
@@ -142,7 +141,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       const type = event.dataTransfer.getData('application/reactflow');
 
       if (!type) {
-        console.log('NodeEditor: No drag data, skipping drop');
         return;
       }
 
@@ -150,19 +148,14 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       try {
         dragData = JSON.parse(type);
       } catch (error) {
-        console.log('NodeEditor: Failed to parse drag data:', error);
         return;
       }
 
       const { moduleName } = dragData;
       if (!moduleName) {
-        console.log('NodeEditor: No moduleName in drag data');
         return;
       }
       
-      console.log('NodeEditor: Dropping module:', moduleName);
-
-      // Get the offset from the drag data (default to 0 if not present)
       const offsetX = dragData.offsetX || 0;
       const offsetY = dragData.offsetY || 0;
 
@@ -198,6 +191,43 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // Determine node type based on module
       const nodeType = moduleName === 'Time Input' ? 'timeInput' : 'custom';
       
+      // Check if there's an existing module instance with the same moduleName in interactions
+      // to get the correct configuration
+      let existingConfig = {};
+      
+      // First check in current interactions
+      interactions.forEach(interaction => {
+        interaction.modules?.forEach(module => {
+          if (module.moduleName === moduleName && module.config && Object.keys(module.config).length > 0) {
+            existingConfig = module.config;
+          }
+        });
+      });
+      
+      // If no config found in interactions, check if this is a known module type and use defaults
+      if (Object.keys(existingConfig).length === 0) {
+        // Use module-specific defaults based on module name
+        if (moduleName === 'Time Input') {
+          existingConfig = {
+            mode: 'clock',
+            targetTime: '12:00 PM',
+            millisecondDelay: 1000,
+            enabled: true,
+            apiEnabled: false,
+            apiEndpoint: ''
+          };
+        } else if (moduleName === 'Audio Output') {
+          existingConfig = {
+            // Add default audio output config if needed
+          };
+        } else if (moduleName === 'DMX Output') {
+          existingConfig = {
+            // Add default DMX output config if needed
+          };
+        }
+        // For other modules, use empty config
+      }
+      
       const newNode = {
         id: newNodeId,
         type: nodeType,
@@ -207,14 +237,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           instance: {
             id: newNodeId,
             moduleName: module.name,
-            config: moduleName === 'Time Input' ? {
-              mode: 'clock',
-              targetTime: '12:00 PM',
-              millisecondDelay: 1000,
-              enabled: true,
-              apiEnabled: false,
-              apiEndpoint: ''
-            } : {},
+            config: existingConfig,
             status: 'stopped',
             messageCount: 0,
             currentFrame: undefined,
@@ -253,7 +276,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
       // Notify parent of local changes
       // The main useEffect will handle creating the ReactFlow node from interactions
-      console.log('NodeEditor: Updating interactions with new module:', moduleName);
       onInteractionsChange(updatedInteractions);
     },
     [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode]
@@ -269,28 +291,25 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
-    console.log('NodeEditor: useEffect triggered with interactions:', interactions.length);
     
     // Check if interactions have actually changed using hash comparison
     const currentHash = getInteractionsHash(interactions);
     if (currentHash === lastInteractionsRef.current) {
-      console.log('NodeEditor: No changes detected, skipping update');
       return; // No actual changes, skip update
     }
     lastInteractionsRef.current = currentHash;
-        console.log('NodeEditor: Processing interactions update');
-    console.log('NodeEditor: Current nodes count:', nodes.length);
-    console.log('NodeEditor: Current edges count:', edges.length);
     
-    const newNodes: Node[] = [];
-    const newEdges: Edge[] = [];
+    // Defer state updates to next tick to avoid React state race conditions
+    setTimeout(() => {
+      const newNodes: Node[] = [];
+      const newEdges: Edge[] = [];
 
-    // Create nodes for each module instance in interactions
-    const moduleInstancesMap = new Map();
-    
-    interactions.forEach((interaction) => {
-      interaction.modules?.forEach((moduleInstance) => {
-                  const manifest = modules.find(m => m.name === moduleInstance.moduleName);
+      // Create nodes for each module instance in interactions
+      const moduleInstancesMap = new Map();
+      
+      interactions.forEach((interaction) => {
+        interaction.modules?.forEach((moduleInstance) => {
+          const manifest = modules.find(m => m.name === moduleInstance.moduleName);
           if (manifest) {
             const nodeId = moduleInstance.id;
             
@@ -312,94 +331,77 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
               },
             });
           }
+        });
       });
-    });
-    
-    newNodes.push(...Array.from(moduleInstancesMap.values()));
+      
+      newNodes.push(...Array.from(moduleInstancesMap.values()));
 
-    // Create edges for interactions
-    console.log('NodeEditor: Creating edges from interactions:', interactions.length);
-    interactions.forEach((interaction) => {
-      console.log('NodeEditor: Processing interaction:', interaction.id, 'with routes:', interaction.routes?.length || 0);
-      interaction.routes?.forEach((route) => {
-        // Use the actual node IDs from the route
-        const sourceNode = newNodes.find(node => node.id === route.source);
-        const targetNode = newNodes.find(node => node.id === route.target);
+      // Create edges for interactions
+      interactions.forEach((interaction) => {
+        interaction.routes?.forEach((route) => {
+          // Use the actual node IDs from the route
+          const sourceNode = newNodes.find(node => node.id === route.source);
+          const targetNode = newNodes.find(node => node.id === route.target);
 
-        if (sourceNode && targetNode) {
-          
-          // No inline styles - everything handled by CSS classes
-          const edgeStyle = {};
+          if (sourceNode && targetNode) {
+            
+            // No inline styles - everything handled by CSS classes
+            const edgeStyle = {};
 
-          const edgeId = route.id || `edge-${interaction.id}-${route.source}-${route.target}`;
-          console.log('NodeEditor: Creating edge with ID:', edgeId);
-          
-          // Check if this edge already exists to prevent duplicates
-          const existingEdge = newEdges.find(edge => edge.id === edgeId);
-          if (existingEdge) {
-            console.log('NodeEditor: Skipping duplicate edge:', edgeId);
-            return;
+            const edgeId = route.id || `edge-${interaction.id}-${route.source}-${route.target}`;
+            
+            // Check if this edge already exists to prevent duplicates
+            const existingEdge = newEdges.find(edge => edge.id === edgeId);
+            if (existingEdge) {
+              return;
+            }
+            
+            newEdges.push({
+              id: edgeId,
+              source: sourceNode.id,
+              target: targetNode.id,
+              sourceHandle: route.event, // Set the sourceHandle based on the route event
+              targetHandle: undefined, // Let ReactFlow determine the target handle
+              type: 'custom',
+              style: edgeStyle,
+              data: {
+                route,
+                interactionId: interaction.id,
+              },
+            });
           }
-          
-          newEdges.push({
-            id: edgeId,
-            source: sourceNode.id,
-            target: targetNode.id,
-            sourceHandle: route.event, // Set the sourceHandle based on the route event
-            targetHandle: undefined, // Let ReactFlow determine the target handle
-            type: 'custom',
-            style: edgeStyle,
-            data: { 
-              route, 
-              interaction,
-              isRegistered: true // All backend-loaded edges are registered
-            },
-          });
-          
-          // Track connection state for handle labels
-          connectionStateTracker.addConnection(
-            sourceNode.id,
-            route.event,
-            targetNode.id,
-            'input', // Output modules have 'input' as their target handle
-            route.event
-          );
-          
-          // Edge registration determined by presence in interactions data
-        }
+        });
       });
-    });
 
-    // Only update nodes and edges if there are actual changes to prevent unnecessary rebuilds
-    setNodes((currentNodes) => {
-      // Check if we need to update nodes
-      const currentNodeIds = new Set(currentNodes.map(n => n.id));
-      const newNodeIds = new Set(newNodes.map(n => n.id));
-      
-      // If the sets are different, update nodes
-      if (currentNodeIds.size !== newNodeIds.size || 
-          !Array.from(currentNodeIds).every(id => newNodeIds.has(id))) {
+      // Update nodes and edges state
+      setNodes((currentNodes) => {
+        const currentNodeIds = new Set(currentNodes.map(n => n.id));
+        const newNodeIds = new Set(newNodes.map(n => n.id));
+        
+        // Check if the actual node IDs are different (not just count)
+        const hasDifferentIds = currentNodeIds.size !== newNodeIds.size || 
+          !Array.from(currentNodeIds).every(id => newNodeIds.has(id)) ||
+          !Array.from(newNodeIds).every(id => currentNodeIds.has(id));
+        
+        // Always update nodes when interactions change (force update to prevent race conditions)
         return newNodes;
-      }
-      
-      // If nodes are the same, preserve current nodes to maintain local state
-      return currentNodes;
-    });
+      });
 
-    setEdges((currentEdges) => {
-      // Check if we need to update edges
-      const currentEdgeIds = new Set(currentEdges.map(e => e.id));
-      const newEdgeIds = new Set(newEdges.map(e => e.id));
-      
-      // If the sets are different, update edges
-      if (currentEdgeIds.size !== newEdgeIds.size || 
-          !Array.from(currentEdgeIds).every(id => newEdgeIds.has(id))) {
-        return newEdges;
-      }
-      
-      // If edges are the same, preserve current edges to maintain local state
-      return currentEdges;
-    });
+      setEdges((currentEdges) => {
+        // Check if we need to update edges
+        const currentEdgeIds = new Set(currentEdges.map(e => e.id));
+        const newEdgeIds = new Set(newEdges.map(e => e.id));
+        
+        // If the sets are different, update edges
+        if (currentEdgeIds.size !== newEdgeIds.size || 
+            !Array.from(currentEdgeIds).every(id => newEdgeIds.has(id))) {
+          return newEdges;
+        }
+        
+        // If edges are the same, preserve current edges to maintain local state
+        return currentEdges;
+      });
+    }, 0); // Defer to next tick
   }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode, getInteractionsHash]); // Use interactions directly
 
   // Update node data with current edges for handle coloring
@@ -545,18 +547,18 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       
       // Edge registration handled through interactions data
       
-      // Track connection state for handle labels
-      connectionStateTracker.addConnection(
-        params.source!,
-        params.sourceHandle!,
-        params.target!,
-        params.targetHandle!,
-        eventType
-      );
+      // Defer connection state tracker updates to next tick to avoid React state race conditions
+      setTimeout(() => {
+        // Track connection state for handle labels
+        connectionStateTracker.addConnection(
+          params.source!,
+          params.sourceHandle!,
+          params.target!,
+          params.targetHandle!,
+          eventType
+        );
+      }, 0);
       
-      // Debug log
-      console.log(`Connection made: ${params.source}:${params.sourceHandle} -> ${params.target}:${params.targetHandle} (${eventType})`);
-  
       // Update local interactions state
       const updatedInteractions = [...interactions];
       const targetInteraction = updatedInteractions.find(interaction => 
@@ -588,25 +590,28 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           edge.source === params.source && edge.target === params.target
         );
         
-        if (existingEdge) {
-          // Update existing connection type
-          connectionStateTracker.updateConnection(
-            params.source!,
-            params.sourceHandle!,
-            params.target!,
-            params.targetHandle!,
-            eventType
-          );
-        } else {
-          // Add new connection
-          connectionStateTracker.addConnection(
-            params.source!,
-            params.sourceHandle!,
-            params.target!,
-            params.targetHandle!,
-            eventType
-          );
-        }
+        // Defer connection state tracker updates to next tick to avoid React state race conditions
+        setTimeout(() => {
+          if (existingEdge) {
+            // Update existing connection type
+            connectionStateTracker.updateConnection(
+              params.source!,
+              params.sourceHandle!,
+              params.target!,
+              params.targetHandle!,
+              eventType
+            );
+          } else {
+            // Add new connection
+            connectionStateTracker.addConnection(
+              params.source!,
+              params.sourceHandle!,
+              params.target!,
+              params.targetHandle!,
+              eventType
+            );
+          }
+        }, 0);
         
         // Remove any existing edges from the same source to the same target
         const filteredEdges = eds.filter(edge => {

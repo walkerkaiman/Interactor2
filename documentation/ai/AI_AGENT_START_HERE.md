@@ -170,6 +170,73 @@ throw InteractorError.validation(
 
 ---
 
+## 🚨 **Configuration Synchronization Issues** (New Critical Lessons!)
+
+### ❌ **Dual Data Structure Problem**
+**Problem**: Backend has two separate data structures that can get out of sync:
+- **Module instances** (in `modules` array) - updated via API
+- **Interactions** (in `interactions` array) - loaded by frontend
+
+**Symptoms**: 
+- Backend terminal shows correct behavior
+- Frontend displays old/incorrect settings
+- Configuration appears to "reset" on refresh
+
+**Root Cause**: When module instances are updated, interactions aren't automatically synced.
+
+### ✅ **Solution Pattern**
+Always sync both data structures when updating module configuration:
+
+```typescript
+// After updating module instances
+await this.stateManager.replaceState({ modules: moduleInstances });
+
+// CRITICAL: Sync interactions with updated module instances
+await this.syncInteractionsWithModules();
+
+// Broadcast state update
+this.broadcastStateUpdate();
+```
+
+### ✅ **Sync Helper Method**
+```typescript
+private async syncInteractionsWithModules(): Promise<void> {
+  const interactions = this.stateManager.getInteractions();
+  const moduleInstances = this.stateManager.getModuleInstances();
+  let interactionsUpdated = false;
+  
+  interactions.forEach(interaction => {
+    interaction.modules?.forEach((module: any) => {
+      const matchingInstance = moduleInstances.find(instance => instance.id === module.id);
+      if (matchingInstance && JSON.stringify(module.config) !== JSON.stringify(matchingInstance.config)) {
+        module.config = matchingInstance.config;
+        interactionsUpdated = true;
+      }
+    });
+  });
+  
+  if (interactionsUpdated) {
+    await this.stateManager.replaceState({ interactions });
+  }
+}
+```
+
+### ✅ **Debugging Configuration Issues**
+**Key Debugging Steps**:
+1. **Check state.json** - Verify both `modules` and `interactions` sections
+2. **Compare configurations** - Look for mismatches between the two sections
+3. **Test API directly** - Use `curl` or `Invoke-WebRequest` to test backend updates
+4. **Check WebSocket updates** - Ensure frontend receives correct data
+5. **Verify persistence** - Confirm state.json is being updated correctly
+
+### ✅ **State Management Best Practices**
+- **Single source of truth**: Keep module instances and interactions in sync
+- **Immediate saves**: Use `saveState()` instead of `debouncedSaveState()` for critical updates
+- **Comprehensive logging**: Log configuration changes and sync operations
+- **Validation**: Always verify both data structures after updates
+
+---
+
 ## 🚨 **Frontend State Management & Debugging** (Critical Lessons!)
 
 ### ✅ **React Re-rendering Issues**

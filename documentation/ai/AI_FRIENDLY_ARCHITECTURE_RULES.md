@@ -67,6 +67,18 @@ const data = useMemo(() => ({ value: Math.random() }), []);
 return <Component data={data} />;
 ```
 
+### **5. Data Synchronization**
+```typescript
+// ❌ BAD - Multiple data structures that can get out of sync
+await this.stateManager.replaceState({ modules: moduleInstances });
+// Interactions not updated - frontend sees stale data
+
+// ✅ GOOD - Keep all data structures in sync
+await this.stateManager.replaceState({ modules: moduleInstances });
+await this.syncInteractionsWithModules(); // Sync related data
+this.broadcastStateUpdate();
+```
+
 ---
 
 ## ✅ **Encouraged Patterns** (AI-Friendly)

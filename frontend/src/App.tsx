@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -43,7 +43,13 @@ function App() {
   // Local state for unregistered interactions
   const [localInteractions, setLocalInteractions] = useState<InteractionConfig[]>([]);
   const [registeredInteractions, setRegisteredInteractions] = useState<InteractionConfig[]>([]);
+  const [originalRegisteredInteractions, setOriginalRegisteredInteractions] = useState<InteractionConfig[]>([]);
   const [originalRegisteredIds, setOriginalRegisteredIds] = useState<Set<string>>(new Set());
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  
+  // Simple state for tracking changes (removed duplicate declaration)
+
+
 
   // UI state
   const [uiState, setUIState] = useState<UIState>({
@@ -79,149 +85,57 @@ function App() {
     },
   });
 
-  // WebSocket connection
+  // WebSocket connection (simplified - only for real-time data, not state changes)
   useEffect(() => {
-    let reconnectTimeout: NodeJS.Timeout;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | undefined;
     
     const connectWebSocket = () => {
       const ws = new WebSocket('ws://localhost:3001');
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
-        // Clear any pending reconnection timeout
-        if (reconnectTimeout) {
-          clearTimeout(reconnectTimeout);
-          reconnectTimeout = null;
-        }
+        // WebSocket connected successfully
       };
       
-                ws.onmessage = (event) => {
-            try {
-              const message = JSON.parse(event.data);
-              if (message.type === 'state_update') {
-                // Update module instances with real-time data
-                const moduleInstances = message.data.moduleInstances || [];
-                
-                // Debug logging for Time Input modules
-                const timeInputInstances = moduleInstances.filter((instance: any) =>
-                  instance.moduleName === 'Time Input'
-                );
-                if (timeInputInstances.length > 0) {
-                  console.log('Received Time Input module updates:', timeInputInstances);
-                  console.log('Full WebSocket message data:', message.data);
-                  console.log('All moduleInstances:', moduleInstances);
-                }
-                
-                // Merge real-time data from moduleInstances into the interactions
-                const newRegisteredInteractions = message.data.interactions || [];
-                const newOriginalIds = new Set<string>(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
-                
-                                 // Update interactions with real-time data from moduleInstances
-                 setRegisteredInteractions((prev: InteractionConfig[]) => {
-                   // Check if the interactions have actually changed
-                   const prevIds = new Set(prev.map((i: InteractionConfig) => i.id));
-                   const newIds = new Set(newRegisteredInteractions.map((i: InteractionConfig) => i.id));
-                   
-                   console.log('WebSocket update - prev interactions:', prev);
-                   console.log('WebSocket update - new interactions:', newRegisteredInteractions);
-                   console.log('WebSocket update - moduleInstances:', moduleInstances);
-                   
-                   if (prevIds.size !== newIds.size || 
-                       !Array.from(prevIds).every(id => newIds.has(id))) {
-                     console.log('WebSocket update - interactions structure changed');
-                     // If interactions structure changed, use new interactions but merge real-time data
-                     const updatedInteractions = newRegisteredInteractions.map((interaction: InteractionConfig) => ({
-                       ...interaction,
-                       modules: interaction.modules?.map((module: any) => {
-                         // Find matching module instance update with real-time data
-                         const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
-                         if (instanceUpdate) {
-                           console.log('WebSocket update - merging data for module:', module.id, instanceUpdate);
-                           return {
-                             ...module,
-                             ...instanceUpdate, // Merge in the real-time data
-                           };
-                         }
-                         return module;
-                       }) || []
-                     }));
-                     console.log('WebSocket update - final updated interactions:', updatedInteractions);
-                     console.log('WebSocket update - Time Input module in final interactions:', 
-                       updatedInteractions[0]?.modules?.find((m: any) => m.moduleName === 'Time Input'));
-                     return updatedInteractions;
-                   }
-                   
-                   console.log('WebSocket update - no structural change, merging real-time data');
-                   // If no structural change, just merge real-time data into existing interactions
-                   const updatedInteractions = prev.map((interaction: InteractionConfig) => ({
-                     ...interaction,
-                     modules: interaction.modules?.map((module: any) => {
-                       // Find matching module instance update with real-time data
-                       const instanceUpdate = moduleInstances.find((instance: any) => instance.id === module.id);
-                       if (instanceUpdate) {
-                         console.log('WebSocket update - merging data for module:', module.id, instanceUpdate);
-                         return {
-                           ...module,
-                           ...instanceUpdate, // Merge in the real-time data
-                         };
-                       }
-                       return module;
-                     }) || []
-                   }));
-                   console.log('WebSocket update - final updated interactions:', updatedInteractions);
-                   console.log('WebSocket update - Time Input module in final interactions:', 
-                     updatedInteractions[0]?.modules?.find((m: any) => m.moduleName === 'Time Input'));
-                   return updatedInteractions;
-                 });
-            
-            setOriginalRegisteredIds(newOriginalIds);
-          } else if (message.type === 'trigger_event') {
-            // Handle trigger events from backend
-            const { moduleId, type } = message.data;
-            console.log(`Received trigger event for module ${moduleId} of type ${type}`);
-            
-            // Record the trigger event to trigger pulse animation
-            // Trigger events now handled directly in components
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'state_update') {
+            const moduleInstances = message.data.moduleInstances || [];
+            const timeInputInstances = moduleInstances.filter((instance: any) =>
+              instance.moduleName === 'Time Input'
+            );
+            if (timeInputInstances.length > 0) {
+              // Real-time data updates only
+            }
+            // No longer processing structural changes via WebSocket here
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('WebSocket message parsing error:', error);
         }
       };
-      
-      ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
-        // Attempt to reconnect after a delay
-        setTimeout(() => {
-          console.log('Attempting to reconnect WebSocket...');
-          connectWebSocket();
-        }, 1000);
+
+      ws.onclose = () => {
+        // Attempt to reconnect after 5 seconds
+        reconnectTimeout = setTimeout(connectWebSocket, 5000);
       };
-      
+
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        // Don't treat WebSocket errors as fatal - they can be temporary
-        // The app will continue to work without real-time updates
       };
-      
-      ws.onclose = () => {
-        console.log('WebSocket disconnected, attempting to reconnect in 5 seconds...');
-        // Attempt to reconnect after 5 seconds
-        reconnectTimeout = setTimeout(() => {
-          connectWebSocket();
-        }, 5000);
+
+      return () => {
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
+        ws.close();
       };
-      
-      return ws;
     };
-    
-    const ws = connectWebSocket();
+
+    connectWebSocket();
     
     return () => {
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
-      }
-      if (ws) {
-        ws.close();
       }
     };
   }, []);
@@ -242,25 +156,11 @@ function App() {
 
   const loadInitialData = async () => {
     try {
-      console.log('App: Loading initial data...');
       const [modules, interactions, settings] = await Promise.all([
         apiService.getModules(),
         apiService.getInteractions(),
         apiService.getSettings(),
       ]);
-
-      console.log('App: Loaded data:', {
-        modulesCount: modules.length,
-        interactionsCount: interactions.length,
-        settingsKeys: Object.keys(settings)
-      });
-      
-      console.log('App: Interactions details:', interactions.map(i => ({
-        id: i.id,
-        name: i.name,
-        modulesCount: i.modules?.length || 0,
-        routesCount: i.routes?.length || 0
-      })));
 
       setAppState(prev => ({
         ...prev,
@@ -268,15 +168,15 @@ function App() {
         settings,
       }));
       
-      // Only update registered interactions, preserve local ones
+      // Set up interaction tracking with proper original state
       setRegisteredInteractions(interactions);
+      setOriginalRegisteredInteractions(JSON.parse(JSON.stringify(interactions))); // Deep copy as immutable snapshot
       
       // Track the original registered interaction IDs
       const originalIds = new Set(interactions.map(interaction => interaction.id));
       setOriginalRegisteredIds(originalIds);
       
-      console.log('App: Initial data loaded successfully');
-      // Edge registration now handled directly in NodeEditor through interactions data
+      setInitialDataLoaded(true);
     } catch (error) {
       console.error('App: Failed to load initial data:', error);
       setAppState(prev => ({
@@ -332,6 +232,8 @@ function App() {
   // Handle interaction updates (local changes)
   const handleInteractionsUpdate = useCallback((interactions: InteractionConfig[]) => {
     
+    // No longer need WebSocket locks since we simplified the approach
+    
     // Determine which interactions are local vs registered based on original IDs
     const local: InteractionConfig[] = [];
     const registered: InteractionConfig[] = [];
@@ -341,8 +243,42 @@ function App() {
       const isRegistered = originalRegisteredIds.has(interaction.id);
       
       if (isRegistered) {
-        registered.push(interaction);
+        // Check if this registered interaction has been modified
+        // Compare against the original interaction state from the backend
+        const originalInteractionFromBackend = originalRegisteredInteractions.find(i => i.id === interaction.id);
+        if (originalInteractionFromBackend) {
+          const originalModuleCount = originalInteractionFromBackend.modules?.length || 0;
+          const currentModuleCount = interaction.modules?.length || 0;
+          const moduleCountChanged = originalModuleCount !== currentModuleCount;
+          
+          // Deep compare to see if anything changed, but exclude position data
+          const originalWithoutPosition = JSON.parse(JSON.stringify(originalInteractionFromBackend));
+          const currentWithoutPosition = JSON.parse(JSON.stringify(interaction));
+          
+          // Remove position data from modules for comparison
+          originalWithoutPosition.modules?.forEach((module: any) => {
+            delete module.position;
+          });
+          currentWithoutPosition.modules?.forEach((module: any) => {
+            delete module.position;
+          });
+          
+          const hasChanges = JSON.stringify(originalWithoutPosition) !== JSON.stringify(currentWithoutPosition);
+          
+          if (hasChanges || moduleCountChanged) {
+            // Modified registered interaction should be treated as local
+            local.push(interaction);
+          } else {
+            // Unchanged registered interaction
+            registered.push(interaction);
+          }
+        } else {
+          // This shouldn't happen, but treat as registered
+          registered.push(interaction);
+        }
       } else {
+        // New interaction (not in originalRegisteredIds)
+        // Always treat new interactions as local, regardless of originalRegisteredIds size
         local.push(interaction);
       }
     });
@@ -351,10 +287,7 @@ function App() {
     setLocalInteractions(local);
     setRegisteredInteractions(registered);
     
-    // Update edge registration tracker - but preserve individual edge registration states
-    // Don't call updateFromInteractions here as it would override individual edge states
-    // Instead, let the tracker maintain its current state for existing edges
-  }, [originalRegisteredIds]);
+  }, [originalRegisteredIds, originalRegisteredInteractions, initialDataLoaded]);
 
   // Handle settings updates
   const handleSettingsUpdate = useCallback(async (key: string, value: any) => {
@@ -398,14 +331,33 @@ function App() {
   // Compute all interactions (local + registered)
   const allInteractions = [...localInteractions, ...registeredInteractions];
   
-  // Debug logging for interactions
-  console.log('App: Current interactions state:', {
-    localCount: localInteractions.length,
-    registeredCount: registeredInteractions.length,
-    allCount: allInteractions.length,
-    localIds: localInteractions.map(i => i.id),
-    registeredIds: registeredInteractions.map(i => i.id)
-  });
+  // Check if current interactions differ from registered interactions
+  const hasUnregisteredChanges = useMemo(() => {
+    
+    // If there are local interactions, there are unregistered changes
+    if (localInteractions.length > 0) {
+      return true;
+    }
+    
+    // Check if any registered interactions have been modified
+    const originalRegisteredInteractions = Array.from(originalRegisteredIds).map(id => 
+      registeredInteractions.find(interaction => interaction.id === id)
+    ).filter(Boolean);
+    
+    // Compare current registered interactions with original ones
+    if (originalRegisteredInteractions.length !== registeredInteractions.length) {
+      return true;
+    }
+    
+    return false;
+  }, [localInteractions, registeredInteractions, originalRegisteredIds, initialDataLoaded]);
+  
+  // Track state changes (minimal logging)
+  useEffect(() => {
+    if (hasUnregisteredChanges) {
+      // console.log('Unregistered changes detected'); // Removed debugging log
+    }
+  }, [hasUnregisteredChanges]);
 
   // Handle page state updates
   const updateWikisPageState = useCallback((updates: Partial<WikisPageState>) => {
@@ -448,6 +400,8 @@ function App() {
     }));
   }, []);
 
+
+
   return (
     <div className={styles.app}>
       <ReactFlowProvider>
@@ -472,6 +426,7 @@ function App() {
               onToggleSettings={toggleSettingsPanel}
               onToggleTrigger={toggleTriggerPanel}
               sidebarOpen={uiState.sidebarOpen}
+              hasUnregisteredChanges={hasUnregisteredChanges}
             />
 
             {/* Page Content */}

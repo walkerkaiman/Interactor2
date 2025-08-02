@@ -112,6 +112,16 @@ export class StateManager {
       const dataDir = path.dirname(this.stateFile);
       await fs.ensureDir(dataDir);
       
+      this.logger.debug('Saving state to file', 'StateManager', {
+        interactionsCount: this.state.interactions.length,
+        modulesCount: this.state.modules.length,
+        modules: this.state.modules.map(m => ({
+          id: m.id,
+          moduleName: m.moduleName,
+          config: m.config
+        }))
+      });
+      
       await fs.writeJson(this.stateFile, this.state, { spaces: 2 });
       this.lastSaved = Date.now();
       this.logger.debug('State saved to file', 'StateManager');
@@ -227,7 +237,7 @@ export class StateManager {
     const index = this.state.modules.findIndex(m => m.id === moduleInstance.id);
     if (index !== -1) {
       this.state.modules[index] = moduleInstance;
-      this.debouncedSaveState();
+      await this.saveState(); // Save immediately for configuration updates
     }
   }
 

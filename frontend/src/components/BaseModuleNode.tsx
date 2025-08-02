@@ -74,8 +74,10 @@ export function useBaseModuleNode(
   // Connection state change handling
   useEffect(() => {
     const handleConnectionChange = () => {
-  
-      setConnectionStateVersion(prev => prev + 1);
+      // Defer state update to next tick to avoid React state race conditions
+      setTimeout(() => {
+        setConnectionStateVersion(prev => prev + 1);
+      }, 0);
     };
 
     // Subscribe to connection state changes

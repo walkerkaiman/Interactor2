@@ -30,7 +30,7 @@ export class MyInputModule extends InputModuleBase {
       type: 'input',
       version: '1.0.0',
       description: 'Describe what this module does',
-      author: 'Your Name',
+      author: 'Kaiman Walker',
       configSchema: {
         type: 'object',
         properties: {
@@ -101,7 +101,7 @@ export class MyInputModule extends InputModuleBase {
   "type": "input",
   "version": "1.0.0",
   "description": "Describe what this module does",
-  "author": "Your Name",
+  "author": "Kaiman Walker",
   "configSchema": {
     "type": "object",
     "properties": {

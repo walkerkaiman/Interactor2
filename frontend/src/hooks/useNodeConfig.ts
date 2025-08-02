@@ -62,7 +62,6 @@ export function useInstanceData<T>(instance: any, key: string, defaultValue: T):
       const newValue = instance[key] !== undefined 
         ? instance[key] 
         : defaultValue;
-      console.log(`useInstanceData - ${key}: instance[${key}] = ${instance[key]}, newValue = ${newValue}`);
       setValue(newValue);
     }
   }, [instance, key, defaultValue]);
