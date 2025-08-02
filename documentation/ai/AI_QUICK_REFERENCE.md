@@ -1,135 +1,228 @@
-# 🚀 AI Quick Reference - Interactor
+# AI Quick Reference
 
-## 📋 **Module Development Checklist**
+## Module Development
 
-### Required Files
-- [ ] `index.ts` - Module implementation
-- [ ] `manifest.json` - Configuration schema
-- [ ] `wiki.md` - Documentation (optional)
-
-### Base Class Choice
-- **Input Module**: `extends InputModuleBase`
-- **Output Module**: `extends OutputModuleBase`
-
-### Required Methods
-- [ ] `constructor(config)` - Initialize with manifest
-- [ ] `onStart()` - Start your module logic
-- [ ] `onStop()` - Clean up resources
-
-### Manifest Required Fields
-```json
-{
-  "name": "Human Readable Name",
-  "type": "input" | "output", 
-  "version": "1.0.0",
-  "description": "What this does",
-  "author": "Kaiman Walker",
-  "configSchema": { "type": "object" },
-  "events": [{ "name": "event", "type": "input|output" }]
-}
+### File Structure
+```
+backend/src/modules/input/my_module/
+├── index.ts          # Module implementation
+├── manifest.json     # Module configuration
+└── wiki.md          # Documentation (optional)
 ```
 
----
+### Base Classes
+- **Input modules**: Extend `InputModuleBase`
+- **Output modules**: Extend `OutputModuleBase`
 
-## 🔗 **Key File Locations**
-
-- **Module Base Classes**: `backend/src/modules/InputModuleBase.ts`, `OutputModuleBase.ts`
-- **Shared Types**: `shared/src/types/index.ts`
-- **Example Module**: `backend/src/modules/input/time_input/`
-- **Frontend Components**: `frontend/src/components/`
-
----
-
-## 🎛️ **Available Input/Output Types**
-
-### Current Input Modules
-- `frames_input` - Frame-based triggers
-- `http_input` - HTTP endpoint listener
-- `osc_input` - OSC protocol
-- `serial_input` - Serial port communication
-- `time_input` - Clock/metronome triggers
-
-### Current Output Modules  
-- `audio_output` - Audio playback
-- `dmx_output` - DMX lighting control
-- `http_output` - HTTP requests
-- `osc_output` - OSC protocol
-
----
-
-## 📡 **Common Patterns**
-
-### Input Module Pattern
+### Lifecycle Methods
 ```typescript
-export class MyInput extends InputModuleBase {
-  private timer?: NodeJS.Timeout;
+export class MyModule extends InputModuleBase {
+  protected async onInit(): Promise<void> {
+    // Setup and validation
+  }
   
   protected async onStart(): Promise<void> {
-    this.timer = setInterval(() => {
-      this.emitTrigger('pulse', { timestamp: Date.now() });
-    }, 1000);
+    // Begin processing
   }
   
   protected async onStop(): Promise<void> {
-    if (this.timer) clearInterval(this.timer);
+    // Cleanup
   }
 }
 ```
 
-### Output Module Pattern
+### Manifest Schema
+```json
+{
+  "name": "Module Name",
+  "type": "input|output",
+  "description": "Module description",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "enabled": { "type": "boolean", "default": true }
+    }
+  }
+}
+```
+
+## API Endpoints
+
+### Core Endpoints
+- `GET /api/modules` - Get all modules
+- `GET /api/interactions` - Get all interactions
+- `POST /api/interactions` - Register interactions
+- `PUT /api/modules/instances/:id` - Update module config
+
+### WebSocket Events
+- `state_update` - Real-time module data updates
+
+## Common Patterns
+
+### Error Handling
 ```typescript
-export class MyOutput extends OutputModuleBase {
-  protected async onStart(): Promise<void> {
-    this.on('trigger', (payload) => {
-      console.log('Received:', payload);
-    });
-  }
-}
+import { InteractorError } from '../../../core/ErrorHandler';
+
+// Validation errors
+throw InteractorError.validation('Invalid config', { config });
+
+// Network errors
+throw InteractorError.networkError('Connection failed', originalError);
+
+// Module errors
+throw InteractorError.moduleError(moduleName, 'start', error);
 ```
 
----
+### Retry Logic
+```typescript
+import { RetryHandler } from '../../../core/RetryHandler';
 
-## 🚨 **Common Mistakes to Avoid**
+await RetryHandler.withNetworkRetry(async () => {
+  return await fetch(url);
+});
+```
 
-- ❌ Don't modify `MessageRouter` or `StateManager`
-- ❌ Don't create your own WebSocket connections
-- ❌ Don't add complex frontend state management
-- ❌ Don't import Node.js modules in shared code
-- ❌ Don't hardcode file paths
+## Troubleshooting Common Issues
 
----
+### State Synchronization Issues
 
-## 🚨 **Troubleshooting Common Issues**
+**Problem**: "Unregistered Interactions" indicator not working or phantom modules appearing after deletion.
 
-### **Configuration Not Updating in Frontend**
-**Symptoms**: Backend works correctly, frontend shows old settings
-**Solution**: Check if `modules` and `interactions` in state.json are in sync
-**Fix**: Add sync logic to update interactions when module instances change
+**Root Causes**:
+1. **Immutable state snapshots**: Using shallow copies that can be modified
+2. **Race conditions in node updates**: Preserving old state instead of using latest data
 
-### **State Persistence Issues**
-**Symptoms**: Settings reset on backend restart
-**Solution**: Use `saveState()` instead of `debouncedSaveState()` for critical updates
-**Pattern**: Always sync both data structures after configuration changes
+**Solutions**:
+```typescript
+// ❌ Wrong: Shallow copy
+setOriginalState([...interactions]);
 
-### **WebSocket Race Conditions**
-**Symptoms**: Initial load overridden by WebSocket updates
-**Solution**: Add `initialDataLoaded` flag to prevent WebSocket updates before initial load
-**Pattern**: Only process WebSocket updates after initial data is loaded
+// ✅ Correct: Deep copy
+setOriginalState(JSON.parse(JSON.stringify(interactions)));
 
----
+// ❌ Wrong: Conditional updates
+if (hasDifferentIds) {
+  return newNodes;
+} else {
+  return currentNodes; // Can preserve old state
+}
 
-## ✅ **Testing Your Module**
+// ✅ Correct: Force updates
+return newNodes; // Always use latest data
+```
 
-1. **Module loads**: Check backend logs for errors
-2. **Config UI**: Module appears in frontend sidebar
-3. **Events work**: Connect to other modules and test triggers
-4. **No crashes**: System remains stable
+### Configuration Not Updating
 
----
+**Problem**: Module settings appear to reset or not persist.
 
-## 📞 **API Endpoints for Testing**
+**Solution**: Ensure both data structures are synced:
+```typescript
+// After updating module instances
+await this.stateManager.replaceState({ modules: moduleInstances });
 
-- `GET /api/modules` - List available modules
-- `POST /api/trigger/:moduleId` - Manually trigger module
-- `GET /api/interactions` - Current connections
-- `POST /api/interactions/register` - Save connections
+// CRITICAL: Sync interactions with updated modules
+await this.syncInteractionsWithModules();
+```
+
+### WebSocket Race Conditions
+
+**Problem**: UI not updating or showing incorrect state.
+
+**Solution**: Use WebSocket only for real-time data, not structural changes:
+```typescript
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.type === 'state_update') {
+    // Handle real-time data only
+    // Don't process structural changes via WebSocket
+  }
+};
+```
+
+### React State Race Conditions
+
+**Problem**: "Cannot update during render" errors or inconsistent UI state.
+
+**Solution**: Defer state updates to next tick:
+```typescript
+// ❌ Wrong: Can cause render errors
+setNodes(newNodes);
+setEdges(newEdges);
+
+// ✅ Correct: Defer to next tick
+setTimeout(() => {
+  setNodes(newNodes);
+  setEdges(newEdges);
+}, 0);
+```
+
+### State Comparison Issues
+
+**Problem**: Changes not detected when they should be.
+
+**Solution**: Use deep comparison with exclusions:
+```typescript
+// Remove position data (doesn't affect backend behavior)
+const originalWithoutPosition = JSON.parse(JSON.stringify(original));
+const currentWithoutPosition = JSON.parse(JSON.stringify(current));
+
+originalWithoutPosition.modules?.forEach(m => delete m.position);
+currentWithoutPosition.modules?.forEach(m => delete m.position);
+
+const hasChanges = JSON.stringify(originalWithoutPosition) !== JSON.stringify(currentWithoutPosition);
+```
+
+## Debugging Techniques
+
+### State Tracking
+```typescript
+// Add detailed logging
+console.log('State comparison:', {
+  original: originalState,
+  current: currentState,
+  hasChanges: hasChanges
+});
+```
+
+### Node Updates
+```typescript
+// Track node ID changes
+console.log('Node update:', {
+  currentIds: currentNodes.map(n => n.id),
+  newIds: newNodes.map(n => n.id),
+  shouldUpdate: hasDifferentIds
+});
+```
+
+### WebSocket Debugging
+```typescript
+// Monitor WebSocket messages
+ws.onmessage = (event) => {
+  console.log('WebSocket message:', JSON.parse(event.data));
+};
+```
+
+## Performance Best Practices
+
+### React Optimization
+- Use `useCallback` for expensive operations
+- Use `useMemo` for computed values
+- Avoid unnecessary re-renders with proper dependencies
+
+### State Management
+- Use immutable updates
+- Batch related state updates
+- Defer updates with `setTimeout(..., 0)`
+
+### Error Handling
+- Always use `InteractorError` for structured errors
+- Include helpful error messages and suggestions
+- Use retry logic for transient failures
+
+## File Locations
+
+- **Backend modules**: `backend/src/modules/`
+- **Frontend components**: `frontend/src/components/`
+- **Shared types**: `shared/src/types/`
+- **Configuration**: `config/`
+- **Documentation**: `documentation/`

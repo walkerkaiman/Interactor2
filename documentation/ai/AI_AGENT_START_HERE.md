@@ -1,444 +1,326 @@
-# 🤖 AI Agent Start Here - Interactor Development Guide
+# AI Agent Start Here
 
-## 🚀 Quick Start (Read This First!)
+This document provides essential information for AI agents working on the Interactor project.
 
-**Interactor** is a modular, event-driven system for interactive installations. You are here to develop **new modules** or **enhance existing features**.
+## Core Rules
 
-### 📁 What You're Working With
-- **Backend**: Node.js/TypeScript modules that handle inputs/outputs (sensors, lights, audio, etc.)
-- **Frontend**: React visual editor for connecting modules
-- **Architecture**: Simple base classes + manifest-driven modules
+1. **Never restart the server automatically** - The user runs the server themselves
+2. **Avoid inline CSS** - Use proper CSS files for styling
+3. **Follow the modular architecture** - Each module should be self-contained
+4. **Maintain backward compatibility** - Changes should not break existing functionality
+5. **Use TypeScript strictly** - No `any` types unless absolutely necessary
 
----
+## Recent Lessons Learned
 
-## 🎯 Your Main Tasks Will Be
+### State Synchronization and Race Conditions (2025-01-27)
 
-### ✅ **Module Development** (Most Common)
-1. **Extend base classes**: `InputModuleBase` or `OutputModuleBase` 
-2. **Create manifest.json**: Describes your module's config and capabilities
-3. **Follow the lifecycle**: `onInit()` → `onStart()` → `onStop()`
+**Issues Resolved:**
+1. **"Unregistered Interactions" indicator not working** - The indicator wasn't appearing when dragging new modules or connecting them
+2. **Phantom module appearing after deletion** - A duplicate module would appear after deleting the last new module
 
-**📂 Template Location**: `backend/src/modules/input/time_input/` (great example)
+**Root Causes:**
+1. **Immutable state snapshots**: The original state was being modified when current state changed, causing incorrect comparisons
+2. **Race conditions in node updates**: The node update logic was preserving old state instead of using the latest interactions data
 
-### ✅ **Frontend Features** (Less Common)
-- The frontend is **simplified architecture only**
-- Main files: `App.tsx`, `NodeEditor.tsx`, `CustomEdge.tsx`
-- **No singletons or complex state management**
+**Solutions Applied:**
+1. **True immutable snapshots**: Used `JSON.parse(JSON.stringify(interactions))` instead of `[...interactions]` to create deep copies
+2. **Force updates instead of conditional updates**: Changed node update logic from conditional updates to always using the latest interactions data
+3. **Simplified WebSocket handling**: Removed complex structural change detection from WebSocket, using only for real-time data updates
 
----
+**Key Technical Insights:**
+- **Deep vs shallow copying**: `[...array]` creates a shallow copy that can still reference mutable objects
+- **State comparison logic**: When comparing states, ensure you're comparing the actual data, not references
+- **Race condition prevention**: Force updates can prevent race conditions where old state is preserved incorrectly
+- **WebSocket simplification**: Using WebSocket only for real-time data and fetch for structural changes reduces complexity
 
-## 🚨 **Critical Rules** (Read These!)
-
-### ❌ **What NOT to Touch**
-- **Don't modify core services**: `MessageRouter`, `StateManager`, `ModuleLoader`
-- **Don't create new base classes**: Use existing `InputModuleBase`/`OutputModuleBase`
-- **Don't add complex state management**: Keep it simple
-- **Don't create documentation files**: Focus on code
-
-### ✅ **What TO Do**
-- **Read the existing module examples first**
-- **Use shared types from `@interactor/shared`**
-- **Follow the manifest schema exactly**
-- **Test your module in isolation**
-- **Keep modules focused and simple**
-- **✨ Use InteractorError for all error handling**
-- **✨ Add retry logic for network/file operations**
-- **✨ Include helpful error messages and suggestions**
-
----
-
-## 🚨 **Error Handling & Logging** (New System!)
-
-### ✅ **Use InteractorError for All Errors**
-The system now has **centralized error handling** with user-friendly messages and automatic retry capabilities.
-
+**Code Patterns:**
 ```typescript
-import { InteractorError } from '../../../core/ErrorHandler';
+// ❌ Wrong: Shallow copy that can be modified
+setOriginalState([...interactions]);
 
-// Validation errors with helpful suggestions
-if (!config.url) {
-  throw InteractorError.validation(
-    'URL is required for HTTP module',
-    { providedConfig: config },
-    [
-      'Provide a valid URL (e.g., "http://localhost:3000/api")',
-      'Include the protocol (http:// or https://)',
-      'Check that the target server is accessible'
-    ]
-  );
+// ✅ Correct: Deep copy that's truly immutable
+setOriginalState(JSON.parse(JSON.stringify(interactions)));
+
+// ❌ Wrong: Conditional updates that can preserve old state
+if (hasDifferentIds) {
+  return newNodes;
+} else {
+  return currentNodes; // Can preserve old state incorrectly
 }
 
-// Network errors (automatically retryable)
-throw InteractorError.networkError(
-  `Cannot connect to ${this.url}`,
-  originalError
-);
-
-// Module errors with operation context
-throw InteractorError.moduleError(
-  this.name, 
-  'initialization', 
-  error, 
-  retryable: true
-);
+// ✅ Correct: Force updates that always use latest data
+return newNodes; // Always use latest interactions data
 ```
 
-### ✅ **Use RetryHandler for Network Operations**
-Automatic retry with exponential backoff for reliable operations:
+**Debugging Techniques:**
+- Add detailed logging to track state changes
+- Compare actual node IDs, not just counts
+- Log before/after states to identify race conditions
+- Use immutable snapshots for reliable comparisons
+
+## Configuration Synchronization Issues
+
+The backend maintains two related data structures:
+- `modules` array: Contains module instances with their configurations
+- `interactions` array: Contains interaction definitions that reference modules
+
+**Problem**: These structures can get out of sync, causing modules to appear with incorrect settings.
+
+**Solution Pattern**: After any module configuration update, synchronize the interactions:
 
 ```typescript
-import { RetryHandler } from '../../../core/RetryHandler';
-
-// Network requests with automatic retry
-const { result, attempts } = await RetryHandler.withNetworkRetry(
-  async () => await fetch(this.url, options),
-  {
-    maxAttempts: 3,
-    onRetry: (error, attempt, delay) => {
-      this.logger?.warn(`Retry ${attempt}/3 in ${delay}ms: ${error.message}`);
-    }
-  }
-);
-
-// File operations with retry
-await RetryHandler.withFileRetry(async () => {
-  return await fs.writeFile(path, data);
-});
-```
-
-### ✅ **Enhanced Logging Patterns**
-Use the built-in logger with proper context:
-
-```typescript
-export class MyModule extends InputModuleBase {
-  protected async onStart(): Promise<void> {
-    try {
-      // Success logging
-      this.logger?.info('Module started successfully', {
-        url: this.url,
-        timeout: this.timeout
-      });
-      
-      // Debug information
-      this.logger?.debug('Processing data', { 
-        dataSize: data.length,
-        timestamp: Date.now()
-      });
-      
-    } catch (error) {
-      // Error logging with context
-      this.logger?.error('Startup failed', error, {
-        moduleName: this.name,
-        config: this.config
-      });
-      
-      // Re-throw as InteractorError
-      throw InteractorError.moduleError(
-        this.name, 
-        'startup', 
-        error as Error, 
-        retryable: true
-      );
-    }
-  }
-}
-```
-
-### ✅ **Error Types to Use**
-
-| Use Case | Error Type | Example |
-|----------|------------|---------|
-| Invalid config | `InteractorError.validation()` | Missing URL, invalid timeout |
-| Resource not found | `InteractorError.notFound()` | Module instance, file not found |
-| Network failures | `InteractorError.networkError()` | Connection refused, timeout |
-| File operations | `InteractorError.fileError()` | Permission denied, disk full |
-| Module operations | `InteractorError.moduleError()` | Start/stop failures |
-| Conflicts | `InteractorError.conflict()` | Already running, port in use |
-
-### ❌ **Don't Use Generic Errors**
-```typescript
-// ❌ BAD - Generic error
-throw new Error('Something went wrong');
-
-// ✅ GOOD - Specific error with context
-throw InteractorError.validation(
-  'Timeout must be between 1000-30000ms',
-  { provided: config.timeout, min: 1000, max: 30000 },
-  ['Try 5000ms for most cases', 'Use 10000ms for slow networks']
-);
-```
-
----
-
-## 🚨 **Configuration Synchronization Issues** (New Critical Lessons!)
-
-### ❌ **Dual Data Structure Problem**
-**Problem**: Backend has two separate data structures that can get out of sync:
-- **Module instances** (in `modules` array) - updated via API
-- **Interactions** (in `interactions` array) - loaded by frontend
-
-**Symptoms**: 
-- Backend terminal shows correct behavior
-- Frontend displays old/incorrect settings
-- Configuration appears to "reset" on refresh
-
-**Root Cause**: When module instances are updated, interactions aren't automatically synced.
-
-### ✅ **Solution Pattern**
-Always sync both data structures when updating module configuration:
-
-```typescript
-// After updating module instances
-await this.stateManager.replaceState({ modules: moduleInstances });
-
-// CRITICAL: Sync interactions with updated module instances
-await this.syncInteractionsWithModules();
-
-// Broadcast state update
-this.broadcastStateUpdate();
-```
-
-### ✅ **Sync Helper Method**
-```typescript
-private async syncInteractionsWithModules(): Promise<void> {
-  const interactions = this.stateManager.getInteractions();
+// In backend/src/index.ts
+private syncInteractionsWithModules() {
   const moduleInstances = this.stateManager.getModuleInstances();
-  let interactionsUpdated = false;
+  const interactions = this.stateManager.getInteractions();
   
-  interactions.forEach(interaction => {
-    interaction.modules?.forEach((module: any) => {
+  // Update interactions to match current module configurations
+  const updatedInteractions = interactions.map(interaction => ({
+    ...interaction,
+    modules: interaction.modules?.map(module => {
       const matchingInstance = moduleInstances.find(instance => instance.id === module.id);
-      if (matchingInstance && JSON.stringify(module.config) !== JSON.stringify(matchingInstance.config)) {
-        module.config = matchingInstance.config;
-        interactionsUpdated = true;
-      }
-    });
-  });
+      return matchingInstance ? { ...module, config: matchingInstance.config } : module;
+    }) || []
+  }));
   
-  if (interactionsUpdated) {
-    await this.stateManager.replaceState({ interactions });
+  this.stateManager.updateInteractions(updatedInteractions);
+}
+```
+
+**When to call**: After any module instance configuration update (PUT /api/modules/instances/:id)
+
+**Debugging steps**:
+1. Check `data/state.json` for inconsistencies between `modules` and `interactions`
+2. Verify module configurations are being persisted immediately (not debounced)
+3. Ensure the sync function is called after configuration updates
+
+## Frontend State Management Lessons
+
+### React State Race Conditions
+
+**Problem**: Multiple state updates happening simultaneously can cause inconsistent UI state.
+
+**Solution**: Use `setTimeout(..., 0)` to defer state updates and prevent render-phase updates:
+
+```typescript
+// ❌ Wrong: Can cause "Cannot update during render" errors
+setNodes(newNodes);
+setEdges(newEdges);
+
+// ✅ Correct: Defer to next tick
+setTimeout(() => {
+  setNodes(newNodes);
+  setEdges(newEdges);
+}, 0);
+```
+
+### State Comparison Logic
+
+**Problem**: Comparing complex objects can be unreliable due to reference equality.
+
+**Solution**: Use deep comparison with specific exclusions:
+
+```typescript
+// Remove position data before comparison (it doesn't affect backend behavior)
+const originalWithoutPosition = JSON.parse(JSON.stringify(original));
+const currentWithoutPosition = JSON.parse(JSON.stringify(current));
+
+// Remove position from modules
+originalWithoutPosition.modules?.forEach(m => delete m.position);
+currentWithoutPosition.modules?.forEach(m => delete m.position);
+
+const hasChanges = JSON.stringify(originalWithoutPosition) !== JSON.stringify(currentWithoutPosition);
+```
+
+## Error Handling
+
+The system uses structured error handling with `InteractorError` class:
+
+```typescript
+class InteractorError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'InteractorError';
   }
 }
 ```
 
-### ✅ **Debugging Configuration Issues**
-**Key Debugging Steps**:
-1. **Check state.json** - Verify both `modules` and `interactions` sections
-2. **Compare configurations** - Look for mismatches between the two sections
-3. **Test API directly** - Use `curl` or `Invoke-WebRequest` to test backend updates
-4. **Check WebSocket updates** - Ensure frontend receives correct data
-5. **Verify persistence** - Confirm state.json is being updated correctly
+**Best practices**:
+- Always include error codes for programmatic handling
+- Provide meaningful error messages
+- Include relevant context in error details
+- Use try-catch blocks around async operations
 
-### ✅ **State Management Best Practices**
-- **Single source of truth**: Keep module instances and interactions in sync
-- **Immediate saves**: Use `saveState()` instead of `debouncedSaveState()` for critical updates
-- **Comprehensive logging**: Log configuration changes and sync operations
-- **Validation**: Always verify both data structures after updates
+## Module Development
 
----
+### Input Modules
+Extend `InputModuleBase` and implement:
+- `onInit()`: Setup and validation
+- `onStart()`: Begin processing
+- `onStop()`: Cleanup
 
-## 🚨 **Frontend State Management & Debugging** (Critical Lessons!)
+### Output Modules  
+Extend `OutputModuleBase` and implement:
+- `onInit()`: Setup and validation
+- `onStart()`: Begin processing
+- `onStop()`: Cleanup
 
-### ✅ **React Re-rendering Issues**
-**Problem**: Module settings changes not updating UI
-**Root Cause**: `useCallback` dependencies not watching `instance.config` changes
-**Solution**: Add state variable to force re-renders when config changes
-
-```typescript
-// ❌ WRONG - React won't re-render when config changes
-const renderConfig = useCallback(() => {
-  // ...
-}, [config.renderConfig, instance, props.data.onConfigChange]);
-
-// ✅ CORRECT - Force re-render when config changes
-const [configVersion, setConfigVersion] = useState(0);
-const renderConfig = useCallback(() => {
-  // ...
-  const updateConfig = (key: string, value: any) => {
-    // ... update logic ...
-    setConfigVersion(prev => prev + 1); // Force re-render
-  };
-}, [config.renderConfig, instance, props.data.onConfigChange, configVersion]);
-```
-
-### ✅ **Module Creation Race Conditions**
-**Problem**: Double module creation when dragging from sidebar
-**Root Cause**: `onDrop` creating nodes directly AND through interactions
-**Solution**: Single source of truth - only update interactions, let useEffect handle node creation
-
-```typescript
-// ❌ WRONG - Creates race condition
-const onDrop = useCallback((event) => {
-  // ... create node ...
-  setNodes((nds) => [...nds, newNode]); // Direct manipulation
-  onInteractionsChange(updatedInteractions); // Also triggers useEffect
-}, [dependencies]);
-
-// ✅ CORRECT - Single source of truth
-const onDrop = useCallback((event) => {
-  // ... create node ...
-  onInteractionsChange(updatedInteractions); // Only update interactions
-  // useEffect will handle node creation from interactions
-}, [dependencies]);
-```
-
-### ✅ **Edge Duplication Prevention**
-**Problem**: React warnings about duplicate edge keys
-**Root Cause**: useEffect running multiple times creating duplicate edges
-**Solution**: Check for existing edges before creating new ones
-
-```typescript
-// ✅ Add duplicate prevention
-const edgeId = route.id || `edge-${interaction.id}-${route.source}-${route.target}`;
-const existingEdge = newEdges.find(edge => edge.id === edgeId);
-if (existingEdge) {
-  console.log('Skipping duplicate edge:', edgeId);
-  return;
-}
-newEdges.push({ id: edgeId, ... });
-```
-
-### ✅ **Debugging Frontend State Issues**
-**Key Debugging Points**:
-1. **Check useEffect dependencies** - ensure they're stable
-2. **Add console.log to track state changes** - see when components re-render
-3. **Use hash comparison** - prevent unnecessary updates
-4. **Monitor React warnings** - duplicate keys indicate state issues
-
-```typescript
-// ✅ Debug state changes
-console.log('Component: useEffect triggered with data:', data);
-console.log('Component: Hash comparison:', currentHash === lastHash);
-console.log('Component: State update:', newState);
-```
-
-### ✅ **Port Configuration Issues**
-**Problem**: Frontend trying to connect to wrong backend port
-**Root Cause**: Vite config proxy pointing to wrong port
-**Solution**: Ensure frontend (3000) and backend (3001) ports match config
-
-```typescript
-// ✅ Correct Vite config
-export default defineConfig({
-  server: {
-    port: 3000, // Frontend port
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001', // Backend port
-        changeOrigin: true,
-      },
-    },
-  },
-});
-```
-
----
-
-## 📚 **Essential Reading (In Order)**
-
-1. **`MODULE_DEVELOPMENT.md`** - How to create modules
-2. **`shared/src/types/index.ts`** - All available types  
-3. **`backend/src/modules/input/time_input/`** - Complete example
-4. **`backend/src/core/ErrorHandler.ts`** - Error handling system
-5. **`backend/src/core/RetryHandler.ts`** - Retry mechanisms
-6. **`API_GUIDE.md`** - REST endpoints and WebSocket events
-
----
-
-## 🔧 **Development Workflow**
-
-```bash
-# 1. Create your module directory
-mkdir backend/src/modules/input/my_new_module
-
-# 2. Create required files
-touch backend/src/modules/input/my_new_module/index.ts
-touch backend/src/modules/input/my_new_module/manifest.json
-
-# 3. Start development server (don't restart it yourself)
-npm run dev  # (User handles this)
-
-# 4. Test your module via API or frontend
-```
-
----
-
-## 🎨 **Current Architecture Status**
-
-- ✅ **Backend**: Stable, don't modify core services
-- ✅ **Frontend**: Recently simplified, stable patterns only
-- ✅ **Shared Types**: Complete and consistent
-- ❌ **No complex patterns**: Singletons, complex state, duplicate WebSocket logic
-
----
-
-## 💡 **Quick Examples**
-
-### Module Structure (with Error Handling)
-```typescript
-import { InteractorError } from '../../../core/ErrorHandler';
-import { RetryHandler } from '../../../core/RetryHandler';
-
-export class MyInputModule extends InputModuleBase {
-  constructor(config: MyConfig) {
-    // Validate config with helpful messages
-    if (!config.interval || config.interval < 100) {
-      throw InteractorError.validation(
-        'Interval must be at least 100ms',
-        { provided: config.interval },
-        ['Try 1000ms for regular updates', 'Use 100-500ms for real-time data']
-      );
-    }
-    
-    super('my_input', config, manifest);
-  }
-  
-  protected async onStart(): Promise<void> {
-    try {
-      // Use retry for network operations
-      await RetryHandler.withNetworkRetry(async () => {
-        await this.connectToExternalService();
-      });
-      
-      this.emitTrigger('trigger', { value: 123 });
-      this.logger?.info('Module started successfully');
-      
-    } catch (error) {
-      this.logger?.error('Failed to start module', error);
-      throw InteractorError.moduleError(
-        this.name, 
-        'start', 
-        error as Error, 
-        retryable: true
-      );
-    }
-  }
-}
-```
-
-### Manifest Structure
+### Configuration
+Each module needs a `manifest.json`:
 ```json
 {
-  "name": "My Input",
-  "type": "input",
-  "version": "1.0.0",
-  "description": "Does something useful",
-  "configSchema": { "type": "object", "properties": {} },
-  "events": [{ "name": "trigger", "type": "output" }]
+  "name": "Module Name",
+  "type": "input|output",
+  "description": "Module description",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "enabled": { "type": "boolean", "default": true }
+    }
+  }
 }
 ```
 
----
+## File Locations
 
-## 🏁 **Success Criteria**
+- **Backend modules**: `backend/src/modules/`
+- **Frontend components**: `frontend/src/components/`
+- **Shared types**: `shared/src/types/`
+- **Configuration**: `config/`
+- **Documentation**: `documentation/`
 
-- Your module loads without errors
-- Configuration UI appears in frontend  
-- Events route correctly through the system
-- No impact on existing modules
-- Clean, focused code
-- **✨ Proper error handling with InteractorError**
-- **✨ User-friendly error messages with suggestions**
-- **✨ Automatic retry for transient failures**
+## Common Patterns
 
-**Ready to start? Read `MODULE_DEVELOPMENT.md` next!**
+### API Communication
+```typescript
+// GET data
+const data = await apiService.getInteractions();
+
+// POST registration
+await apiService.registerInteractions(interactions);
+
+// PUT configuration
+await apiService.updateModuleConfig(moduleId, config);
+```
+
+### WebSocket Usage
+```typescript
+// Real-time data updates only
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.type === 'state_update') {
+    // Handle real-time data only
+    // Don't process structural changes via WebSocket
+  }
+};
+```
+
+### State Management
+```typescript
+// Local state for unregistered changes
+const [localInteractions, setLocalInteractions] = useState([]);
+const [registeredInteractions, setRegisteredInteractions] = useState([]);
+
+// Original state for comparison
+const [originalRegisteredInteractions, setOriginalRegisteredInteractions] = useState([]);
+```
+
+## Frontend Lessons
+
+### Performance
+- Use `useCallback` and `useMemo` for expensive operations
+- Avoid unnecessary re-renders with proper dependency arrays
+- Consider `useLayoutEffect` for DOM measurements
+
+### State Updates
+- Defer state updates with `setTimeout(..., 0)` to avoid render-phase updates
+- Use immutable updates to prevent reference equality issues
+- Batch related state updates together
+
+### Error Boundaries
+- Wrap components in error boundaries for graceful failure handling
+- Provide fallback UI for error states
+- Log errors for debugging
+
+## Backend Lessons
+
+### Module Lifecycle
+- Always implement proper cleanup in `onStop()`
+- Validate configuration in `onInit()`
+- Handle async operations gracefully
+
+### State Persistence
+- Use immediate persistence for critical state changes
+- Implement proper error handling for file operations
+- Consider backup strategies for state corruption
+
+### WebSocket Management
+- Implement reconnection logic
+- Handle connection failures gracefully
+- Limit message frequency to prevent flooding
+
+## Testing
+
+### Unit Tests
+- Test module lifecycle methods
+- Verify configuration validation
+- Test error handling scenarios
+
+### Integration Tests
+- Test API endpoints
+- Verify WebSocket communication
+- Test state persistence
+
+### Frontend Tests
+- Test component rendering
+- Verify state management
+- Test user interactions
+
+## Deployment
+
+### Backend
+- Ensure all dependencies are installed
+- Verify configuration files are present
+- Test module loading on target system
+
+### Frontend
+- Build with production optimizations
+- Verify all assets are included
+- Test in target browser environment
+
+## Troubleshooting
+
+### Common Issues
+1. **Module not loading**: Check manifest.json syntax and file structure
+2. **Configuration not saving**: Verify file permissions and disk space
+3. **WebSocket connection failed**: Check port availability and firewall settings
+4. **State corruption**: Restore from backup or reset state.json
+
+### Debugging Steps
+1. Check console logs for error messages
+2. Verify file permissions and disk space
+3. Test API endpoints directly
+4. Check network connectivity for WebSocket
+5. Validate configuration files
+
+## Contributing
+
+### Code Style
+- Use TypeScript strictly
+- Follow existing naming conventions
+- Add proper error handling
+- Include relevant documentation
+
+### Testing
+- Add tests for new functionality
+- Update existing tests as needed
+- Verify integration with existing modules
+
+### Documentation
+- Update relevant documentation files
+- Include usage examples
+- Document any breaking changes

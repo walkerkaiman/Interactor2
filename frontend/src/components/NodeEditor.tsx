@@ -257,11 +257,20 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // Add the new node to local interactions
       const updatedInteractions = [...interactions];
       
-      if (updatedInteractions.length === 0) {
-        // Create a new interaction if none exists
+      // Check if there's an existing module with the same type but different configuration
+      // If so, create a new interaction for independent triggering
+      const existingModule = updatedInteractions.flatMap(interaction => 
+        interaction.modules || []
+      ).find(module => module.moduleName === moduleName);
+      
+      const shouldCreateNewInteraction = existingModule && 
+        JSON.stringify(existingModule.config) !== JSON.stringify(existingConfig);
+      
+      if (updatedInteractions.length === 0 || shouldCreateNewInteraction) {
+        // Create a new interaction for independent triggering
         const newInteraction = {
           id: `interaction-${Date.now()}`,
-          name: 'New Interaction',
+          name: `New Interaction ${updatedInteractions.length + 1}`,
           description: 'Automatically created interaction',
           enabled: true,
           modules: [{ ...newNode.data.instance, position }],
@@ -269,11 +278,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         };
         updatedInteractions.push(newInteraction);
       } else {
-        // Add to the first interaction
+        // Add to the first interaction if configurations are the same
         updatedInteractions[0].modules = updatedInteractions[0].modules || [];
         updatedInteractions[0].modules.push({ ...newNode.data.instance, position });
       }
-
+      
       // Notify parent of local changes
       // The main useEffect will handle creating the ReactFlow node from interactions
       onInteractionsChange(updatedInteractions);

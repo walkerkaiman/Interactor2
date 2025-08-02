@@ -120,6 +120,10 @@ export class InteractorServer {
       await this.moduleLoader.init();
       this.logger.info('Module loader initialized');
 
+      // Restore live module instances from data store
+      await this.restoreModuleInstances();
+      this.logger.info('Module instances restored');
+
       // Register available modules (no hot reloading)
       // TODO: Fix module registration with proper manifests
       // this.moduleLoader.register('frames_input', {});
@@ -135,6 +139,47 @@ export class InteractorServer {
       this.logger.info('All services initialized successfully');
     } catch (error) {
       this.logger.error('Failed to initialize services:', String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Restore live module instances from data store
+   */
+  private async restoreModuleInstances(): Promise<void> {
+    try {
+      const moduleInstances = this.stateManager.getModuleInstances();
+      const interactions = this.stateManager.getInteractions();
+      
+      this.logger.info(`Restoring ${moduleInstances.length} module instances from data store`);
+      
+      // Create live instances for all modules in the data store
+      for (const moduleInstance of moduleInstances) {
+        if (moduleInstance.moduleName === 'Time Input' || moduleInstance.moduleName === 'time_input') {
+          try {
+            // Create live module instance
+            const liveInstance = await this.createModuleInstance(moduleInstance);
+            if (liveInstance) {
+              // Start the live module instance if it was previously running
+              if (moduleInstance.status === 'running') {
+                await liveInstance.start();
+                this.logger.info(`Restored and started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+              } else {
+                this.logger.info(`Restored live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}) - not starting (status: ${moduleInstance.status})`);
+              }
+            }
+          } catch (error) {
+            this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, error);
+          }
+        }
+      }
+      
+      // Set up trigger event listeners for output modules
+      this.setupTriggerEventListeners();
+      
+      this.logger.info(`Successfully restored ${this.moduleInstances.size} live module instances`);
+    } catch (error) {
+      this.logger.error('Failed to restore module instances:', error);
       throw error;
     }
   }
@@ -200,14 +245,14 @@ export class InteractorServer {
   private async createModuleInstance(moduleData: any): Promise<any> {
     const { id, moduleName, config } = moduleData;
     
-    // For now, only handle Time Input module
-    if (moduleName === 'time_input') {
+    // Handle Time Input module (check for both possible names)
+    if (moduleName === 'Time Input' || moduleName === 'time_input') {
       try {
         // Import the TimeInputModule class
         const { TimeInputModule } = await import('./modules/input/time_input/index');
         
-        // Create instance with config
-        const moduleInstance = new TimeInputModule(config);
+        // Create instance with config and external ID
+        const moduleInstance = new TimeInputModule(config, id);
         moduleInstance.setLogger(this.logger);
         
         // Set up event listeners for state updates
@@ -540,6 +585,23 @@ export class InteractorServer {
           interactions: interactionMap,
           modules: moduleInstances 
         });
+        
+        // Create and start live module instances for input modules
+        for (const moduleInstance of moduleInstances) {
+          if (moduleInstance.moduleName === 'Time Input') {
+            try {
+              // Create live module instance
+              const liveInstance = await this.createModuleInstance(moduleInstance);
+              if (liveInstance) {
+                // Start the live module instance
+                await liveInstance.start();
+                this.logger.info(`Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+              }
+            } catch (error) {
+              this.logger.error(`Failed to start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, error);
+            }
+          }
+        }
         
         // Set up trigger event listeners for output modules
         this.setupTriggerEventListeners();

@@ -1,17 +1,50 @@
 {
   "interactions": [
     {
-      "id": "interaction-1754108542080",
-      "name": "New Interaction",
+      "id": "interaction-1754162576455",
+      "name": "New Interaction 1",
       "description": "Automatically created interaction",
       "enabled": true,
       "modules": [
         {
-          "id": "node-1754108542080",
+          "id": "node-1754162576455",
           "moduleName": "Time Input",
           "config": {
             "mode": "metronome",
-            "targetTime": "3:45 PM",
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 2000,
+            "enabled": true,
+            "apiEnabled": false,
+            "apiEndpoint": ""
+          },
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1754162576455,
+          "position": {
+            "x": 51.53703692058593,
+            "y": 395.8601705153272
+          }
+        },
+        {
+          "id": "node-1754162591003",
+          "moduleName": "Audio Output",
+          "config": {},
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1754162591003,
+          "position": {
+            "x": 659.4212194915909,
+            "y": 478.9310369465589
+          }
+        },
+        {
+          "id": "node-1754162594864",
+          "moduleName": "Time Input",
+          "config": {
+            "mode": "metronome",
+            "targetTime": "12:00 PM",
             "millisecondDelay": 3000,
             "enabled": true,
             "apiEnabled": false,
@@ -20,31 +53,37 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754145404125,
+          "lastUpdate": 1754162594864,
           "position": {
-            "x": 125,
-            "y": 207.9375
+            "x": 73.59734999775958,
+            "y": 872.6106656782972
           }
         },
         {
-          "id": "node-1754108556182",
+          "id": "node-1754162604513",
           "moduleName": "Audio Output",
           "config": {},
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754145069661,
+          "lastUpdate": 1754162604513,
           "position": {
-            "x": 626.2022920033513,
-            "y": 322.96767080327237
+            "x": 621.4284580809032,
+            "y": 949.5711712763925
           }
         }
       ],
       "routes": [
         {
-          "id": "route-1754108558124",
-          "source": "node-1754108542080",
-          "target": "node-1754108556182",
+          "id": "route-1754162606474",
+          "source": "node-1754162576455",
+          "target": "node-1754162591003",
+          "event": "trigger"
+        },
+        {
+          "id": "route-1754162609595",
+          "source": "node-1754162594864",
+          "target": "node-1754162604513",
           "event": "trigger"
         }
       ]
@@ -52,29 +91,72 @@
   ],
   "modules": [
     {
-      "id": "node-1754108542080",
+      "id": "node-1754162576455",
       "moduleName": "Time Input",
       "config": {
         "mode": "metronome",
-        "targetTime": "3:45 PM",
-        "millisecondDelay": 3000,
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 2000,
         "enabled": true,
         "apiEnabled": false,
         "apiEndpoint": ""
       },
-      "status": "stopped",
+      "status": "running",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754145554018
+      "lastUpdate": 1754163222925,
+      "mode": "metronome",
+      "currentTime": "2:33 PM",
+      "countdown": "2s interval",
+      "targetTime": "12:00 PM",
+      "targetTime12Hour": "",
+      "millisecondDelay": 2000,
+      "enabled": true,
+      "apiEnabled": false,
+      "apiEndpoint": ""
     },
     {
-      "id": "node-1754108556182",
+      "id": "node-1754162591003",
       "moduleName": "Audio Output",
       "config": {},
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754145554018
+      "lastUpdate": 1754162887531
+    },
+    {
+      "id": "node-1754162594864",
+      "moduleName": "Time Input",
+      "config": {
+        "mode": "metronome",
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 3000,
+        "enabled": true,
+        "apiEnabled": false,
+        "apiEndpoint": ""
+      },
+      "status": "running",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1754163222926,
+      "mode": "metronome",
+      "currentTime": "2:33 PM",
+      "countdown": "3s interval",
+      "targetTime": "12:00 PM",
+      "targetTime12Hour": "",
+      "millisecondDelay": 3000,
+      "enabled": true,
+      "apiEnabled": false,
+      "apiEndpoint": ""
+    },
+    {
+      "id": "node-1754162604513",
+      "moduleName": "Audio Output",
+      "config": {},
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1754162887531
     }
   ],
   "routes": [],

@@ -15,7 +15,7 @@ Documentation is organized for different audiences:
 **Simple Start** (Recommended):
 ```bash
 # Windows
-start-simple.bat
+start-interactor.bat
 
 # Manual
 cd backend && npm install

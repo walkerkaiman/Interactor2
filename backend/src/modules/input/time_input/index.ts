@@ -23,8 +23,9 @@ export class TimeInputModule extends InputModuleBase {
   private reconnectDelay = 5000; // 5 seconds
   private apiEnabled = false;
   private apiEndpoint?: string;
+  private externalId?: string; // Store external ID for state updates
 
-  constructor(config: TimeInputConfig) {
+  constructor(config: TimeInputConfig, externalId?: string) {
     super('time_input', config, {
       name: 'Time Input',
       type: 'input',
@@ -103,6 +104,9 @@ export class TimeInputModule extends InputModuleBase {
     // WebSocket configuration
     this.apiEnabled = config.apiEnabled || false;
     this.apiEndpoint = config.apiEndpoint;
+    
+    // Store external ID if provided
+    this.externalId = externalId;
   }
 
   protected async onInit(): Promise<void> {
@@ -261,9 +265,10 @@ export class TimeInputModule extends InputModuleBase {
    * Emit current module state - called after config changes and periodic updates
    */
   private emitStateUpdate(): void {
+    const moduleId = this.externalId ?? this.id;
     const stateUpdate = {
-      id: this.id,
-      moduleName: this.name,
+      id: moduleId,
+      moduleName: 'Time Input', // Use the display name that frontend expects
       status: this.enabled ? (this.isRunning ? 'running' : 'ready') : 'stopped',
       mode: this.timeMode,
       currentTime: this.currentTime,
@@ -277,7 +282,7 @@ export class TimeInputModule extends InputModuleBase {
       lastUpdate: Date.now()
     };
 
-    this.logger?.debug(`Time Input ${this.id}: Emitting state update`, stateUpdate);
+    this.logger?.debug(`Time Input ${moduleId}: Emitting state update`, stateUpdate);
     
     // Emit state update event for core system to handle
     this.emit('stateUpdate', stateUpdate);
