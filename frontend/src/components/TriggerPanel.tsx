@@ -1,7 +1,7 @@
 import React from 'react';
 import { ModuleInstance } from '@interactor/shared';
 import { apiService } from '../api';
-import { triggerEventTracker } from '../utils/triggerEventTracker';
+
 import styles from './TriggerPanel.module.css';
 
 interface TriggerPanelProps {
@@ -31,7 +31,7 @@ const TriggerPanel: React.FC<TriggerPanelProps> = ({ interactions, onClose }) =>
       await apiService.triggerModule(moduleId);
       
       // Record the trigger event to trigger pulse animation
-      triggerEventTracker.recordTriggerEvent(moduleId, 'manual');
+      // Manual triggers now handled directly without global event tracking
     } catch (error) {
       console.error('Failed to trigger module:', error);
     } finally {

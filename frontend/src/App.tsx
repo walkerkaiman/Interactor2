@@ -12,7 +12,7 @@ import WikisPage from './components/WikisPage';
 import PerformancePage from './components/PerformancePage';
 import ConsolePage from './components/ConsolePage';
 import { apiService } from './api';
-import { triggerEventTracker } from './utils/triggerEventTracker';
+
 import { 
   AppState, 
   UIState, 
@@ -23,7 +23,7 @@ import {
   ModulesPageState 
 } from './types';
 import { InteractionConfig } from '@interactor/shared';
-import { edgeRegistrationTracker } from './utils/edgeRegistrationTracker';
+
 import { webSocketService } from './services/WebSocketService';
 
 import styles from './App.module.css';
@@ -174,7 +174,7 @@ function App() {
             console.log(`Received trigger event for module ${moduleId} of type ${type}`);
             
             // Record the trigger event to trigger pulse animation
-            triggerEventTracker.recordTriggerEvent(moduleId, type);
+            // Trigger events now handled directly in components
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -241,8 +241,7 @@ function App() {
       const originalIds = new Set(interactions.map(interaction => interaction.id));
       setOriginalRegisteredIds(originalIds);
       
-      // Update edge registration tracker on initial load only
-      edgeRegistrationTracker.updateFromInteractions(interactions, localInteractions);
+      // Edge registration now handled directly in NodeEditor through interactions data
     } catch (error) {
       setAppState(prev => ({
         ...prev,
@@ -273,7 +272,7 @@ function App() {
       
       // Update edge registration tracker after registration - all interactions are now registered
       const allRegisteredInteractions = [...registeredInteractions, ...localInteractions];
-      edgeRegistrationTracker.updateFromInteractions(allRegisteredInteractions, []);
+      // Edge registration now handled directly in NodeEditor
       
       setAppState(prev => ({
         ...prev,

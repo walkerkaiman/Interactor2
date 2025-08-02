@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { FrontendNodeData } from '../types';
-import { triggerEventTracker } from '../utils/triggerEventTracker';
+
 import { connectionStateTracker } from '../utils/connectionStateTracker';
 import { useNodeConfig, useInstanceData } from '../hooks/useNodeConfig';
 import styles from './CustomNode.module.css';
@@ -65,12 +65,9 @@ export function useBaseModuleNode(
       }
     };
 
-    triggerEventTracker.on('triggerEvent', handleTriggerEvent);
-    triggerEventTracker.on('pulseEnded', handlePulseEnded);
-
+    // Trigger events now handled through direct props/callbacks
     return () => {
-      triggerEventTracker.off('triggerEvent', handleTriggerEvent);
-      triggerEventTracker.off('pulseEnded', handlePulseEnded);
+      // No cleanup needed for simplified approach
     };
   }, [nodeId, config.enablePulseAnimation, config.pulseAnimationDuration]);
 

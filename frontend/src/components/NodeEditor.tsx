@@ -6,7 +6,8 @@ import ReactFlow, {
   Background,
   useNodesState,
   useEdgesState,
-  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
   Connection,
   NodeTypes,
   EdgeTypes,
@@ -15,12 +16,12 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { apiService } from '../api';
+
 import { ModuleManifest, InteractionConfig } from '@interactor/shared';
 import CustomNode from './CustomNode';
 import TimeInputNode from './TimeInputNode';
 import CustomEdge from './CustomEdge';
-import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
+
 import { connectionStateTracker } from '../utils/connectionStateTracker';
 import styles from './NodeEditor.module.css';
 
@@ -52,7 +53,17 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [draggedHandle, setDraggedHandle] = useState<{ nodeId: string; handleId: string } | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-  const isUpdatingFromInteractions = useRef(false);
+  // Track last interactions hash to prevent unnecessary updates
+  const lastInteractionsRef = useRef<string>('');
+  
+  // Helper function to create a stable hash of interactions
+  const getInteractionsHash = useCallback((interactions: InteractionConfig[]) => {
+    return JSON.stringify(interactions.map(i => ({
+      id: i.id,
+      modules: i.modules?.map(m => ({ id: m.id, position: m.position })) || [],
+      routes: i.routes || []
+    })));
+  }, []);
 
   // Handle ReactFlow instance
   const onInit = useCallback((instance: any) => {
@@ -61,8 +72,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle node deletion
   const handleDeleteNode = useCallback((nodeId: string) => {
-    // Set flag to prevent useEffect from running during this operation
-    isUpdatingFromInteractions.current = true;
+    // Handle deletion through interactions update only
 
     // Update local interactions state
     const updatedInteractions = interactions.map(interaction => ({
@@ -83,7 +93,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // Remove edges from tracker
       eds.forEach(edge => {
         if (edge.source === nodeId || edge.target === nodeId) {
-          edgeRegistrationTracker.unregisterEdge(edge.id);
+          // Edge registration now handled through interactions data
           // Remove from connection state tracker
           connectionStateTracker.removeConnection(
             edge.source,
@@ -97,10 +107,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       return filtered;
     });
 
-    // Reset flag after a short delay to allow the state updates to complete
-    setTimeout(() => {
-      isUpdatingFromInteractions.current = false;
-    }, 100);
+    // Deletion handled through interactions update
   }, [setNodes, setEdges, interactions, onInteractionsChange]);
 
   // Handle config changes from nodes
@@ -212,8 +219,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         },
       };
 
-      // Set flag to prevent useEffect from running during this operation
-      isUpdatingFromInteractions.current = true;
+
+      
 
       // Add the new node to local interactions
       const updatedInteractions = [...interactions];
@@ -241,10 +248,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // Add the node to ReactFlow
       setNodes((nds) => [...nds, newNode]);
 
-      // Reset flag after a short delay to allow the state updates to complete
-      setTimeout(() => {
-        isUpdatingFromInteractions.current = false;
-      }, 100);
+      // Node addition handled through interactions update
     },
     [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
   );
@@ -256,16 +260,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  // Reset the flag when interactions change (e.g., from WebSocket updates)
-  useEffect(() => {
-    isUpdatingFromInteractions.current = false;
-  }, [interactions]);
 
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
-    if (isUpdatingFromInteractions.current) {
-      return;
+    // Check if interactions have actually changed using hash comparison
+    const currentHash = getInteractionsHash(interactions);
+    if (currentHash === lastInteractionsRef.current) {
+      return; // No actual changes, skip update
     }
+    lastInteractionsRef.current = currentHash;
 
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
@@ -304,7 +307,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
     // Create edges for interactions
     interactions.forEach((interaction) => {
-      interaction.routes?.forEach((route, routeIndex) => {
+      interaction.routes?.forEach((route) => {
         // Use the actual node IDs from the route
         const sourceNode = newNodes.find(node => node.id === route.source);
         const targetNode = newNodes.find(node => node.id === route.target);
@@ -340,11 +343,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             route.event
           );
           
-          // Don't automatically register edges - let the tracker maintain individual states
-          // Only register if not already tracked
-          if (!edgeRegistrationTracker.isEdgeRegistered(edgeId) && !edgeRegistrationTracker.unregisteredEdges.has(edgeId)) {
-            edgeRegistrationTracker.registerEdge(edgeId);
-          }
+          // Edge registration determined by presence in interactions data
         }
       });
     });
@@ -413,7 +412,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   // Handle node position changes
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     // Set flag to prevent useEffect from running during this operation
-    isUpdatingFromInteractions.current = true;
+    
 
     // Update local interactions state with new position
     const updatedInteractions = interactions.map(interaction => ({
@@ -430,15 +429,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
     // Reset flag after a short delay to allow the state updates to complete
     setTimeout(() => {
-      isUpdatingFromInteractions.current = false;
+
     }, 100);
   }, [interactions, onInteractionsChange]);
 
   // Handle pane click to disconnect
   const onPaneClick = useCallback((_event: React.MouseEvent) => {
     if (draggedHandle) {
-      // Set flag to prevent useEffect from running during this operation
-      isUpdatingFromInteractions.current = true;
+
+      
 
       // Update local interactions state to remove the route
       const updatedInteractions = interactions.map(interaction => ({
@@ -462,7 +461,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           if ((edge.source === draggedHandle.nodeId && edge.sourceHandle === draggedHandle.handleId) ||
               (edge.target === draggedHandle.nodeId && edge.targetHandle === draggedHandle.handleId)) {
             
-            edgeRegistrationTracker.unregisterEdge(edge.id);
+            // Edge registration now handled through interactions data
             // Remove from connection state tracker
             connectionStateTracker.removeConnection(
               edge.source,
@@ -479,7 +478,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
       // Reset flag after a short delay to allow the state updates to complete
       setTimeout(() => {
-        isUpdatingFromInteractions.current = false;
+  
       }, 100);
     }
     onNodeSelect(null);
@@ -487,8 +486,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   const onConnect = useCallback(
     (params: Connection) => {
-      // Set flag to prevent useEffect from running during this operation
-      isUpdatingFromInteractions.current = true;
+
+      
       
       // Determine the event type based on the source handle
       let eventType = 'default';
@@ -522,8 +521,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         },
       };
       
-      // Register the new edge as unregistered
-      edgeRegistrationTracker.unregisterEdge(edgeId);
+      // Edge registration handled through interactions data
       
       // Track connection state for handle labels
       connectionStateTracker.addConnection(
@@ -593,7 +591,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           const shouldRemove = edge.source === params.source && edge.target === params.target;
           if (shouldRemove) {
             // Remove from tracker
-            edgeRegistrationTracker.unregisterEdge(edge.id);
+            // Edge registration now handled through interactions data
           }
           return !shouldRemove;
         });
@@ -604,7 +602,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
       // Reset flag after a short delay to allow the state updates to complete
       setTimeout(() => {
-        isUpdatingFromInteractions.current = false;
+  
       }, 100);
     },
     [setEdges, interactions, onInteractionsChange]

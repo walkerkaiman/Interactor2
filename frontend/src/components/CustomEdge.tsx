@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { EdgeLabelRenderer, getBezierPath } from 'reactflow';
 import { FrontendEdgeData } from '../types';
-import { edgeRegistrationTracker } from '../utils/edgeRegistrationTracker';
+
 import styles from './CustomEdge.module.css';
 
 interface CustomEdgeProps {
@@ -37,28 +37,8 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
     targetPosition,
   });
 
-  const [isRegistered, setIsRegistered] = useState(edgeRegistrationTracker.isEdgeRegistered(id));
-
-  // Listen for registration state changes
-  useEffect(() => {
-    const handleRegistrationChange = (edgeId: string) => {
-      if (edgeId === id) {
-        const registered = edgeRegistrationTracker.isEdgeRegistered(id);
-        setIsRegistered(registered);
-      }
-    };
-
-    // Check initial state
-    const initialRegistered = edgeRegistrationTracker.isEdgeRegistered(id);
-    setIsRegistered(initialRegistered);
-
-    // Listen for registration changes
-    edgeRegistrationTracker.on('registrationChanged', handleRegistrationChange);
-
-    return () => {
-      edgeRegistrationTracker.off('registrationChanged', handleRegistrationChange);
-    };
-  }, [id]);
+  // Use registration state from data prop (passed from parent)
+  const isRegistered = data?.isRegistered ?? false;
   
   // Determine CSS classes based on registration status and event type
   const edgeClasses = [];
@@ -142,4 +122,4 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   );
 };
 
-export default CustomEdge; 
+export default memo(CustomEdge); 

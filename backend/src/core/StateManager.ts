@@ -1,4 +1,4 @@
-import { InteractionConfig, ModuleConfig, MessageRoute } from '@interactor/shared';
+import { InteractionConfig, ModuleConfig, MessageRoute, ModuleInstance } from '@interactor/shared';
 import { Logger } from './Logger';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -9,17 +9,18 @@ export class StateManager {
   private stateFile: string;
   private state: {
     interactions: InteractionConfig[];
-    modules: any[];
+    modules: ModuleInstance[];
     routes: MessageRoute[];
     settings: Record<string, any>;
   };
   private lastSaved: number;
+  private saveTimeout: NodeJS.Timeout | null = null;
 
   private constructor(config: {
     stateFile?: string;
   } = {}) {
     this.logger = Logger.getInstance();
-    this.stateFile = config.stateFile || path.join(process.cwd(), 'data', 'state.json');
+    this.stateFile = config.stateFile || path.join(__dirname, '..', '..', '..', 'data', 'state.json');
     this.state = {
       interactions: [],
       modules: [],
@@ -87,9 +88,25 @@ export class StateManager {
   }
 
   /**
-   * Save state to file
+   * Save state to file with debouncing to reduce disk I/O
    */
-  private async saveState(): Promise<void> {
+  private debouncedSaveState(): void {
+    // Clear existing timeout
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    
+    // Set new timeout for 500ms
+    this.saveTimeout = setTimeout(async () => {
+      await this.saveStateImmediate();
+      this.saveTimeout = null;
+    }, 500);
+  }
+
+  /**
+   * Save state to file immediately (internal method)
+   */
+  private async saveStateImmediate(): Promise<void> {
     try {
       // Ensure the directory exists
       const dataDir = path.dirname(this.stateFile);
@@ -103,6 +120,18 @@ export class StateManager {
       // Don't throw the error to prevent breaking WebSocket connections
       // Just log it and continue
     }
+  }
+
+  /**
+   * Force immediate save (for critical operations)
+   */
+  private async saveState(): Promise<void> {
+    // Clear any pending debounced save
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    await this.saveStateImmediate();
   }
 
   /**
@@ -135,7 +164,7 @@ export class StateManager {
    */
   public async addInteraction(interaction: InteractionConfig): Promise<void> {
     this.state.interactions.push(interaction);
-    await this.saveState();
+    this.debouncedSaveState();
   }
 
   /**
@@ -152,7 +181,7 @@ export class StateManager {
     const index = this.state.interactions.findIndex(i => i.id === interaction.id);
     if (index !== -1) {
       this.state.interactions[index] = interaction;
-      await this.saveState();
+      this.debouncedSaveState();
     }
   }
 
@@ -163,7 +192,7 @@ export class StateManager {
     const index = this.state.interactions.findIndex(i => i.id === id);
     if (index !== -1) {
       this.state.interactions.splice(index, 1);
-      await this.saveState();
+      this.debouncedSaveState();
       return true;
     }
     return false;
@@ -172,33 +201,33 @@ export class StateManager {
   /**
    * Get module instances
    */
-  public getModuleInstances(): any[] {
+  public getModuleInstances(): ModuleInstance[] {
     return [...this.state.modules];
   }
 
   /**
    * Add module instance
    */
-  public async addModuleInstance(moduleInstance: any): Promise<void> {
+  public async addModuleInstance(moduleInstance: ModuleInstance): Promise<void> {
     this.state.modules.push(moduleInstance);
-    await this.saveState();
+    this.debouncedSaveState();
   }
 
   /**
    * Get module instance by ID
    */
-  public getModuleInstance(id: string): any | undefined {
+  public getModuleInstance(id: string): ModuleInstance | undefined {
     return this.state.modules.find(m => m.id === id);
   }
 
   /**
    * Update module instance
    */
-  public async updateModuleInstance(moduleInstance: any): Promise<void> {
+  public async updateModuleInstance(moduleInstance: ModuleInstance): Promise<void> {
     const index = this.state.modules.findIndex(m => m.id === moduleInstance.id);
     if (index !== -1) {
       this.state.modules[index] = moduleInstance;
-      await this.saveState();
+      this.debouncedSaveState();
     }
   }
 
@@ -209,7 +238,7 @@ export class StateManager {
     const index = this.state.modules.findIndex(m => m.id === id);
     if (index !== -1) {
       this.state.modules.splice(index, 1);
-      await this.saveState();
+      this.debouncedSaveState();
       return true;
     }
     return false;
