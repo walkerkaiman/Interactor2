@@ -13,6 +13,7 @@ import { MessageRouter } from './core/MessageRouter';
 import { ModuleLoader } from './core/ModuleLoader';
 import { StateManager } from './core/StateManager';
 import { SystemStats } from './core/SystemStats';
+import { ErrorHandler, InteractorError } from './core/ErrorHandler';
 
 // Types
 import {
@@ -34,6 +35,7 @@ export class InteractorServer {
   private systemStats: SystemStats;
   private config: any;
   private isShuttingDown = false;
+  private moduleInstances: Map<string, any> = new Map(); // Live module instances registry
 
   constructor() {
     this.app = express();
@@ -193,31 +195,115 @@ export class InteractorServer {
   }
 
   /**
+   * Create a live module instance
+   */
+  private async createModuleInstance(moduleData: any): Promise<any> {
+    const { id, moduleName, config } = moduleData;
+    
+    // For now, only handle Time Input module
+    if (moduleName === 'time_input') {
+      try {
+        // Import the TimeInputModule class
+        const { TimeInputModule } = await import('./modules/input/time_input/index');
+        
+        // Create instance with config
+        const moduleInstance = new TimeInputModule(config);
+        moduleInstance.setLogger(this.logger);
+        
+        // Set up event listeners for state updates
+        moduleInstance.on('stateUpdate', (stateData: any) => {
+          this.handleModuleStateUpdate(id, stateData);
+        });
+        
+        moduleInstance.on('configUpdated', (configData: any) => {
+          this.handleModuleConfigUpdate(id, configData);
+        });
+        
+        // Initialize the module
+        await moduleInstance.init();
+        
+        // Store in registry
+        this.moduleInstances.set(id, moduleInstance);
+        
+        this.logger.info(`Created live instance for ${moduleName} (${id})`);
+        return moduleInstance;
+      } catch (error) {
+        this.logger.error(`Failed to create ${moduleName} instance:`, error);
+        throw error;
+      }
+    }
+    
+    return null; // Module type not supported yet
+  }
+  
+  /**
+   * Handle state update from a live module instance
+   */
+  private async handleModuleStateUpdate(moduleId: string, stateData: any): Promise<void> {
+    try {
+      const moduleInstances = this.stateManager.getModuleInstances();
+      const moduleInstance = moduleInstances.find(m => m.id === moduleId);
+      
+      if (moduleInstance) {
+        // Update the stored state with the new data
+        Object.assign(moduleInstance, stateData);
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Save to StateManager
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast to frontend
+        this.broadcastStateUpdate();
+        
+        this.logger.debug(`Updated state for module ${moduleId}`, stateData);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to handle state update for module ${moduleId}:`, error);
+    }
+  }
+  
+  /**
+   * Handle config update from a live module instance
+   */
+  private async handleModuleConfigUpdate(moduleId: string, configData: any): Promise<void> {
+    try {
+      const moduleInstances = this.stateManager.getModuleInstances();
+      const moduleInstance = moduleInstances.find(m => m.id === moduleId);
+      
+      if (moduleInstance) {
+        // Update the stored config
+        moduleInstance.config = configData.newConfig;
+        moduleInstance.lastUpdate = Date.now();
+        
+        // Save to StateManager
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        
+        // Broadcast to frontend
+        this.broadcastStateUpdate();
+        
+        this.logger.debug(`Updated config for module ${moduleId}`, configData);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to handle config update for module ${moduleId}:`, error);
+    }
+  }
+
+  /**
    * Setup minimal REST API routes
    */
   private setupRoutes(): void {
     // Health check
-    this.app.get('/health', (req, res) => {
-      try {
-        const health = this.systemStats.getHealthStatus();
-        const uptime = this.systemStats.getUptimeFormatted();
-        
-        res.json({
-          status: health.status,
-          uptime: uptime,
-          timestamp: Date.now(),
-          message: health.message
-        });
-      } catch (error) {
-        console.error('Health check error:', error);
-        res.status(500).json({
-          status: 'error',
-          uptime: '0s',
-          timestamp: Date.now(),
-          error: String(error)
-        });
-      }
-    });
+    this.app.get('/health', ErrorHandler.asyncHandler(async (req, res) => {
+      const health = this.systemStats.getHealthStatus();
+      const uptime = this.systemStats.getUptimeFormatted();
+      
+      res.json({
+        status: health.status,
+        uptime: uptime,
+        timestamp: Date.now(),
+        message: health.message
+      });
+    }));
 
     // System stats
     this.app.get('/api/stats', (req, res) => {
@@ -230,72 +316,79 @@ export class InteractorServer {
     // Module management - list available modules
     this.app.get('/api/modules', (req, res) => {
       const modules = this.moduleLoader.getAllManifests();
+      this.logger.debug(`API: Returning ${modules.length} modules`, 'InteractorServer');
       const response: ModuleListResponse = { modules };
       res.json({ success: true, data: response });
     });
 
     // Get module instances and their real-time state (must come before /:name route)
-    this.app.get('/api/modules/instances', (req, res) => {
-      try {
-        const moduleInstances = this.stateManager.getModuleInstances();
-        res.json({ 
-          success: true, 
-          data: { 
-            instances: moduleInstances,
-            count: moduleInstances.length 
-          } 
-        });
-      } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
-      }
-    });
+    this.app.get('/api/modules/instances', ErrorHandler.asyncHandler(async (req, res) => {
+      const moduleInstances = this.stateManager.getModuleInstances();
+      res.json({ 
+        success: true, 
+        data: { 
+          instances: moduleInstances,
+          count: moduleInstances.length 
+        } 
+      });
+    }));
 
     // Get specific module instance state (must come before /:name route)
-    this.app.get('/api/modules/instances/:id', (req, res) => {
-      try {
-        const moduleInstance = this.stateManager.getModuleInstance(req.params.id as string);
-        if (moduleInstance) {
-          res.json({ success: true, data: moduleInstance });
-        } else {
-          res.status(404).json({ success: false, error: 'Module instance not found' });
-        }
-      } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
+    this.app.get('/api/modules/instances/:id', ErrorHandler.asyncHandler(async (req, res) => {
+      const moduleInstance = this.stateManager.getModuleInstance(req.params.id as string);
+      if (!moduleInstance) {
+        throw InteractorError.notFound('Module instance', req.params.id);
       }
-    });
+      res.json({ success: true, data: moduleInstance });
+    }));
 
     // Update module instance configuration
-    this.app.put('/api/modules/instances/:id', async (req, res) => {
-      try {
-        const moduleInstances = this.stateManager.getModuleInstances();
-        const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
-        
-        if (!moduleInstance) {
-          return res.status(404).json({ success: false, error: 'Module instance not found' });
-        }
-        
-        // Update module configuration
-        if (req.body.config) {
-          moduleInstance.config = { ...moduleInstance.config, ...req.body.config };
-        }
-        
-        moduleInstance.lastUpdate = Date.now();
-        
-        // Update state
-        await this.stateManager.replaceState({ modules: moduleInstances });
-        
-        // Broadcast state update
-        this.broadcastStateUpdate();
-        
-        res.json({ 
-          success: true, 
-          message: 'Module configuration updated successfully',
-          data: moduleInstance
-        });
-      } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
+    this.app.put('/api/modules/instances/:id', ErrorHandler.asyncHandler(async (req, res) => {
+      if (!req.body.config) {
+        throw InteractorError.validation('Configuration data is required', {
+          field: 'config',
+          provided: req.body
+        }, ['Include config object in request body']);
       }
-    });
+
+      const moduleInstances = this.stateManager.getModuleInstances();
+      const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
+      
+      if (!moduleInstance) {
+        throw InteractorError.notFound('Module instance', req.params.id);
+      }
+      
+      // Update module configuration in data store
+      const newConfig = { ...moduleInstance.config, ...req.body.config };
+      moduleInstance.config = newConfig;
+      moduleInstance.lastUpdate = Date.now();
+      
+      // CRITICAL: Also update the live module instance if it exists
+      const liveInstance = this.moduleInstances.get(req.params.id);
+      if (liveInstance) {
+        try {
+          await liveInstance.updateConfig(newConfig);
+          this.logger.info(`Updated live module instance config for ${moduleInstance.moduleName} (${req.params.id})`);
+        } catch (error) {
+          this.logger.error(`Failed to update live module config:`, error);
+          throw InteractorError.moduleError('Failed to update module configuration', error as Error);
+        }
+      } else {
+        this.logger.warn(`No live instance found for module ${req.params.id}, only updated data store`);
+      }
+      
+      // Update state
+      await this.stateManager.replaceState({ modules: moduleInstances });
+      
+      // Broadcast state update
+      this.broadcastStateUpdate();
+      
+      res.json({ 
+        success: true, 
+        message: 'Module configuration updated successfully',
+        data: moduleInstance
+      });
+    }));
 
     // Update module instance configuration (specific endpoint)
     this.app.put('/api/modules/instances/:id/config', async (req, res) => {
@@ -347,6 +440,13 @@ export class InteractorServer {
       const interactions = this.stateManager.getInteractions();
       const moduleInstances = this.stateManager.getModuleInstances();
       
+      this.logger.debug(`API: Returning ${interactions.length} interactions with ${moduleInstances.length} module instances`, 'InteractorServer');
+      
+      // Log interaction details for debugging
+      interactions.forEach(interaction => {
+        this.logger.debug(`API: Interaction ${interaction.id} has ${interaction.modules?.length || 0} modules`, 'InteractorServer');
+      });
+      
       // Merge real-time module data into interactions
       const enrichedInteractions = interactions.map(interaction => ({
         ...interaction,
@@ -360,6 +460,7 @@ export class InteractorServer {
       }));
       
       const response: InteractionListResponse = { interactions: enrichedInteractions };
+      this.logger.debug(`API: Sending response with ${enrichedInteractions.length} interactions`, 'InteractorServer');
       res.json({ success: true, data: response });
     });
 
@@ -546,43 +647,27 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
-        // Get the actual module instance from the module loader
-        const actualModule = this.moduleLoader.getInstance(req.params.id as string);
-        if (actualModule) {
-          // Call the module's onStart method
-          await actualModule.start();
-          this.logger.info(`Module ${moduleInstance.moduleName} started successfully`);
+        // Create live module instance if it doesn't exist
+        let liveInstance = this.moduleInstances.get(req.params.id);
+        if (!liveInstance) {
+          liveInstance = await this.createModuleInstance(moduleInstance);
+          if (!liveInstance) {
+            throw new Error(`Failed to create live instance for ${moduleInstance.moduleName}`);
+          }
+        }
+        
+        // Start the live module instance
+        try {
+          await liveInstance.start();
+          this.logger.info(`Module ${moduleInstance.moduleName} (${req.params.id}) started successfully`);
+        } catch (error) {
+          this.logger.error(`Failed to start module ${moduleInstance.moduleName}:`, error);
+          throw error;
         }
         
         // Update module status to running
         moduleInstance.status = 'running';
         moduleInstance.lastUpdate = Date.now();
-        
-        // Handle Time Input module specific logic
-        if (moduleInstance.moduleName === 'Time Input') {
-          const now = new Date();
-          
-          // Calculate current time in 12-hour format
-          const hours = now.getHours();
-          const minutes = now.getMinutes();
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-          moduleInstance.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-          
-          // Calculate countdown based on mode
-          const mode = moduleInstance.config?.mode || 'clock';
-          if (mode === 'metronome') {
-            const millisecondDelay = moduleInstance.config?.millisecondDelay || 1000;
-            const seconds = millisecondDelay / 1000;
-            moduleInstance.countdown = `${seconds}s interval`;
-          } else if (mode === 'clock') {
-            const targetTime = moduleInstance.config?.targetTime || '12:00 PM';
-            // For now, just show a placeholder for clock mode
-            moduleInstance.countdown = 'Clock mode - target time calculation needed';
-          }
-          
-          this.logger.info(`Time Input module ${moduleInstance.id}: currentTime = ${moduleInstance.currentTime}, countdown = ${moduleInstance.countdown}`);
-        }
         
         // Update state
         await this.stateManager.replaceState({ modules: moduleInstances });
@@ -611,12 +696,18 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
-        // Get the actual module instance from the module loader
-        const actualModule = this.moduleLoader.getInstance(req.params.id as string);
-        if (actualModule) {
-          // Call the module's onStop method
-          await actualModule.stop();
-          this.logger.info(`Module ${moduleInstance.moduleName} stopped successfully`);
+        // Stop the live module instance if it exists
+        const liveInstance = this.moduleInstances.get(req.params.id);
+        if (liveInstance) {
+          try {
+            await liveInstance.stop();
+            this.logger.info(`Live module ${moduleInstance.moduleName} (${req.params.id}) stopped successfully`);
+          } catch (error) {
+            this.logger.error(`Failed to stop live module ${moduleInstance.moduleName}:`, error);
+            throw error;
+          }
+        } else {
+          this.logger.warn(`No live instance found for module ${req.params.id}`);
         }
         
         // Update module status to stopped
@@ -663,14 +754,13 @@ export class InteractorServer {
     });
 
     // Error handling
-    this.app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      this.logger.error('Unhandled error:', err);
-      res.status(500).json({ success: false, error: 'Internal server error' });
-    });
+    this.app.use(ErrorHandler.middleware());
 
     // 404 handler
     this.app.use((req, res) => {
-      res.status(404).json({ success: false, error: 'Not found' });
+      const error = InteractorError.notFound('Resource', req.path);
+      const response = ErrorHandler.toResponse(error);
+      res.status(404).json(response);
     });
   }
 
@@ -679,54 +769,151 @@ export class InteractorServer {
    */
   private setupWebSocket(): void {
     this.wss.on('connection', (ws) => {
-      this.logger.info('WebSocket client connected');
+      const clientId = Math.random().toString(36).substring(7);
+      this.logger.info('WebSocket client connected', 'WebSocket', { clientId });
       
-      // Send initial state
-      this.sendStateToClient(ws);
+      // Send initial state with error handling
+      try {
+        this.sendStateToClient(ws);
+      } catch (error) {
+        ErrorHandler.logError(error as Error, { context: 'initial_state_send', clientId });
+        
+        // Send error message to client
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            data: {
+              message: 'Failed to load initial state',
+              code: 'INITIAL_STATE_ERROR',
+              retryable: true,
+              suggestions: ['Refresh the page to reconnect']
+            }
+          }));
+        } catch (sendError) {
+          this.logger.error('Failed to send error message to WebSocket client', 'WebSocket', { clientId });
+        }
+      }
       
-      ws.on('close', () => {
-        this.logger.info('WebSocket client disconnected');
+      ws.on('close', (code, reason) => {
+        this.logger.info('WebSocket client disconnected', 'WebSocket', { 
+          clientId, 
+          code, 
+          reason: reason.toString() 
+        });
       });
       
       ws.on('error', (error) => {
-        this.logger.error('WebSocket error:', String(error));
-        // Don't let the error break the connection
+        ErrorHandler.logError(error, { 
+          context: 'websocket_error', 
+          clientId,
+          errorType: error.name || 'UnknownWebSocketError'
+        });
+        
+        // Attempt graceful recovery
+        if (ws.readyState === ws.OPEN) {
+          try {
+            ws.send(JSON.stringify({
+              type: 'connection_error',
+              data: {
+                message: 'Connection error occurred',
+                code: 'WEBSOCKET_ERROR',
+                retryable: true,
+                suggestions: ['Connection will automatically retry', 'Refresh if issues persist']
+              }
+            }));
+          } catch (sendError) {
+            this.logger.error('Failed to send error recovery message', 'WebSocket', { clientId });
+          }
+        }
       });
       
       // Handle ping/pong to keep connection alive
       ws.on('ping', () => {
-        ws.pong();
+        try {
+          ws.pong();
+        } catch (error) {
+          this.logger.error('Failed to respond to ping', 'WebSocket', { clientId, error: String(error) });
+        }
       });
+
+      // Handle unexpected WebSocket termination
+      ws.on('unexpected-response', (request, response) => {
+        this.logger.warn('WebSocket unexpected response', 'WebSocket', {
+          clientId,
+          statusCode: response.statusCode,
+          statusMessage: response.statusMessage
+        });
+      });
+    });
+
+    // Handle WebSocket server errors
+    this.wss.on('error', (error) => {
+      ErrorHandler.logError(error, { context: 'websocket_server_error' });
     });
   }
 
   /**
-   * Send state to a specific WebSocket client
+   * Send state to a specific WebSocket client with enhanced error handling
    */
   private sendStateToClient(ws: any): void {
+    if (ws.readyState !== ws.OPEN) {
+      this.logger.warn('Attempted to send state to closed WebSocket connection', 'WebSocket');
+      return;
+    }
+
     try {
+      const interactions = this.stateManager.getInteractions();
+      const moduleInstances = this.stateManager.getModuleInstances();
+      
       const state = {
         type: 'state_update',
         data: {
-          interactions: this.stateManager.getInteractions(),
-          moduleInstances: this.stateManager.getModuleInstances()
+          interactions,
+          moduleInstances,
+          timestamp: Date.now()
         }
       };
+      
       ws.send(JSON.stringify(state));
-    } catch (error) {
-      this.logger.error('Error sending state to client:', String(error));
-      // Send a minimal state if there's an error
+      
+    } catch (stateError) {
+      ErrorHandler.logError(stateError as Error, { context: 'state_retrieval' });
+      
+      // Send a minimal state if there's an error retrieving data
       try {
         const minimalState = {
           type: 'state_update',
           data: {
             interactions: [],
-            moduleInstances: []
+            moduleInstances: [],
+            timestamp: Date.now()
+          },
+          error: {
+            message: 'Failed to retrieve complete state',
+            code: 'STATE_RETRIEVAL_ERROR',
+            retryable: true
           }
         };
         ws.send(JSON.stringify(minimalState));
       } catch (sendError) {
-        this.logger.error('Error sending minimal state to client:', String(sendError));
+        ErrorHandler.logError(sendError as Error, { context: 'minimal_state_send' });
+        
+        // Last resort: send error notification
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            data: {
+              message: 'System temporarily unavailable',
+              code: 'SYSTEM_ERROR',
+              retryable: true,
+              suggestions: ['Refresh the page', 'Check system status']
+            }
+          }));
+        } catch (finalError) {
+          this.logger.error('Complete failure to communicate with WebSocket client', 'WebSocket');
+          // Close the connection as last resort
+          ws.close(1011, 'Server error - unable to send data');
+        }
       }
     }
   }

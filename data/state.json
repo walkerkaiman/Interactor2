@@ -1,0 +1,82 @@
+{
+  "interactions": [
+    {
+      "id": "interaction-1754108542080",
+      "name": "New Interaction",
+      "description": "Automatically created interaction",
+      "enabled": true,
+      "modules": [
+        {
+          "id": "node-1754108542080",
+          "moduleName": "Time Input",
+          "config": {
+            "mode": "clock",
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 1000,
+            "enabled": true,
+            "apiEnabled": false,
+            "apiEndpoint": ""
+          },
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1754108558847,
+          "position": {
+            "x": 125,
+            "y": 207.9375
+          }
+        },
+        {
+          "id": "node-1754108556182",
+          "moduleName": "Audio Output",
+          "config": {},
+          "status": "stopped",
+          "messageCount": 0,
+          "frameCount": 0,
+          "lastUpdate": 1754108558847,
+          "position": {
+            "x": 626.2022920033513,
+            "y": 322.96767080327237
+          }
+        }
+      ],
+      "routes": [
+        {
+          "id": "route-1754108558124",
+          "source": "node-1754108542080",
+          "target": "node-1754108556182",
+          "event": "trigger"
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "id": "node-1754108542080",
+      "moduleName": "Time Input",
+      "config": {
+        "mode": "clock",
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 1000,
+        "enabled": true,
+        "apiEnabled": false,
+        "apiEndpoint": ""
+      },
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1754108575664
+    },
+    {
+      "id": "node-1754108556182",
+      "moduleName": "Audio Output",
+      "config": {},
+      "status": "stopped",
+      "messageCount": 0,
+      "frameCount": 0,
+      "lastUpdate": 1754108575664
+    }
+  ],
+  "routes": [],
+  "settings": {}
+}

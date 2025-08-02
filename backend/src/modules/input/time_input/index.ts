@@ -1,6 +1,6 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
-import { StateManager } from '../../../core/StateManager';
+import { InteractorError } from '../../../core/ErrorHandler';
 import WebSocket from 'ws';
 
 export class TimeInputModule extends InputModuleBase {
@@ -12,7 +12,7 @@ export class TimeInputModule extends InputModuleBase {
   private countdown: string = '';
   private timeMode: 'clock' | 'metronome' = 'clock';
   private millisecondDelay: number = 1000;
-  private stateManager: StateManager;
+  // StateManager removed - modules should not directly access core services
   
   // WebSocket properties
   private ws: WebSocket | null = null;
@@ -98,7 +98,7 @@ export class TimeInputModule extends InputModuleBase {
     this.enabled = config.enabled !== false;
     this.timeMode = config.mode || 'clock';
     this.millisecondDelay = config.millisecondDelay || 1000;
-    this.stateManager = StateManager.getInstance();
+    // StateManager access removed - using proper event emission instead
     
     // WebSocket configuration
     this.apiEnabled = config.apiEnabled || false;
@@ -109,28 +109,43 @@ export class TimeInputModule extends InputModuleBase {
     if (this.timeMode === 'clock') {
       // Validate time format for clock mode
       if (!this.isValidTimeFormat(this.targetTime)) {
-        throw new Error(`Invalid time format: ${this.targetTime}. Expected 12-hour format (e.g., 2:30 PM).`);
+        throw InteractorError.validation(
+          `Invalid time format: ${this.targetTime}`,
+          { provided: this.targetTime, expected: '12-hour format' },
+          ['Use format like "2:30 PM" or "10:15 AM"', 'Include AM/PM designation', 'Use 12-hour format (1-12), not 24-hour']
+        );
       }
     } else if (this.timeMode === 'metronome') {
       // Validate millisecond delay for metronome mode
       if (this.millisecondDelay < 100 || this.millisecondDelay > 60000) {
-        throw new Error(`Invalid millisecond delay: ${this.millisecondDelay}. Must be between 100 and 60000.`);
+        throw InteractorError.validation(
+          `Millisecond delay must be between 100-60000ms`,
+          { provided: this.millisecondDelay, min: 100, max: 60000 },
+          ['Try 1000ms for 1-second intervals', 'Use 500ms for faster pulses', 'Maximum is 60000ms (1 minute)']
+        );
       }
     }
 
     // Validate WebSocket configuration if enabled
     if (this.apiEnabled) {
       if (!this.apiEndpoint) {
-        throw new Error('API endpoint is required when apiEnabled is true');
+        throw InteractorError.validation(
+          'WebSocket API endpoint is required when API is enabled',
+          { apiEnabled: this.apiEnabled, apiEndpoint: this.apiEndpoint },
+          ['Provide a WebSocket URL like "wss://api.example.com/time"', 'Or disable apiEnabled if not using external time source']
+        );
       }
       if (!this.apiEndpoint.match(/^wss?:\/\/.+/)) {
-        throw new Error('API endpoint must be a valid WebSocket URL (ws:// or wss://)');
+        throw InteractorError.validation(
+          'API endpoint must be a valid WebSocket URL',
+          { provided: this.apiEndpoint, expected: 'ws:// or wss:// protocol' },
+          ['Use "wss://" for secure connections', 'Use "ws://" for local development', 'Include full URL path if needed']
+        );
       }
     }
   }
 
   protected async onStart(): Promise<void> {
-    console.log(`[DEBUG] Time Input module ${this.id} onStart() called`);
     this.logger?.info(`Time Input module ${this.id} starting...`);
     
     if (this.enabled) {
@@ -151,8 +166,6 @@ export class TimeInputModule extends InputModuleBase {
     }
     
     // Start updating current time and countdown immediately
-    console.log(`[DEBUG] Time Input module ${this.id} calling updateTimeDisplay`);
-    this.logger?.info(`Time Input module ${this.id} calling updateTimeDisplay`);
     this.updateTimeDisplay();
   }
 
@@ -188,14 +201,22 @@ export class TimeInputModule extends InputModuleBase {
     if (newTimeConfig.targetTime !== this.targetTime) {
       this.targetTime = newTimeConfig.targetTime || this.targetTime;
       if (this.timeMode === 'clock' && !this.isValidTimeFormat(this.targetTime)) {
-        throw new Error(`Invalid time format: ${this.targetTime}. Expected 12-hour format (e.g., 2:30 PM).`);
+        throw InteractorError.validation(
+          `Invalid time format: ${this.targetTime}`,
+          { provided: this.targetTime, expected: '12-hour format' },
+          ['Use format like "2:30 PM" or "10:15 AM"', 'Include AM/PM designation', 'Use 12-hour format (1-12), not 24-hour']
+        );
       }
     }
     
     if (newTimeConfig.millisecondDelay !== this.millisecondDelay) {
       this.millisecondDelay = newTimeConfig.millisecondDelay || 1000;
       if (this.timeMode === 'metronome' && (this.millisecondDelay < 100 || this.millisecondDelay > 60000)) {
-        throw new Error(`Invalid millisecond delay: ${this.millisecondDelay}. Must be between 100 and 60000.`);
+        throw InteractorError.validation(
+          `Millisecond delay must be between 100-60000ms`,
+          { provided: this.millisecondDelay, min: 100, max: 60000 },
+          ['Try 1000ms for 1-second intervals', 'Use 500ms for faster pulses', 'Maximum is 60000ms (1 minute)']
+        );
       }
       // Restart metronome with new delay if running
       if (this.timeMode === 'metronome' && this.enabled && this.isRunning) {
@@ -230,6 +251,36 @@ export class TimeInputModule extends InputModuleBase {
         this.disconnectWebSocket();
       }
     }
+    
+    // CRITICAL: Notify core system about configuration changes
+    // This ensures the frontend receives the updated state
+    this.emitStateUpdate();
+  }
+  
+  /**
+   * Emit current module state - called after config changes and periodic updates
+   */
+  private emitStateUpdate(): void {
+    const stateUpdate = {
+      id: this.id,
+      moduleName: this.name,
+      status: this.enabled ? (this.isRunning ? 'running' : 'ready') : 'stopped',
+      mode: this.timeMode,
+      currentTime: this.currentTime,
+      countdown: this.countdown,
+      targetTime: this.targetTime,
+      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
+      millisecondDelay: this.millisecondDelay,
+      enabled: this.enabled,
+      apiEnabled: this.apiEnabled,
+      apiEndpoint: this.apiEndpoint,
+      lastUpdate: Date.now()
+    };
+
+    this.logger?.debug(`Time Input ${this.id}: Emitting state update`, stateUpdate);
+    
+    // Emit state update event for core system to handle
+    this.emit('stateUpdate', stateUpdate);
   }
 
   protected handleInput(data: any): void {
@@ -314,6 +365,15 @@ export class TimeInputModule extends InputModuleBase {
         timestamp: Date.now()
       });
     }, this.millisecondDelay);
+    
+    // Also update time display more frequently for metronome mode
+    // This ensures the countdown shows accurate time to next pulse
+    const updateInterval = Math.min(1000, this.millisecondDelay / 4); // Update at least every second, or 1/4 of the delay
+    setInterval(() => {
+      if (this.enabled && this.timeMode === 'metronome') {
+        this.updateTimeDisplay();
+      }
+    }, updateInterval);
   }
 
   /**
@@ -411,7 +471,11 @@ export class TimeInputModule extends InputModuleBase {
     const minutes = parts[1];
     
     if (hours === undefined || minutes === undefined) {
-      throw new Error(`Invalid time format: ${time24}`);
+      throw InteractorError.validation(
+        `Cannot convert invalid 24-hour time format`,
+        { provided: time24, expected: 'HH:MM format' },
+        ['Use format like "14:30" for 2:30 PM', 'Ensure hours are 0-23 and minutes are 0-59', 'Check time string parsing']
+      );
     }
     
     const period = hours >= 12 ? 'PM' : 'AM';
@@ -425,7 +489,11 @@ export class TimeInputModule extends InputModuleBase {
   private convertTo24Hour(time12: string): string {
     const match = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (!match) {
-      throw new Error(`Invalid 12-hour time format: ${time12}`);
+      throw InteractorError.validation(
+        `Cannot convert invalid 12-hour time format`,
+        { provided: time12, expected: 'H:MM AM/PM format' },
+        ['Use format like "2:30 PM" or "10:15 AM"', 'Include AM/PM designation', 'Use 12-hour format (1-12), not 24-hour']
+      );
     }
     
     const hoursStr = match[1];
@@ -433,7 +501,11 @@ export class TimeInputModule extends InputModuleBase {
     const periodStr = match[3];
     
     if (!hoursStr || !minutesStr || !periodStr) {
-      throw new Error(`Invalid 12-hour time format: ${time12}`);
+      throw InteractorError.validation(
+        `Missing components in 12-hour time format`,
+        { provided: time12, parsed: { hours: hoursStr, minutes: minutesStr, period: periodStr } },
+        ['Ensure format is "H:MM AM" or "H:MM PM"', 'Include both AM/PM designation', 'Check for proper time separators']
+      );
     }
     
     let hours = parseInt(hoursStr);
@@ -453,19 +525,15 @@ export class TimeInputModule extends InputModuleBase {
    * Update current time and countdown display
    */
   private updateTimeDisplay(): void {
-    console.log(`[DEBUG] Time Input module ${this.id} updateTimeDisplay() called`);
     const now = new Date();
     
-    // Update current time in 12-hour format
+    // Update current time in 12-hour format with seconds
     const hours = now.getHours();
     const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
     const period = hours >= 12 ? 'PM' : 'AM';
     const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-    
-    // Debug logging
-    console.log(`[DEBUG] Time Input module ${this.id}: Current time = ${this.currentTime}, Mode = ${this.timeMode}, Enabled = ${this.enabled}`);
-    this.logger?.info(`Time Input ${this.id || 'unknown'}: Current time = ${this.currentTime}, Mode = ${this.timeMode}, Enabled = ${this.enabled}, Countdown = ${this.countdown}`);
+    this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${period}`;
     
     // Calculate countdown based on mode
     if (this.timeMode === 'clock') {
@@ -501,60 +569,20 @@ export class TimeInputModule extends InputModuleBase {
         this.countdown = `${diffSeconds}s`;
       }
     } else if (this.timeMode === 'metronome') {
-      // For metronome mode, show the delay interval
-      const seconds = this.millisecondDelay / 1000;
-      this.countdown = `${seconds}s interval`;
-    }
-    
-    // Create state update for UI sync
-    const stateUpdate = {
-      id: this.id,
-      moduleName: this.name || 'Time Input',
-      status: this.enabled ? 'listening' : 'stopped',
-      mode: this.timeMode,
-      currentTime: this.currentTime,
-      countdown: this.countdown,
-      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
-      millisecondDelay: this.millisecondDelay,
-      enabled: this.enabled || false,
-      lastUpdate: Date.now()
-    };
-
-    // Debug logging
-    this.logger?.info(`Time Input ${this.id || 'unknown'}: State update object:`, stateUpdate);
-
-    // Update the state manager directly
-    try {
-      // Check if the module instance exists in the state manager
-      const existingInstance = this.stateManager.getModuleInstance(this.id);
-      this.logger?.info(`Time Input ${this.id || 'unknown'}: Existing instance found: ${!!existingInstance}`);
+      // For metronome mode, show countdown to next pulse
+      const timeSinceLastPulse = Date.now() % this.millisecondDelay;
+      const timeToNextPulse = this.millisecondDelay - timeSinceLastPulse;
+      const secondsToNext = Math.ceil(timeToNextPulse / 1000);
       
-      if (existingInstance) {
-        // Update existing instance
-        this.logger?.info(`Time Input ${this.id || 'unknown'}: Updating existing instance`);
-        this.stateManager.updateModuleInstance(stateUpdate);
+      if (secondsToNext > 0) {
+        this.countdown = `${secondsToNext}s to next`;
       } else {
-        // Add new instance if it doesn't exist
-        this.logger?.info(`Time Input ${this.id || 'unknown'}: Adding new instance`);
-        this.stateManager.addModuleInstance(stateUpdate);
+        this.countdown = 'Now!';
       }
-      
-      // Verify the update worked
-      const updatedInstance = this.stateManager.getModuleInstance(this.id);
-      this.logger?.info(`Time Input ${this.id || 'unknown'}: Updated instance currentTime: ${updatedInstance?.currentTime}, countdown: ${updatedInstance?.countdown}`);
-    } catch (error) {
-      this.logger?.error(`Failed to update module instance state: ${error}`);
     }
     
-    // Emit state update for UI sync
-    this.emit('stateUpdate', {
-      mode: this.timeMode,
-      currentTime: this.currentTime,
-      countdown: this.countdown,
-      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
-      millisecondDelay: this.millisecondDelay,
-      enabled: this.enabled
-    });
+    // Emit updated state to core system
+    this.emitStateUpdate();
   }
 
   /**

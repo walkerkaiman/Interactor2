@@ -9,23 +9,47 @@ function CountdownDisplay({ countdown }: { countdown: string }) {
   const [countdownTimer, setCountdownTimer] = useState<number | null>(null);
   
   useEffect(() => {
-    if (countdown && typeof countdown === 'string' && countdown.includes('s interval')) {
-      // Extract the number of seconds from "3s interval"
-      const seconds = parseInt(countdown.split('s')[0]);
-      if (!isNaN(seconds)) {
-        setCountdownTimer(seconds);
-        
-        // Start countdown timer
-        const interval = setInterval(() => {
-          setCountdownTimer(prev => {
-            if (prev === null || prev <= 0) {
-              return seconds; // Reset to original value
-            }
-            return prev - 1;
-          });
-        }, 1000);
-        
-        return () => clearInterval(interval);
+    if (countdown && typeof countdown === 'string') {
+      // Handle different countdown formats
+      if (countdown.includes('s to next')) {
+        // Metronome mode: "3s to next"
+        const seconds = parseInt(countdown.split('s')[0]);
+        if (!isNaN(seconds)) {
+          setCountdownTimer(seconds);
+          
+          // Start countdown timer
+          const interval = setInterval(() => {
+            setCountdownTimer(prev => {
+              if (prev === null || prev <= 0) {
+                return seconds; // Reset to original value
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          
+          return () => clearInterval(interval);
+        }
+      } else if (countdown.includes('s interval')) {
+        // Legacy metronome format: "3s interval"
+        const seconds = parseInt(countdown.split('s')[0]);
+        if (!isNaN(seconds)) {
+          setCountdownTimer(seconds);
+          
+          // Start countdown timer
+          const interval = setInterval(() => {
+            setCountdownTimer(prev => {
+              if (prev === null || prev <= 0) {
+                return seconds; // Reset to original value
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          
+          return () => clearInterval(interval);
+        }
+      } else {
+        // Clock mode or other formats - just display as-is
+        setCountdownTimer(null);
       }
     }
   }, [countdown]);
@@ -60,19 +84,6 @@ const TimeInputNodeConfig = {
     // Get real-time data from instance (updated via WebSocket)
     const currentTime = useInstanceData<string>(instance, 'currentTime', '');
     const countdown = useInstanceData<string>(instance, 'countdown', '');
-    
-    // Debug logging to see what data we're receiving
-    console.log('TimeInputNode instance data:', {
-      instanceId: instance?.id,
-      currentTime,
-      countdown,
-      mode: instance?.mode,
-      enabled: instance?.enabled,
-      fullInstance: instance
-    });
-    console.log('TimeInputNode - raw instance object:', instance);
-    console.log('TimeInputNode - instance.currentTime:', instance?.currentTime);
-    console.log('TimeInputNode - instance.countdown:', instance?.countdown);
 
 
 

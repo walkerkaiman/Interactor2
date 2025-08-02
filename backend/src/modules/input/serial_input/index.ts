@@ -1,5 +1,6 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, SerialInputConfig, SerialData, SerialTriggerPayload, SerialStreamPayload } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import { SerialPort } from 'serialport';
 
 export class SerialInputModule extends InputModuleBase {
@@ -88,13 +89,21 @@ export class SerialInputModule extends InputModuleBase {
     
     // Validate baud rate
     if (this.baudRate < 9600 || this.baudRate > 115200) {
-      throw new Error(`Invalid baud rate: ${this.baudRate}. Must be between 9600 and 115200.`);
+      throw InteractorError.validation(
+        `Serial baud rate must be between 9600-115200`,
+        { provided: this.baudRate, min: 9600, max: 115200 },
+        ['Use 9600 for basic Arduino communication', 'Use 57600 for faster data transfer', 'Use 115200 for high-speed serial communication']
+      );
     }
 
     // Validate logic operator
     const validOperators = ['>', '<', '='];
     if (!validOperators.includes(this.logicOperator)) {
-      throw new Error(`Invalid logic operator: ${this.logicOperator}. Must be one of: ${validOperators.join(', ')}`);
+      throw InteractorError.validation(
+        `Serial logic operator must be >, <, or =`,
+        { provided: this.logicOperator, allowed: validOperators },
+        ['Use ">" to trigger when value exceeds threshold', 'Use "<" to trigger when value is below threshold', 'Use "=" to trigger when value equals threshold']
+      );
     }
   }
 

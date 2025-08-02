@@ -1,7 +1,7 @@
 import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, FramesInputConfig, FrameData, FrameTriggerPayload, FrameStreamPayload } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import * as sacn from 'sacn';
-import { StateManager } from '../../../core/StateManager';
 
 export class FramesInputModule extends InputModuleBase {
   private receiver?: sacn.Receiver;
@@ -10,7 +10,7 @@ export class FramesInputModule extends InputModuleBase {
   private lastFrameNumber: number = 0;
   private frameCount: number = 0;
   private lastFrameData?: FrameData;
-  private stateManager: StateManager;
+  // StateManager removed - modules should not directly access core services
 
   constructor(config: FramesInputConfig) {
     super('frames_input', config, {
@@ -58,7 +58,7 @@ export class FramesInputModule extends InputModuleBase {
 
     this.universe = config.universe ?? 999;
     this.enabled = config.enabled !== false;
-    this.stateManager = StateManager.getInstance();
+    // StateManager access removed - using proper event emission instead
   }
 
   protected async onInit(): Promise<void> {
@@ -67,7 +67,11 @@ export class FramesInputModule extends InputModuleBase {
     }
     
     if (this.universe < 1 || this.universe > 63999) {
-      throw new Error(`Invalid universe number: ${this.universe}. Must be between 1 and 63999.`);
+      throw InteractorError.validation(
+        `sACN universe must be between 1-63999`,
+        { provided: this.universe, min: 1, max: 63999 },
+        ['Try 999 for standard frame monitoring', 'Use 1-512 for lighting universes', 'Maximum is 63999 per sACN specification']
+      );
     }
   }
 
@@ -259,25 +263,8 @@ export class FramesInputModule extends InputModuleBase {
         lastUpdate: frameData.timestamp
       };
 
-      // Update the state manager directly
-      try {
-        await this.stateManager.updateModuleInstance(stateUpdate);
-        if (this.logger) {
-          this.logger.debug(`Updated module instance state for ${this.name}:`, stateUpdate);
-        }
-        
-        // Also emit a custom event to trigger broadcast
-        this.emit('moduleStateChanged', {
-          moduleId: this.id,
-          currentFrame: frameNumber,
-          frameCount: this.frameCount,
-          timestamp: frameData.timestamp
-        });
-      } catch (error) {
-        if (this.logger) {
-          this.logger.error(`Failed to update module instance state: ${error}`);
-        }
-      }
+      // State management is handled by the core system via event emission
+      this.logger?.debug(`Frames Input ${this.id}: Emitting state update`, stateUpdate);
 
       // Emit stateUpdate event for the frontend
       this.emit('stateUpdate', stateUpdate);

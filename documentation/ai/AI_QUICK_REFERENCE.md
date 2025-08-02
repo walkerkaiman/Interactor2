@@ -23,7 +23,7 @@
   "type": "input" | "output", 
   "version": "1.0.0",
   "description": "What this does",
-  "author": "Your Name",
+  "author": "Kaiman Walker",
   "configSchema": { "type": "object" },
   "events": [{ "name": "event", "type": "input|output" }]
 }

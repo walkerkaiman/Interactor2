@@ -77,7 +77,7 @@ export class StateManager {
           settings: loadedState.settings || {}
         };
         
-        this.logger.debug('State loaded from file', 'StateManager');
+        this.logger.debug(`State loaded from file: ${this.state.interactions.length} interactions, ${this.state.modules.length} modules`, 'StateManager');
       } else {
         this.logger.debug('No existing state file found, using defaults', 'StateManager');
       }

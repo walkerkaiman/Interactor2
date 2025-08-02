@@ -81,11 +81,18 @@ function App() {
 
   // WebSocket connection
   useEffect(() => {
+    let reconnectTimeout: NodeJS.Timeout;
+    
     const connectWebSocket = () => {
       const ws = new WebSocket('ws://localhost:3001');
       
       ws.onopen = () => {
         console.log('WebSocket connected');
+        // Clear any pending reconnection timeout
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = null;
+        }
       };
       
                 ws.onmessage = (event) => {
@@ -192,6 +199,16 @@ function App() {
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        // Don't treat WebSocket errors as fatal - they can be temporary
+        // The app will continue to work without real-time updates
+      };
+      
+      ws.onclose = () => {
+        console.log('WebSocket disconnected, attempting to reconnect in 5 seconds...');
+        // Attempt to reconnect after 5 seconds
+        reconnectTimeout = setTimeout(() => {
+          connectWebSocket();
+        }, 5000);
       };
       
       return ws;
@@ -200,6 +217,9 @@ function App() {
     const ws = connectWebSocket();
     
     return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
       if (ws) {
         ws.close();
       }
@@ -222,11 +242,25 @@ function App() {
 
   const loadInitialData = async () => {
     try {
+      console.log('App: Loading initial data...');
       const [modules, interactions, settings] = await Promise.all([
         apiService.getModules(),
         apiService.getInteractions(),
         apiService.getSettings(),
       ]);
+
+      console.log('App: Loaded data:', {
+        modulesCount: modules.length,
+        interactionsCount: interactions.length,
+        settingsKeys: Object.keys(settings)
+      });
+      
+      console.log('App: Interactions details:', interactions.map(i => ({
+        id: i.id,
+        name: i.name,
+        modulesCount: i.modules?.length || 0,
+        routesCount: i.routes?.length || 0
+      })));
 
       setAppState(prev => ({
         ...prev,
@@ -241,8 +275,10 @@ function App() {
       const originalIds = new Set(interactions.map(interaction => interaction.id));
       setOriginalRegisteredIds(originalIds);
       
+      console.log('App: Initial data loaded successfully');
       // Edge registration now handled directly in NodeEditor through interactions data
     } catch (error) {
+      console.error('App: Failed to load initial data:', error);
       setAppState(prev => ({
         ...prev,
         lastError: `Failed to load data: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -361,6 +397,15 @@ function App() {
 
   // Compute all interactions (local + registered)
   const allInteractions = [...localInteractions, ...registeredInteractions];
+  
+  // Debug logging for interactions
+  console.log('App: Current interactions state:', {
+    localCount: localInteractions.length,
+    registeredCount: registeredInteractions.length,
+    allCount: allInteractions.length,
+    localIds: localInteractions.map(i => i.id),
+    registeredIds: registeredInteractions.map(i => i.id)
+  });
 
   // Handle page state updates
   const updateWikisPageState = useCallback((updates: Partial<WikisPageState>) => {

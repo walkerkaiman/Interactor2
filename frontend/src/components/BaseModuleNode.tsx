@@ -345,6 +345,8 @@ export function useBaseModuleNode(
 // HOC to create a module node component with shared functionality
 export function createModuleNode(config: ModuleNodeConfig) {
   return function ModuleNodeComponent(props: BaseModuleNodeProps) {
+    const [configVersion, setConfigVersion] = useState(0);
+    
     const {
       instance,
       handleSelect,
@@ -392,12 +394,14 @@ export function createModuleNode(config: ModuleNodeConfig) {
             if (props.data.onConfigChange && instance.id) {
               props.data.onConfigChange(instance.id, updatedConfig);
             }
+            // Force re-render by updating a state variable
+            setConfigVersion(prev => prev + 1);
           }
         };
         return config.renderConfig(instance?.config || {}, updateConfig, instance);
       }
       return null; // Override in specific implementations
-    }, [config.renderConfig, instance, props.data.onConfigChange]);
+    }, [config.renderConfig, instance, props.data.onConfigChange, configVersion]);
 
     const renderActions = useCallback((): React.ReactNode => {
       if (config.renderActions) {

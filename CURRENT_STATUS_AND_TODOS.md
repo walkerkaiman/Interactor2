@@ -189,6 +189,34 @@ modules: ModuleInstance[];
 
 ---
 
+## 🎓 **Critical Lessons Learned (December 17, 2024)**
+
+### **Frontend State Management Issues**
+1. **React Re-rendering Problems**: Module settings not updating due to `useCallback` dependencies not watching `instance.config` changes
+2. **Race Conditions**: Double module creation when `onDrop` manipulates nodes directly AND through interactions
+3. **Edge Duplication**: React warnings about duplicate keys when useEffect runs multiple times
+4. **Port Configuration**: Frontend connecting to wrong backend port due to Vite config mismatch
+
+### **Debugging Strategies**
+1. **Add console.log to track state changes** - see when components re-render
+2. **Use hash comparison** - prevent unnecessary useEffect runs
+3. **Monitor React warnings** - duplicate keys indicate state issues
+4. **Check useEffect dependencies** - ensure they're stable and minimal
+
+### **Architecture Principles**
+1. **Single Source of Truth**: Only update interactions, let useEffect handle node creation
+2. **Force Re-renders**: Use state variables to trigger UI updates when config changes
+3. **Duplicate Prevention**: Check for existing items before creating new ones
+4. **Proper Port Configuration**: Ensure frontend (3000) and backend (3001) ports match
+
+### **Common Pitfalls to Avoid**
+1. **Don't manipulate ReactFlow nodes directly** - always go through interactions
+2. **Don't use timeout-based flags** - use hash-based change detection
+3. **Don't ignore React warnings** - they indicate real state management issues
+4. **Don't assume port configurations** - always verify frontend/backend port alignment
+
+---
+
 ## 🎯 **Next Steps (Medium/Low Priority)**
 
 The system is now **production-stable** with all high-priority issues resolved. Remaining tasks are quality-of-life improvements:

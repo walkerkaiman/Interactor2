@@ -14,6 +14,7 @@ import {
   StreamEvent,
   isAudioOutputConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import express, { Request, Response } from 'express';
@@ -258,46 +259,82 @@ export class AudioOutputModule extends OutputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate sample rate
     if (this.sampleRate < 8000 || this.sampleRate > 48000) {
-      throw new Error(`Invalid sample rate: ${this.sampleRate}. Must be between 8000 and 48000 Hz.`);
+      throw InteractorError.validation(
+        `Audio sample rate must be between 8000-48000 Hz`,
+        { provided: this.sampleRate, min: 8000, max: 48000 },
+        ['Use 44100 Hz for CD quality', 'Use 48000 Hz for professional audio', 'Use 22050 Hz for lower quality/bandwidth']
+      );
     }
 
     // Validate channels
     if (this.channels < 1 || this.channels > 2) {
-      throw new Error(`Invalid channel count: ${this.channels}. Must be 1 or 2.`);
+      throw InteractorError.validation(
+        `Audio channels must be 1 (mono) or 2 (stereo)`,
+        { provided: this.channels, min: 1, max: 2 },
+        ['Use 1 for mono audio', 'Use 2 for stereo audio', 'Stereo provides better spatial audio experience']
+      );
     }
 
     // Validate volume
     if (this.volume < 0.0 || this.volume > 1.0) {
-      throw new Error(`Invalid volume: ${this.volume}. Must be between 0.0 and 1.0.`);
+      throw InteractorError.validation(
+        `Audio volume must be between 0.0-1.0`,
+        { provided: this.volume, min: 0.0, max: 1.0 },
+        ['Use 1.0 for full volume', 'Use 0.7 for comfortable listening', 'Use 0.0 to mute']
+      );
     }
 
     // Validate buffer size
     if (this.bufferSize < 256 || this.bufferSize > 16384) {
-      throw new Error(`Invalid buffer size: ${this.bufferSize}. Must be between 256 and 16384 samples.`);
+      throw InteractorError.validation(
+        `Audio buffer size must be between 256-16384 samples`,
+        { provided: this.bufferSize, min: 256, max: 16384 },
+        ['Use 4096 for balanced performance and latency', 'Use 256 for low latency', 'Use 8192 for high performance']
+      );
     }
 
     // Validate format
     if (!['wav', 'mp3', 'ogg'].includes(this.format)) {
-      throw new Error(`Invalid audio format: ${this.format}. Must be 'wav', 'mp3', or 'ogg'.`);
+      throw InteractorError.validation(
+        `Audio format must be wav, mp3, or ogg`,
+        { provided: this.format, allowed: ['wav', 'mp3', 'ogg'] },
+        ['Use "wav" for uncompressed audio', 'Use "mp3" for compressed audio', 'Use "ogg" for open-source format']
+      );
     }
 
     // Validate fade durations
     if (this.fadeInDuration < 0 || this.fadeInDuration > 10000) {
-      throw new Error(`Invalid fade in duration: ${this.fadeInDuration}. Must be between 0 and 10000 ms.`);
+      throw InteractorError.validation(
+        `Fade in duration must be between 0-10000 ms`,
+        { provided: this.fadeInDuration, min: 0, max: 10000 },
+        ['Use 0 for no fade in', 'Use 1000 for 1 second fade', 'Use 3000 for smooth fade in']
+      );
     }
 
     if (this.fadeOutDuration < 0 || this.fadeOutDuration > 10000) {
-      throw new Error(`Invalid fade out duration: ${this.fadeOutDuration}. Must be between 0 and 10000 ms.`);
+      throw InteractorError.validation(
+        `Fade out duration must be between 0-10000 ms`,
+        { provided: this.fadeOutDuration, min: 0, max: 10000 },
+        ['Use 0 for no fade out', 'Use 1000 for 1 second fade', 'Use 3000 for smooth fade out']
+      );
     }
 
     // Validate file upload settings
     if (this.enableFileUpload) {
       if (this.uploadPort < 1024 || this.uploadPort > 65535) {
-        throw new Error(`Invalid upload port: ${this.uploadPort}. Must be between 1024 and 65535.`);
+        throw InteractorError.validation(
+          `File upload port must be between 1024-65535`,
+          { provided: this.uploadPort, min: 1024, max: 65535 },
+          ['Use 3001 (default for Audio module)', 'Avoid ports below 1024 (system reserved)', 'Check that port is not already in use']
+        );
       }
 
       if (this.maxFileSize < 1024 || this.maxFileSize > 100 * 1024 * 1024) {
-        throw new Error(`Invalid max file size: ${this.maxFileSize}. Must be between 1024 and 100MB.`);
+        throw InteractorError.validation(
+          `Max file size must be between 1KB-100MB`,
+          { provided: this.maxFileSize, min: 1024, max: 100 * 1024 * 1024 },
+          ['Use 52428800 (50MB) for most audio files', 'Use smaller size to save disk space', 'Use larger size for long recordings']
+        );
       }
 
       // Ensure assets directory exists
@@ -344,12 +381,20 @@ export class AudioOutputModule extends OutputModuleBase {
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     // Use type guard to ensure we have audio output config
     if (!isAudioOutputConfig(newConfig)) {
-      throw new Error('Invalid audio output configuration provided');
+      throw InteractorError.validation(
+        'Invalid audio output configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: sampleRate, channels, format, volume', 'Ensure values are within valid ranges', 'Verify audio format is supported']
+      );
     }
     
     // Validate configuration
     if (newConfig.sampleRate < 8000 || newConfig.sampleRate > 48000) {
-      throw new Error(`Invalid sample rate: ${newConfig.sampleRate}. Must be between 8000 and 48000 Hz.`);
+      throw InteractorError.validation(
+        `Audio sample rate must be between 8000-48000 Hz`,
+        { provided: newConfig.sampleRate, min: 8000, max: 48000 },
+        ['Use 44100 Hz for CD quality', 'Use 48000 Hz for professional audio', 'Use 22050 Hz for lower quality/bandwidth']
+      );
     }
     
     this.deviceId = newConfig.deviceId || 'default';
@@ -388,7 +433,11 @@ export class AudioOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw new Error('Audio output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot send audio data when module is disabled',
+        { enabled: this.enabled, attempted: 'send' },
+        ['Enable the audio module in configuration', 'Check module status before sending audio', 'Verify module initialization completed successfully']
+      );
     }
     await this.playAudio(data);
   }
@@ -398,7 +447,11 @@ export class AudioOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('Audio output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle trigger event when audio module is disabled',
+        { enabled: this.enabled, attempted: 'trigger_event' },
+        ['Enable the audio module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
+      );
     }
     await this.playAudio(event.payload);
   }
@@ -408,7 +461,11 @@ export class AudioOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('Audio output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle streaming event when audio module is disabled',
+        { enabled: this.enabled, attempted: 'streaming_event' },
+        ['Enable the audio module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
+      );
     }
     // For streaming events, we might want to adjust volume based on the value
     const volume = Math.max(0, Math.min(1, event.value / 100)); // Normalize 0-100 to 0-1
@@ -420,7 +477,11 @@ export class AudioOutputModule extends OutputModuleBase {
    */
   protected async onManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw new Error('Audio output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot perform manual trigger when audio module is disabled',
+        { enabled: this.enabled, attempted: 'manual_trigger' },
+        ['Enable the audio module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
+      );
     }
     
     // Play a test sound or beep
@@ -482,7 +543,11 @@ export class AudioOutputModule extends OutputModuleBase {
       
       // Validate audio data - only check if it's an empty string
       if (typeof audioData.audioData === 'string' && audioData.audioData.trim() === '') {
-        throw new Error('No audio data provided');
+        throw InteractorError.validation(
+          'Audio data cannot be empty',
+          { provided: audioData.audioData, type: typeof audioData.audioData },
+          ['Provide valid audio file path or URL', 'Check that audio file exists and is accessible', 'Ensure audio data is properly formatted']
+        );
       }
       
       // Start playback

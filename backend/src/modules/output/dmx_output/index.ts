@@ -12,6 +12,7 @@ import {
   StreamEvent,
   isDmxOutputConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import * as fs from 'fs';
 import * as path from 'path';
 import express from 'express';
@@ -33,7 +34,7 @@ export class DmxOutputModule extends OutputModuleBase {
   
   // File upload server
   private uploadServer: express.Application | undefined = undefined;
-  private uploadPort: number = 3001;
+  private uploadPort: number = 3002;
   private uploadHost: string = 'localhost';
   private enableFileUpload: boolean = false;
   private maxFileSize: number = 10 * 1024 * 1024; // 10MB
@@ -59,7 +60,7 @@ export class DmxOutputModule extends OutputModuleBase {
       },
       enabled: config.enabled !== false,
       enableFileUpload: config.enableFileUpload !== false,
-      uploadPort: config.uploadPort || 3001,
+      uploadPort: config.uploadPort || 3002,
       uploadHost: config.uploadHost || 'localhost',
       maxFileSize: config.maxFileSize || 10 * 1024 * 1024,
       allowedExtensions: config.allowedExtensions || ['.csv']
@@ -137,7 +138,7 @@ export class DmxOutputModule extends OutputModuleBase {
             description: 'File upload server port',
             minimum: 1024,
             maximum: 65535,
-            default: 3001
+            default: 3002
           },
           uploadHost: {
             type: 'string',
@@ -210,38 +211,66 @@ export class DmxOutputModule extends OutputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate universe range
     if (this.universe < 1 || this.universe > 512) {
-      throw new Error(`Invalid universe number: ${this.universe}. Must be between 1 and 512.`);
+      throw InteractorError.validation(
+        `DMX universe must be between 1-512`,
+        { provided: this.universe, min: 1, max: 512 },
+        ['Try universe 1 for main lighting', 'Use 2-512 for additional fixtures', 'Each universe supports 512 channels']
+      );
     }
 
     // Validate brightness range
     if (this.brightness < 0.0 || this.brightness > 1.0) {
-      throw new Error(`Invalid brightness level: ${this.brightness}. Must be between 0.0 and 1.0.`);
+      throw InteractorError.validation(
+        `DMX brightness must be between 0.0-1.0`,
+        { provided: this.brightness, min: 0.0, max: 1.0 },
+        ['Use 1.0 for full brightness', 'Use 0.5 for 50% brightness', 'Use 0.0 to turn off all channels']
+      );
     }
 
     // Validate protocol configuration
     if (!this.protocol.type) {
-      throw new Error('Protocol type is required');
+      throw InteractorError.validation(
+        'DMX protocol type is required',
+        { provided: this.protocol },
+        ['Use "artnet" for Art-Net protocol', 'Use "sACN" for streaming ACN', 'Use "dmx512" for direct serial DMX']
+      );
     }
 
     if (this.protocol.type === 'artnet' || this.protocol.type === 'sACN') {
       if (!this.protocol.host) {
-        throw new Error(`Host is required for ${this.protocol.type} protocol`);
+        throw InteractorError.validation(
+          `Host address is required for ${this.protocol.type} protocol`,
+          { protocol: this.protocol.type, host: this.protocol.host },
+          ['Use "127.0.0.1" for local testing', 'Use broadcast address "255.255.255.255" for network', 'Use specific IP like "192.168.1.100" for target device']
+        );
       }
       if (!this.protocol.port || this.protocol.port < 1024 || this.protocol.port > 65535) {
-        throw new Error(`Invalid port number: ${this.protocol.port}. Must be between 1024 and 65535.`);
+        throw InteractorError.validation(
+          `${this.protocol.type} port must be between 1024-65535`,
+          { provided: this.protocol.port, min: 1024, max: 65535, protocol: this.protocol.type },
+          ['Use 6454 for Art-Net (default)', 'Use 5568 for sACN/E1.31', 'Avoid ports below 1024 (system reserved)']
+        );
       }
     }
 
     if (this.protocol.type === 'dmx512') {
       if (!this.protocol.serialPort) {
-        throw new Error('Serial port is required for DMX512 protocol');
+        throw InteractorError.validation(
+          'Serial port is required for DMX512 protocol',
+          { protocol: this.protocol.type, serialPort: this.protocol.serialPort },
+          ['Use "COM1" on Windows', 'Use "/dev/ttyUSB0" on Linux', 'Check Device Manager for available ports']
+        );
       }
     }
 
     // Validate upload configuration
     if (this.enableFileUpload) {
       if (this.uploadPort < 1024 || this.uploadPort > 65535) {
-        throw new Error(`Invalid upload port: ${this.uploadPort}. Must be between 1024 and 65535.`);
+        throw InteractorError.validation(
+          `File upload port must be between 1024-65535`,
+          { provided: this.uploadPort, min: 1024, max: 65535 },
+          ['Use 3002 (default for DMX module)', 'Avoid ports below 1024 (system reserved)', 'Check that port is not already in use']
+        );
       }
     }
   }
@@ -280,17 +309,29 @@ export class DmxOutputModule extends OutputModuleBase {
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     if (!isDmxOutputConfig(newConfig)) {
-      throw new Error('Invalid DMX output configuration provided');
+      throw InteractorError.validation(
+        'Invalid DMX output configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: universe, brightness, protocol', 'Ensure protocol object has type, host, and port fields', 'Verify values are within valid ranges']
+      );
     }
     
     // Validate universe range
     if (newConfig.universe < 1 || newConfig.universe > 512) {
-      throw new Error(`Invalid universe number: ${newConfig.universe}. Must be between 1 and 512.`);
+      throw InteractorError.validation(
+        `DMX universe must be between 1-512`,
+        { provided: newConfig.universe, min: 1, max: 512 },
+        ['Try universe 1 for main lighting', 'Use 2-512 for additional fixtures', 'Each universe supports 512 channels']
+      );
     }
 
     // Validate brightness range
     if (newConfig.brightness < 0.0 || newConfig.brightness > 1.0) {
-      throw new Error(`Invalid brightness level: ${newConfig.brightness}. Must be between 0.0 and 1.0.`);
+      throw InteractorError.validation(
+        `DMX brightness must be between 0.0-1.0`,
+        { provided: newConfig.brightness, min: 0.0, max: 1.0 },
+        ['Use 1.0 for full brightness', 'Use 0.5 for 50% brightness', 'Use 0.0 to turn off all channels']
+      );
     }
 
     let needsRestart = false;
@@ -331,7 +372,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw new Error('DMX output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot send DMX data when module is disabled',
+        { enabled: this.enabled, attempted: 'send' },
+        ['Enable the DMX module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
+      );
     }
     
     // Handle different data types
@@ -349,10 +394,18 @@ export class DmxOutputModule extends OutputModuleBase {
       } else if (typeof dmxData.frameIndex === 'number') {
         await this.sendFrameByIndex(dmxData.frameIndex);
       } else {
-        throw new Error('Invalid DMX data format');
+        throw InteractorError.validation(
+          'Invalid DMX data format - object must contain channels array or frameIndex',
+          { provided: dmxData, expected: 'object with channels[] or frameIndex' },
+          ['Use { channels: [0, 255, 128, ...] } for channel data', 'Use { frameIndex: 5 } for frame selection', 'Ensure channels array contains values 0-255']
+        );
       }
     } else {
-      throw new Error('Invalid DMX data type');
+              throw InteractorError.validation(
+          'Invalid DMX data type - must be number, array, or object',
+          { provided: typeof data, data: data },
+          ['Use number for frame index: 5', 'Use array for channels: [0, 255, 128]', 'Use object for structured data: { channels: [...] }']
+        );
     }
   }
 
@@ -361,7 +414,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('DMX output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle trigger event when DMX module is disabled',
+        { enabled: this.enabled, attempted: 'trigger_event' },
+        ['Enable the DMX module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
+      );
     }
     
     // In trigger mode, increment frame and send next frame
@@ -381,7 +438,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('DMX output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle streaming event when DMX module is disabled',
+        { enabled: this.enabled, attempted: 'streaming_event' },
+        ['Enable the DMX module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
+      );
     }
     
     // In streaming mode, use the value as frame index
@@ -401,7 +462,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async onManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw new Error('DMX output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot perform manual trigger when DMX module is disabled',
+        { enabled: this.enabled, attempted: 'manual_trigger' },
+        ['Enable the DMX module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
+      );
     }
     
     // Send a test pattern
@@ -747,7 +812,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   private async sendDmxChannels(channels: number[]): Promise<void> {
     if (!this.isConnected) {
-      throw new Error('DMX connection is not ready');
+      throw InteractorError.moduleError(
+        'DMX connection is not ready - cannot send channels',
+        new Error('Connection not established'),
+        ['Check protocol configuration (Art-Net/sACN/DMX512)', 'Verify network connectivity for Art-Net/sACN', 'Check serial port connection for DMX512', 'Ensure module is started and initialized']
+      );
     }
     
     // Apply brightness multiplier
@@ -970,7 +1039,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   public setBrightness(brightness: number): void {
     if (brightness < 0.0 || brightness > 1.0) {
-      throw new Error('Brightness must be between 0.0 and 1.0');
+      throw InteractorError.validation(
+        `DMX brightness must be between 0.0-1.0`,
+        { provided: brightness, min: 0.0, max: 1.0 },
+        ['Use 1.0 for full brightness', 'Use 0.5 for 50% brightness', 'Use 0.0 to turn off all channels']
+      );
     }
     this.brightness = brightness;
     this.emitStatus('brightnessChanged', { brightness });
@@ -988,7 +1061,11 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   public setCurrentFrame(frame: number): void {
     if (this.dmxSequence.length === 0) {
-      throw new Error('No DMX sequence loaded');
+      throw InteractorError.conflict(
+        'No DMX sequence loaded - cannot set frame',
+        { sequenceLength: this.dmxSequence.length, requestedFrame: frame },
+        ['Upload a CSV file with DMX sequence data', 'Load the default DMX file first', 'Check that file upload completed successfully']
+      );
     }
     this.currentFrame = ((frame % this.dmxSequence.length) + this.dmxSequence.length) % this.dmxSequence.length;
     this.emitStatus('frameChanged', { currentFrame: this.currentFrame });

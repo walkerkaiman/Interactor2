@@ -10,6 +10,8 @@ import {
   StreamEvent,
   isHttpOutputConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
+import { RetryHandler } from '../../../core/RetryHandler';
 
 export class HttpOutputModule extends OutputModuleBase {
   private url: string;
@@ -107,17 +109,29 @@ export class HttpOutputModule extends OutputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate URL format
     if (!this.isValidUrl(this.url)) {
-      throw new Error(`Invalid URL format: ${this.url}`);
+      throw InteractorError.validation(
+        `HTTP URL format is invalid`,
+        { provided: this.url, expected: 'http:// or https:// URL' },
+        ['Use "http://localhost:3000/api" for local testing', 'Use "https://api.example.com/webhook" for secure endpoints', 'Include protocol (http:// or https://)']
+      );
     }
 
     // Validate timeout range
     if (this.timeout < 1000 || this.timeout > 30000) {
-      throw new Error(`Invalid timeout: ${this.timeout}. Must be between 1000 and 30000 ms.`);
+      throw InteractorError.validation(
+        `HTTP timeout must be between 1000-30000 ms`,
+        { provided: this.timeout, min: 1000, max: 30000 },
+        ['Use 5000ms (5 seconds) for most APIs', 'Use 1000ms for fast local requests', 'Use 15000ms for slow external services']
+      );
     }
 
     // Validate method
     if (!['GET', 'POST', 'PUT', 'DELETE'].includes(this.method)) {
-      throw new Error(`Invalid HTTP method: ${this.method}`);
+      throw InteractorError.validation(
+        `HTTP method must be GET, POST, PUT, or DELETE`,
+        { provided: this.method, allowed: ['GET', 'POST', 'PUT', 'DELETE'] },
+        ['Use "POST" for sending data to API', 'Use "GET" for retrieving data', 'Use "PUT" for updating resources']
+      );
     }
   }
 
@@ -139,12 +153,20 @@ export class HttpOutputModule extends OutputModuleBase {
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     // Use type guard to ensure we have HTTP output config
     if (!isHttpOutputConfig(newConfig)) {
-      throw new Error('Invalid HTTP output configuration provided');
+      throw InteractorError.validation(
+        'Invalid HTTP output configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: url', 'Ensure URL format is valid (http:// or https://)', 'Verify method is one of: GET, POST, PUT, DELETE']
+      );
     }
     
     // Validate URL format
     if (!this.isValidUrl(newConfig.url)) {
-      throw new Error(`Invalid URL format: ${newConfig.url}`);
+      throw InteractorError.validation(
+        `HTTP URL format is invalid`,
+        { provided: newConfig.url, expected: 'http:// or https:// URL' },
+        ['Use "http://localhost:3000/api" for local testing', 'Use "https://api.example.com/webhook" for secure endpoints', 'Include protocol (http:// or https://)']
+      );
     }
     
     this.url = newConfig.url;
@@ -159,7 +181,11 @@ export class HttpOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw new Error('HTTP output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot send HTTP request when module is disabled',
+        { enabled: this.enabled, attempted: 'send' },
+        ['Enable the HTTP module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
+      );
     }
     await this.sendHttpRequest(data);
   }
@@ -169,7 +195,11 @@ export class HttpOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('HTTP output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle trigger event when HTTP module is disabled',
+        { enabled: this.enabled, attempted: 'trigger_event' },
+        ['Enable the HTTP module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
+      );
     }
     await this.sendHttpRequest(event.payload);
   }
@@ -179,7 +209,11 @@ export class HttpOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('HTTP output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle streaming event when HTTP module is disabled',
+        { enabled: this.enabled, attempted: 'streaming_event' },
+        ['Enable the HTTP module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
+      );
     }
     await this.sendHttpRequest(event.value);
   }
@@ -189,7 +223,11 @@ export class HttpOutputModule extends OutputModuleBase {
    */
   protected async onManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw new Error('HTTP output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot perform manual trigger when HTTP module is disabled',
+        { enabled: this.enabled, attempted: 'manual_trigger' },
+        ['Enable the HTTP module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
+      );
     }
     
     const testData = {
@@ -202,13 +240,14 @@ export class HttpOutputModule extends OutputModuleBase {
   }
 
   /**
-   * Send HTTP request with proper typing and error handling
+   * Send HTTP request with proper typing, error handling, and retry logic
    */
   private async sendHttpRequest<T = unknown>(data: T): Promise<void> {
     const timestamp = Date.now();
     
-    try {
-      this.logger?.debug(`Sending HTTP ${this.method} request to ${this.url}`, data);
+    // Use retry logic for network requests
+    const { result, attempts } = await RetryHandler.withNetworkRetry(async () => {
+      this.logger?.debug(`Sending HTTP ${this.method} request to ${this.url} (attempt ${attempts || 1})`, data);
       
       // Prepare request options
       const requestOptions: RequestInit = {
@@ -256,6 +295,7 @@ export class HttpOutputModule extends OutputModuleBase {
         this.emitStatus('success', { status: response.status, responseLength: responseText.length });
         
         this.logger?.info(`HTTP request successful: ${response.status} ${response.statusText}`);
+        return; // Success - exit the retry handler
       } else {
         // Error response
         const errorData: HttpErrorData = {
@@ -279,37 +319,87 @@ export class HttpOutputModule extends OutputModuleBase {
         
         this.logger?.error(`HTTP request failed: ${response.status} ${response.statusText}`, responseText);
         
-        // Throw error for the calling method to handle
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Throw proper InteractorError for retry handler to process
+        throw InteractorError.networkError(
+          `HTTP request failed: ${response.status} ${response.statusText}`,
+          new Error(`HTTP ${response.status}: ${response.statusText}`)
+        );
       }
+    }, {
+      maxAttempts: this.enabled ? 3 : 1, // Only retry if module is enabled
+      onRetry: (error, attempt, delay) => {
+        this.logger?.warn(`HTTP request retry ${attempt}/3 in ${delay}ms due to: ${error.message}`, 'HttpOutput');
+      }
+    });
       
     } catch (error) {
       this.errorCount++;
       
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Categorize the error for better user experience
+      let interactorError: InteractorError;
+      if (error instanceof InteractorError) {
+        interactorError = error;
+      } else if (error instanceof Error) {
+        if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+          interactorError = InteractorError.networkError(
+            `Cannot connect to ${this.url}`,
+            error
+          );
+        } else if (error.message.includes('timeout')) {
+          interactorError = InteractorError.networkError(
+            `Request to ${this.url} timed out after ${this.timeout}ms`,
+            error
+          );
+        } else if (error.message.includes('certificate') || error.message.includes('SSL')) {
+          interactorError = new InteractorError(
+            'network_error' as any,
+            `SSL/Certificate error connecting to ${this.url}`,
+            {
+              suggestions: [
+                'Check if the URL uses HTTPS correctly',
+                'Verify the SSL certificate is valid',
+                'Try using HTTP instead of HTTPS for testing'
+              ],
+              retryable: false,
+              cause: error
+            }
+          );
+        } else {
+          interactorError = InteractorError.networkError(
+            `HTTP request failed: ${error.message}`,
+            error
+          );
+        }
+      } else {
+        interactorError = InteractorError.internal(
+          'Unknown HTTP request error',
+          new Error(String(error))
+        );
+      }
+      
       const errorData: HttpErrorData = {
         url: this.url,
         method: this.method,
-        error: errorMessage,
+        error: interactorError.message,
         timestamp
       };
       
       const errorPayload: HttpErrorPayload = {
         url: this.url,
         method: this.method,
-        error: errorMessage,
+        error: interactorError.message,
         timestamp
       };
       
       this.lastError = errorData;
       
-      this.emitError(error instanceof Error ? error : new Error(errorMessage), 'http_request');
+      this.emitError(interactorError, 'http_request');
       this.emitOutput<HttpErrorPayload>('httpError', errorPayload);
       
-      this.logger?.error(`HTTP request error:`, error);
+      this.logger?.error(`HTTP request error:`, interactorError);
       
-      // Re-throw the error for the calling method to handle
-      throw error;
+      // Re-throw the InteractorError for the calling method to handle
+      throw interactorError;
     }
     
     // Emit state update

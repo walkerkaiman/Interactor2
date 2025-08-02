@@ -9,6 +9,7 @@ import {
   StreamEvent,
   isOscConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import * as osc from 'osc';
 
 export class OscInputModule extends InputModuleBase {
@@ -78,12 +79,20 @@ export class OscInputModule extends InputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate port range
     if (this.port < 1024 || this.port > 65535) {
-      throw new Error(`Invalid port number: ${this.port}. Must be between 1024 and 65535.`);
+      throw InteractorError.validation(
+        `OSC listener port must be between 1024-65535`,
+        { provided: this.port, min: 1024, max: 65535 },
+        ['Use 8000 for TouchOSC default', 'Use 9000 for common OSC applications', 'Avoid ports below 1024 (system reserved)']
+      );
     }
 
     // Validate host format
     if (!this.isValidHost(this.host)) {
-      throw new Error(`Invalid host address: ${this.host}`);
+      throw InteractorError.validation(
+        `Invalid OSC listener host address`,
+        { provided: this.host, expected: 'valid IP address or hostname' },
+        ['Use "0.0.0.0" to listen on all interfaces', 'Use "127.0.0.1" for localhost only', 'Use specific IP for network binding']
+      );
     }
   }
 
@@ -104,7 +113,11 @@ export class OscInputModule extends InputModuleBase {
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     // Use type guard to ensure we have OSC config
     if (!isOscConfig(newConfig)) {
-      throw new Error('Invalid OSC configuration provided');
+      throw InteractorError.validation(
+        'Invalid OSC input configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: port, host, addressPattern', 'Ensure port is between 1024-65535', 'Verify address pattern is valid OSC format']
+      );
     }
     
     let needsRestart = false;

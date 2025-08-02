@@ -70,7 +70,7 @@
         "description": "File upload server port",
         "minimum": 1024,
         "maximum": 65535,
-        "default": 3001
+        "default": 3002
       },
       "uploadHost": {
         "type": "string",

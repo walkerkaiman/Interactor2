@@ -58,11 +58,13 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   
   // Helper function to create a stable hash of interactions
   const getInteractionsHash = useCallback((interactions: InteractionConfig[]) => {
-    return JSON.stringify(interactions.map(i => ({
+    const hash = JSON.stringify(interactions.map(i => ({
       id: i.id,
       modules: i.modules?.map(m => ({ id: m.id, position: m.position })) || [],
       routes: i.routes || []
     })));
+    console.log('NodeEditor: Generated hash:', hash.substring(0, 100) + '...');
+    return hash;
   }, []);
 
   // Handle ReactFlow instance
@@ -129,8 +131,10 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      console.log('NodeEditor: onDrop triggered');
 
       if (!reactFlowInstance) {
+        console.log('NodeEditor: No ReactFlow instance, skipping drop');
         return;
       }
 
@@ -138,6 +142,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       const type = event.dataTransfer.getData('application/reactflow');
 
       if (!type) {
+        console.log('NodeEditor: No drag data, skipping drop');
         return;
       }
 
@@ -145,13 +150,17 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       try {
         dragData = JSON.parse(type);
       } catch (error) {
+        console.log('NodeEditor: Failed to parse drag data:', error);
         return;
       }
 
       const { moduleName } = dragData;
       if (!moduleName) {
+        console.log('NodeEditor: No moduleName in drag data');
         return;
       }
+      
+      console.log('NodeEditor: Dropping module:', moduleName);
 
       // Get the offset from the drag data (default to 0 if not present)
       const offsetX = dragData.offsetX || 0;
@@ -243,14 +252,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       }
 
       // Notify parent of local changes
+      // The main useEffect will handle creating the ReactFlow node from interactions
+      console.log('NodeEditor: Updating interactions with new module:', moduleName);
       onInteractionsChange(updatedInteractions);
-
-      // Add the node to ReactFlow
-      setNodes((nds) => [...nds, newNode]);
-
-      // Node addition handled through interactions update
     },
-    [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode, setNodes]
+    [reactFlowInstance, modules, interactions, onInteractionsChange, onNodeSelect, handleDeleteNode]
   );
 
   // Handle drag over
@@ -263,13 +269,19 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Convert modules and interactions to ReactFlow nodes and edges
   useEffect(() => {
+    console.log('NodeEditor: useEffect triggered with interactions:', interactions.length);
+    
     // Check if interactions have actually changed using hash comparison
     const currentHash = getInteractionsHash(interactions);
     if (currentHash === lastInteractionsRef.current) {
+      console.log('NodeEditor: No changes detected, skipping update');
       return; // No actual changes, skip update
     }
     lastInteractionsRef.current = currentHash;
-
+        console.log('NodeEditor: Processing interactions update');
+    console.log('NodeEditor: Current nodes count:', nodes.length);
+    console.log('NodeEditor: Current edges count:', edges.length);
+    
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
@@ -306,7 +318,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     newNodes.push(...Array.from(moduleInstancesMap.values()));
 
     // Create edges for interactions
+    console.log('NodeEditor: Creating edges from interactions:', interactions.length);
     interactions.forEach((interaction) => {
+      console.log('NodeEditor: Processing interaction:', interaction.id, 'with routes:', interaction.routes?.length || 0);
       interaction.routes?.forEach((route) => {
         // Use the actual node IDs from the route
         const sourceNode = newNodes.find(node => node.id === route.source);
@@ -318,6 +332,14 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           const edgeStyle = {};
 
           const edgeId = route.id || `edge-${interaction.id}-${route.source}-${route.target}`;
+          console.log('NodeEditor: Creating edge with ID:', edgeId);
+          
+          // Check if this edge already exists to prevent duplicates
+          const existingEdge = newEdges.find(edge => edge.id === edgeId);
+          if (existingEdge) {
+            console.log('NodeEditor: Skipping duplicate edge:', edgeId);
+            return;
+          }
           
           newEdges.push({
             id: edgeId,
@@ -378,7 +400,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // If edges are the same, preserve current edges to maintain local state
       return currentEdges;
     });
-  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode]); // Use interactions directly
+  }, [modules, interactions, selectedNodeId, onNodeSelect, handleDeleteNode, getInteractionsHash]); // Use interactions directly
 
   // Update node data with current edges for handle coloring
   useEffect(() => {

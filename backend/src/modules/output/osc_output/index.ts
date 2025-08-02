@@ -9,6 +9,7 @@ import {
   StreamEvent,
   isOscOutputConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import * as osc from 'osc';
 
 export class OscOutputModule extends OutputModuleBase {
@@ -100,17 +101,29 @@ export class OscOutputModule extends OutputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate port range
     if (this.port < 1024 || this.port > 65535) {
-      throw new Error(`Invalid port number: ${this.port}. Must be between 1024 and 65535.`);
+      throw InteractorError.validation(
+        `OSC port must be between 1024-65535`,
+        { provided: this.port, min: 1024, max: 65535 },
+        ['Use 8000 for TouchOSC default', 'Use 9000 for common OSC applications', 'Avoid ports below 1024 (system reserved)']
+      );
     }
 
     // Validate host format
     if (!this.isValidHost(this.host)) {
-      throw new Error(`Invalid host address: ${this.host}`);
+      throw InteractorError.validation(
+        `Invalid OSC host address`,
+        { provided: this.host, expected: 'valid IP address or hostname' },
+        ['Use "127.0.0.1" for local testing', 'Use "192.168.1.100" for network device', 'Use "0.0.0.0" to listen on all interfaces']
+      );
     }
 
     // Validate address pattern
     if (!this.addressPattern || !this.addressPattern.startsWith('/')) {
-      throw new Error(`Invalid OSC address pattern: ${this.addressPattern}. Must start with '/'`);
+      throw InteractorError.validation(
+        `OSC address pattern must start with '/'`,
+        { provided: this.addressPattern, expected: 'pattern starting with /' },
+        ['Use "/trigger" for simple triggers', 'Use "/fader/1" for numbered controls', 'Use "/app/control" for organized patterns']
+      );
     }
   }
 
@@ -131,22 +144,38 @@ export class OscOutputModule extends OutputModuleBase {
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     // Use type guard to ensure we have OSC output config
     if (!isOscOutputConfig(newConfig)) {
-      throw new Error('Invalid OSC output configuration provided');
+      throw InteractorError.validation(
+        'Invalid OSC output configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: host, port, addressPattern', 'Ensure values are within valid ranges', 'Verify address pattern starts with /']
+      );
     }
     
     // Validate port range
     if (newConfig.port < 1024 || newConfig.port > 65535) {
-      throw new Error(`Invalid port number: ${newConfig.port}. Must be between 1024 and 65535.`);
+      throw InteractorError.validation(
+        `OSC port must be between 1024-65535`,
+        { provided: newConfig.port, min: 1024, max: 65535 },
+        ['Use 8000 for TouchOSC default', 'Use 9000 for common OSC applications', 'Avoid ports below 1024 (system reserved)']
+      );
     }
 
     // Validate host format
     if (!this.isValidHost(newConfig.host)) {
-      throw new Error(`Invalid host address: ${newConfig.host}`);
+      throw InteractorError.validation(
+        `Invalid OSC host address`,
+        { provided: newConfig.host, expected: 'valid IP address or hostname' },
+        ['Use "127.0.0.1" for local testing', 'Use "192.168.1.100" for network device', 'Use "0.0.0.0" to listen on all interfaces']
+      );
     }
 
     // Validate address pattern
     if (!newConfig.addressPattern || !newConfig.addressPattern.startsWith('/')) {
-      throw new Error(`Invalid OSC address pattern: ${newConfig.addressPattern}. Must start with '/'`);
+      throw InteractorError.validation(
+        `OSC address pattern must start with '/'`,
+        { provided: newConfig.addressPattern, expected: 'pattern starting with /' },
+        ['Use "/trigger" for simple triggers', 'Use "/fader/1" for numbered controls', 'Use "/app/control" for organized patterns']
+      );
     }
     
     let needsRestart = false;
@@ -187,7 +216,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw new Error('OSC output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot send OSC data when module is disabled',
+        { enabled: this.enabled, attempted: 'send' },
+        ['Enable the OSC module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
+      );
     }
     await this.sendOscMessage(this.addressPattern, data);
   }
@@ -197,7 +230,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('OSC output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle trigger event when OSC module is disabled',
+        { enabled: this.enabled, attempted: 'trigger_event' },
+        ['Enable the OSC module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
+      );
     }
     
     // Extract address from event payload if available, otherwise use default
@@ -212,7 +249,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw new Error('OSC output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot handle streaming event when OSC module is disabled',
+        { enabled: this.enabled, attempted: 'streaming_event' },
+        ['Enable the OSC module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
+      );
     }
     
     // For streaming events, send the value to the default address pattern
@@ -224,7 +265,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async onManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw new Error('OSC output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot perform manual trigger when OSC module is disabled',
+        { enabled: this.enabled, attempted: 'manual_trigger' },
+        ['Enable the OSC module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
+      );
     }
     
     const testData = {
@@ -303,7 +348,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   private async sendOscMessage<T = unknown>(address: string, data: T): Promise<void> {
     if (!this.udpPort || !this.isConnected) {
-      throw new Error('OSC sender is not ready');
+      throw InteractorError.moduleError(
+        'OSC sender is not ready - cannot send message',
+        new Error('UDP port not initialized or connection lost'),
+        ['Check OSC configuration (host and port)', 'Verify network connectivity', 'Ensure module is started and initialized', 'Check if target OSC application is running']
+      );
     }
 
     const timestamp = Date.now();
@@ -525,7 +574,11 @@ export class OscOutputModule extends OutputModuleBase {
    */
   public async sendToAddress(address: string, data: unknown): Promise<void> {
     if (!this.enabled) {
-      throw new Error('OSC output module is disabled');
+      throw InteractorError.conflict(
+        'Cannot send to OSC address when module is disabled',
+        { enabled: this.enabled, attempted: 'send_to_address', address },
+        ['Enable the OSC module in configuration', 'Check module status before sending', 'Verify module initialization completed successfully']
+      );
     }
     await this.sendOscMessage(address, data);
   }

@@ -9,6 +9,7 @@ import {
   StreamEvent,
   isHttpInputConfig
 } from '@interactor/shared';
+import { InteractorError } from '../../../core/ErrorHandler';
 import express, { Request, Response } from 'express';
 import { Server } from 'http';
 
@@ -116,27 +117,47 @@ export class HttpInputModule extends InputModuleBase {
   protected async onInit(): Promise<void> {
     // Validate port range
     if (this.port < 1024 || this.port > 65535) {
-      throw new Error(`Invalid port number: ${this.port}. Must be between 1024 and 65535.`);
+      throw InteractorError.validation(
+        `HTTP server port must be between 1024-65535`,
+        { provided: this.port, min: 1024, max: 65535 },
+        ['Use 3000 for development', 'Use 8000 for webhooks', 'Avoid ports below 1024 (system reserved)']
+      );
     }
 
     // Validate host format
     if (!this.isValidHost(this.host)) {
-      throw new Error(`Invalid host address: ${this.host}`);
+      throw InteractorError.validation(
+        `Invalid HTTP server host address`,
+        { provided: this.host, expected: 'valid IP address or hostname' },
+        ['Use "0.0.0.0" to listen on all interfaces', 'Use "127.0.0.1" for localhost only', 'Use specific IP for network binding']
+      );
     }
 
     // Validate endpoint format
     if (!this.endpoint.startsWith('/')) {
-      throw new Error(`Invalid endpoint: ${this.endpoint}. Must start with '/'`);
+      throw InteractorError.validation(
+        `HTTP endpoint must start with '/'`,
+        { provided: this.endpoint, expected: 'path starting with /' },
+        ['Use "/webhook" for webhooks', 'Use "/api/trigger" for API endpoints', 'Use "/data" for data ingestion']
+      );
     }
 
     // Validate rate limit
     if (this.rateLimit < 1 || this.rateLimit > 1000) {
-      throw new Error(`Invalid rate limit: ${this.rateLimit}. Must be between 1 and 1000 requests per minute.`);
+      throw InteractorError.validation(
+        `HTTP rate limit must be between 1-1000 requests per minute`,
+        { provided: this.rateLimit, min: 1, max: 1000 },
+        ['Use 60 for moderate traffic (1 per second)', 'Use 10 for low traffic', 'Use 300 for high traffic applications']
+      );
     }
 
     // Validate methods
     if (!Array.isArray(this.methods) || this.methods.length === 0) {
-      throw new Error('At least one HTTP method must be specified.');
+      throw InteractorError.validation(
+        'At least one HTTP method must be specified',
+        { provided: this.methods, expected: 'array with at least one method' },
+        ['Use ["POST"] for receiving data', 'Use ["GET", "POST"] for both reading and writing', 'Include only needed methods for security']
+      );
     }
   }
 
@@ -157,7 +178,11 @@ export class HttpInputModule extends InputModuleBase {
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
     // Use type guard to ensure we have HTTP input config
     if (!isHttpInputConfig(newConfig)) {
-      throw new Error('Invalid HTTP input configuration provided');
+      throw InteractorError.validation(
+        'Invalid HTTP input configuration provided',
+        { providedConfig: newConfig },
+        ['Check that all required fields are present: port, host, endpoint, methods', 'Ensure port is between 1024-65535', 'Verify methods array is not empty']
+      );
     }
     
     let needsRestart = false;
