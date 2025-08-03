@@ -117,6 +117,27 @@ protected async onStart(): Promise<void> {
 ```
 
 ### **4. Lifecycle Consistency**
+
+### **5. Helper-Layer Split (Clock / Engine / Network pattern)**
+For any non-trivial module, separate concerns into focused files so that each can be unit-tested and debugged in isolation.
+
+Example pattern taken from `time_input` refactor:
+```
+backend/src/modules/input/time_input/
+├── index.ts         # Thin glue class (Interactor lifecycle only)
+├── TimeEngine.ts    # Pure scheduler (clock/metronome math)
+├── DisplayFormatter.ts # Pure time-format helpers (no side-effects)
+├── WsClient.ts      # Reconnecting WebSocket wrapper (network only)
+```
+Guidelines:
+1. **Pure helpers first** – any maths / string formatting lives in stand-alone functions.
+2. **Event-emitting engines** – long-running logic (schedulers, parsers, etc.) emit events instead of calling Interactor APIs directly.
+3. **Glue class last** – the `index.ts` file listens to engine events and maps them to `emitTrigger`, `emitStateUpdate`, etc.
+4. **No cross-concern imports** – engine never imports WebSocket, network wrapper never imports Interactor.
+5. **Frontend ≠ maths** – all calculations stay in the backend; the client only renders strings coming from state.
+
+Benefit: one bug has one file.
+
 ```typescript
 // ✅ Always implement cleanup
 protected async onStart(): Promise<void> {

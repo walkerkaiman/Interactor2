@@ -132,7 +132,9 @@
       "moduleName": "Time Input",
       "config": {
         "mode": "metronome",
-        "millisecondDelay": 3000
+        "millisecondDelay": 3000,
+        "enabled": true,
+        "targetTime": "12:00 PM"
       },
       "status": "stopped",
       "messageCount": 0,

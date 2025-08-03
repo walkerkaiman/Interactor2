@@ -24,8 +24,19 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
     event.dataTransfer.effectAllowed = 'copy';
   };
 
-  const inputModules = modules.filter(m => m.type === 'input');
-  const outputModules = modules.filter(m => m.type === 'output');
+  // Remove duplicate entries (e.g., runtime instances merged with manifests)
+  const uniqueByName = (list: ModuleManifest[]) => {
+    const map = new Map<string, ModuleManifest>();
+    list.forEach(m => {
+      if (!map.has(m.name)) {
+        map.set(m.name, m);
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  const inputModules = uniqueByName(modules.filter(m => m.type === 'input'));
+  const outputModules = uniqueByName(modules.filter(m => m.type === 'output'));
 
   const getPageTitle = (page: AppPage): string => {
     switch (page) {

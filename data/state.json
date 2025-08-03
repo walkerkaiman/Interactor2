@@ -77,10 +77,19 @@
         "apiEnabled": false,
         "apiEndpoint": ""
       },
-      "status": "stopped",
+      "status": "ready",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754236003036
+      "lastUpdate": 1754240871163,
+      "mode": "metronome",
+      "currentTime": "12:07:51 PM",
+      "countdown": "9s to next",
+      "targetTime": "12:00 PM",
+      "targetTime12Hour": "",
+      "millisecondDelay": 10000,
+      "enabled": true,
+      "apiEnabled": false,
+      "apiEndpoint": ""
     },
     {
       "id": "node-1754170514058",

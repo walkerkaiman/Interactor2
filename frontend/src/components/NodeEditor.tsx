@@ -323,37 +323,43 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       // Create nodes for each module instance in interactions
       const moduleInstancesMap = new Map();
       
-      interactions.forEach((interaction) => {
-        interaction.modules?.forEach((moduleInstance) => {
-          const manifest = modules.find(m => m.name === moduleInstance.moduleName);
-          if (manifest) {
-            const nodeId = moduleInstance.id;
-            
-            // Determine node type based on module name
-            let nodeType = 'custom';
-            if (manifest.name === 'Time Input') {
-              nodeType = 'timeInput';
-            } else if (manifest.name === 'Audio Output') {
-              nodeType = 'audioOutput';
-            }
-            
-            moduleInstancesMap.set(nodeId, {
-              id: nodeId,
-              type: nodeType,
-              position: moduleInstance.position || { x: 100, y: 100 },
-              data: {
-                module: manifest,
-                instance: moduleInstance,
-                isSelected: selectedNodeId === nodeId,
-                onSelect: () => onNodeSelect(nodeId),
-                onDelete: handleDeleteNode,
-                onConfigChange: handleNodeConfigChange,
-                edges: [], // Will be updated after edges are created
-              },
+                interactions.forEach((interaction) => {
+            interaction.modules?.forEach((moduleInstance) => {
+              const manifest = modules.find(m => m.name === moduleInstance.moduleName);
+              if (manifest) {
+                const nodeId = moduleInstance.id;
+
+                // Try to find the latest runtime data for this instance coming from the backend
+                const liveInstance = modules.find(m => (m as any).id === nodeId);
+
+                // Merge interaction data with the latest runtime state (currentTime, countdown, etc.)
+                const mergedInstance = liveInstance ? { ...moduleInstance, ...liveInstance } : moduleInstance;
+                
+                // Determine node type based on module name
+                let nodeType = 'custom';
+                if (manifest.name === 'Time Input') {
+                  nodeType = 'timeInput';
+                } else if (manifest.name === 'Audio Output') {
+                  nodeType = 'audioOutput';
+                }
+                
+                moduleInstancesMap.set(nodeId, {
+                  id: nodeId,
+                  type: nodeType,
+                  position: mergedInstance.position || { x: 100, y: 100 },
+                  data: {
+                    module: manifest,
+                    instance: mergedInstance,
+                    isSelected: selectedNodeId === nodeId,
+                    onSelect: () => onNodeSelect(nodeId),
+                    onDelete: handleDeleteNode,
+                    onConfigChange: handleNodeConfigChange,
+                    edges: [], // Will be updated after edges are created
+                  },
+                });
+              }
             });
-          }
-        });
-      });
+          });
       
       newNodes.push(...Array.from(moduleInstancesMap.values()));
 
@@ -427,16 +433,32 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Update node data with current edges for handle coloring
   useEffect(() => {
-    setNodes((currentNodes) => 
+    setNodes(currentNodes =>
       currentNodes.map(node => ({
         ...node,
-        data: {
-          ...node.data,
-          edges: edges,
-        },
+        data: { ...node.data, edges }
       }))
     );
   }, [edges, setNodes]);
+
+  // Runtime module state sync (currentTime / countdown etc.)
+  useEffect(() => {
+    setNodes(currentNodes =>
+      currentNodes.map(node => {
+        const live = modules.find(m => (m as any).id === node.id);
+        if (live) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              instance: { ...node.data.instance, ...live }
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, [modules, setNodes]);
 
 
   // Handle drag start from handles

@@ -2,10 +2,16 @@ import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
 import { InteractorError } from '../../../core/ErrorHandler';
 import WebSocket from 'ws';
+import { TimeEngine } from './TimeEngine';
+import { WsClient } from './WsClient';
+import { convertTo12Hour, convertTo24Hour } from './DisplayFormatter';
 
 export class TimeInputModule extends InputModuleBase {
   private intervalId?: NodeJS.Timeout;
   private metronomeIntervalId?: NodeJS.Timeout;
+  private engine: TimeEngine;
+  private wsClient?: WsClient;
+  private displayUpdateIntervalId?: NodeJS.Timeout;
   private targetTime: string;
   private enabled: boolean;
   private currentTime: string = '';
@@ -107,9 +113,41 @@ export class TimeInputModule extends InputModuleBase {
     
     // Store external ID if provided
     this.externalId = externalId;
+
+    // Create engine instance
+    this.engine = new TimeEngine({
+      mode: this.timeMode,
+      targetTime: this.targetTime,
+      delayMs: this.millisecondDelay,
+      enabled: this.enabled,
+    });
+
+    // Wire engine events
+    this.engine.on('tick', ({ currentTime, countdown }) => {
+      this.currentTime = currentTime;
+      this.countdown = countdown;
+      this.emitStateUpdate();
+    });
+    this.engine.on('pulse', () => {
+      this.emitTrigger('timeTrigger', {
+        mode: 'metronome',
+        millisecondDelay: this.millisecondDelay,
+        currentTime: new Date().toISOString(),
+        timestamp: Date.now(),
+      });
+    });
+    this.engine.on('clockHit', () => {
+      this.emitTrigger('timeTrigger', {
+        mode: 'clock',
+        targetTime: this.targetTime,
+        currentTime: new Date().toISOString(),
+        timestamp: Date.now(),
+      });
+    });
   }
 
   protected async onInit(): Promise<void> {
+    // Validate configuration first
     if (this.timeMode === 'clock') {
       // Validate time format for clock mode
       if (!this.isValidTimeFormat(this.targetTime)) {
@@ -128,6 +166,14 @@ export class TimeInputModule extends InputModuleBase {
           ['Try 1000ms for 1-second intervals', 'Use 500ms for faster pulses', 'Maximum is 60000ms (1 minute)']
         );
       }
+    }
+    
+    // Initialize the current time and countdown immediately
+    this.updateTimeDisplay();
+    
+    // Start listening if enabled
+    if (this.enabled) {
+      await this.onStartListening();
     }
 
     // Validate WebSocket configuration if enabled
@@ -153,35 +199,24 @@ export class TimeInputModule extends InputModuleBase {
     this.logger?.info(`Time Input module ${this.id} starting...`);
     
     if (this.enabled) {
-      if (this.timeMode === 'clock') {
-        this.logger?.info(`Starting clock mode with target time: ${this.targetTime}`);
-        this.startTimeCheck();
-      } else if (this.timeMode === 'metronome') {
-        this.logger?.info(`Starting metronome mode with delay: ${this.millisecondDelay}ms`);
-        this.startMetronome();
-      }
+      this.engine.start();
     } else {
       this.logger?.warn(`Time Input module ${this.id} is disabled`);
     }
-    
+
     // Start WebSocket connection if API is enabled
     if (this.apiEnabled && this.apiEndpoint) {
       this.connectWebSocket();
     }
-    
-    // Start updating current time and countdown immediately
-    this.updateTimeDisplay();
   }
 
   protected async onStop(): Promise<void> {
-    this.stopTimeCheck();
-    this.stopMetronome();
+    this.engine.stop();
     this.disconnectWebSocket();
   }
 
   protected async onDestroy(): Promise<void> {
-    this.stopTimeCheck();
-    this.stopMetronome();
+    this.engine.stop();
     this.disconnectWebSocket();
   }
 
@@ -190,16 +225,7 @@ export class TimeInputModule extends InputModuleBase {
     
     if (newTimeConfig.mode !== this.timeMode) {
       this.timeMode = newTimeConfig.mode || 'clock';
-      // Restart with new mode
-      if (this.enabled && this.isRunning) {
-        this.stopTimeCheck();
-        this.stopMetronome();
-        if (this.timeMode === 'clock') {
-          this.startTimeCheck();
-        } else if (this.timeMode === 'metronome') {
-          this.startMetronome();
-        }
-      }
+      this.engine.update({ mode: this.timeMode });
     }
     
     if (newTimeConfig.targetTime !== this.targetTime) {
@@ -222,24 +248,14 @@ export class TimeInputModule extends InputModuleBase {
           ['Try 1000ms for 1-second intervals', 'Use 500ms for faster pulses', 'Maximum is 60000ms (1 minute)']
         );
       }
-      // Restart metronome with new delay if running
-      if (this.timeMode === 'metronome' && this.enabled && this.isRunning) {
-        this.stopMetronome();
-        this.startMetronome();
-      }
+      this.engine.update({ delayMs: this.millisecondDelay });
     }
     
     if (newTimeConfig.enabled !== this.enabled) {
       this.enabled = newTimeConfig.enabled ?? this.enabled;
-      if (this.enabled && this.isRunning) {
-        if (this.timeMode === 'clock') {
-          this.startTimeCheck();
-        } else if (this.timeMode === 'metronome') {
-          this.startMetronome();
-        }
-      } else {
-        this.stopTimeCheck();
-        this.stopMetronome();
+      this.engine.update({ enabled: this.enabled });
+      if (!this.enabled) {
+        this.engine.stop();
       }
     }
 
@@ -282,10 +298,13 @@ export class TimeInputModule extends InputModuleBase {
       lastUpdate: Date.now()
     };
 
-    this.logger?.debug(`Time Input ${moduleId}: Emitting state update`, stateUpdate);
+    this.logger?.info(`Time Input ${moduleId}: Emitting state update - currentTime = ${this.currentTime}, countdown = ${this.countdown}`);
     
     // Emit state update event for core system to handle
     this.emit('stateUpdate', stateUpdate);
+    
+    // Also emit moduleStateChanged for real-time updates
+    this.emit('moduleStateChanged', stateUpdate);
   }
 
   protected handleInput(data: any): void {
@@ -301,21 +320,17 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   protected async onStartListening(): Promise<void> {
-    if (this.timeMode === 'clock') {
-      this.startTimeCheck();
-    } else if (this.timeMode === 'metronome') {
-      this.startMetronome();
+    this.logger?.info(`Time Input module ${this.id} starting to listen...`);
+    if (this.enabled) {
+      this.engine.start();
     }
-    
-    // Connect to WebSocket API if enabled
     if (this.apiEnabled && this.apiEndpoint) {
       this.connectWebSocket();
     }
   }
 
   protected async onStopListening(): Promise<void> {
-    this.stopTimeCheck();
-    this.stopMetronome();
+    this.engine.stop();
     this.disconnectWebSocket();
   }
 
@@ -345,8 +360,14 @@ export class TimeInputModule extends InputModuleBase {
     if (this.metronomeIntervalId) {
       clearInterval(this.metronomeIntervalId);
     }
+    if (this.displayUpdateIntervalId) {
+      clearInterval(this.displayUpdateIntervalId);
+    }
 
     this.logger?.info(`Starting metronome with ${this.millisecondDelay}ms delay`);
+    
+    // Update display immediately
+    this.updateTimeDisplay();
     
     // Emit initial trigger
     this.emitTrigger('timeTrigger', {
@@ -363,6 +384,8 @@ export class TimeInputModule extends InputModuleBase {
         return;
       }
       
+      this.updateTimeDisplay(); // Update display before emitting trigger
+      
       this.emitTrigger('timeTrigger', {
         mode: 'metronome',
         millisecondDelay: this.millisecondDelay,
@@ -371,10 +394,9 @@ export class TimeInputModule extends InputModuleBase {
       });
     }, this.millisecondDelay);
     
-    // Also update time display more frequently for metronome mode
-    // This ensures the countdown shows accurate time to next pulse
-    const updateInterval = Math.min(1000, this.millisecondDelay / 4); // Update at least every second, or 1/4 of the delay
-    setInterval(() => {
+    // Set up a separate interval for more frequent display updates
+    const updateInterval = Math.min(1000, Math.floor(this.millisecondDelay / 4)); // Update at least every second, or 1/4 of the delay
+    this.displayUpdateIntervalId = setInterval(() => {
       if (this.enabled && this.timeMode === 'metronome') {
         this.updateTimeDisplay();
       }
@@ -389,6 +411,10 @@ export class TimeInputModule extends InputModuleBase {
       clearInterval(this.metronomeIntervalId);
       this.metronomeIntervalId = undefined as any;
     }
+    if (this.displayUpdateIntervalId) {
+      clearInterval(this.displayUpdateIntervalId);
+      this.displayUpdateIntervalId = undefined as any;
+    }
   }
 
   /**
@@ -398,6 +424,12 @@ export class TimeInputModule extends InputModuleBase {
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
+    if (this.displayUpdateIntervalId) {
+      clearInterval(this.displayUpdateIntervalId);
+    }
+
+    // Update display immediately
+    this.updateTimeDisplay();
 
     // Check every second
     this.intervalId = setInterval(() => {
@@ -410,6 +442,13 @@ export class TimeInputModule extends InputModuleBase {
           currentTime: new Date().toISOString(),
           timestamp: Date.now()
         });
+      }
+    }, 1000);
+    
+    // Set up a separate interval for more frequent display updates
+    this.displayUpdateIntervalId = setInterval(() => {
+      if (this.enabled && this.timeMode === 'clock') {
+        this.updateTimeDisplay();
       }
     }, 1000);
   }
@@ -471,59 +510,14 @@ export class TimeInputModule extends InputModuleBase {
    * Convert 24-hour time to 12-hour format
    */
   private convertTo12Hour(time24: string): string {
-    const parts = time24.split(':').map(Number);
-    const hours = parts[0];
-    const minutes = parts[1];
-    
-    if (hours === undefined || minutes === undefined) {
-      throw InteractorError.validation(
-        `Cannot convert invalid 24-hour time format`,
-        { provided: time24, expected: 'HH:MM format' },
-        ['Use format like "14:30" for 2:30 PM', 'Ensure hours are 0-23 and minutes are 0-59', 'Check time string parsing']
-      );
-    }
-    
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    return convertTo12Hour(time24);
   }
 
   /**
    * Convert 12-hour time to 24-hour format
    */
   private convertTo24Hour(time12: string): string {
-    const match = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) {
-      throw InteractorError.validation(
-        `Cannot convert invalid 12-hour time format`,
-        { provided: time12, expected: 'H:MM AM/PM format' },
-        ['Use format like "2:30 PM" or "10:15 AM"', 'Include AM/PM designation', 'Use 12-hour format (1-12), not 24-hour']
-      );
-    }
-    
-    const hoursStr = match[1];
-    const minutesStr = match[2];
-    const periodStr = match[3];
-    
-    if (!hoursStr || !minutesStr || !periodStr) {
-      throw InteractorError.validation(
-        `Missing components in 12-hour time format`,
-        { provided: time12, parsed: { hours: hoursStr, minutes: minutesStr, period: periodStr } },
-        ['Ensure format is "H:MM AM" or "H:MM PM"', 'Include both AM/PM designation', 'Check for proper time separators']
-      );
-    }
-    
-    let hours = parseInt(hoursStr);
-    const minutes = parseInt(minutesStr);
-    const period = periodStr.toUpperCase();
-    
-    if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      hours = 0;
-    }
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    return convertTo24Hour(time12);
   }
 
   /**
@@ -594,71 +588,44 @@ export class TimeInputModule extends InputModuleBase {
    * Connect to WebSocket API
    */
   private connectWebSocket(): void {
-    if (!this.apiEndpoint || !this.apiEnabled) {
-      return;
-    }
+    if (!this.apiEndpoint || !this.apiEnabled) return;
 
-    try {
-      this.logger?.info(`Connecting to WebSocket API: ${this.apiEndpoint}`);
-      
-      this.ws = new WebSocket(this.apiEndpoint);
-      
-      this.ws.onopen = () => {
+    if (!this.wsClient) {
+      this.wsClient = new WsClient(this.apiEndpoint, {
+        baseDelay: this.reconnectDelay,
+        maxAttempts: this.maxReconnectAttempts,
+      });
+
+      this.wsClient.on('open', () => {
         this.logger?.info('WebSocket API connected');
-        this.wsReconnectAttempts = 0;
-        this.emit('apiConnected', {
-          endpoint: this.apiEndpoint,
-          timestamp: Date.now()
-        });
-      };
-      
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data.toString());
-          this.handleApiTimeData(data);
-        } catch (error) {
-          this.logger?.error('Failed to parse WebSocket message:', error);
-        }
-      };
-      
-      this.ws.onclose = (event) => {
-        this.logger?.warn(`WebSocket API disconnected: ${event.code} ${event.reason}`);
-        this.emit('apiDisconnected', {
-          endpoint: this.apiEndpoint,
-          code: event.code,
-          reason: event.reason,
-          timestamp: Date.now()
-        });
-        
-        // Attempt to reconnect
-        this.scheduleReconnect();
-      };
-      
-      this.ws.onerror = (error) => {
-        this.logger?.error('WebSocket API error:', error);
-      };
-      
-    } catch (error) {
-      this.logger?.error('Failed to connect to WebSocket API:', error);
-      this.scheduleReconnect();
-    }
-  }
+        this.emit('apiConnected', { endpoint: this.apiEndpoint, timestamp: Date.now() });
+      });
 
+      this.wsClient.on('close', (evt) => {
+        this.logger?.warn(`WebSocket API disconnected: ${evt.code} ${evt.reason}`);
+        this.emit('apiDisconnected', { endpoint: this.apiEndpoint, code: evt.code, reason: evt.reason, timestamp: Date.now() });
+      });
+
+      this.wsClient.on('message', (raw) => {
+        try {
+          const data = JSON.parse(raw.toString());
+          this.handleApiTimeData(data);
+        } catch (err) {
+          this.logger?.error('Failed to parse WebSocket message', err);
+        }
+      });
+    }
+
+    this.wsClient.connect();
+  }
   /**
    * Disconnect from WebSocket API
    */
   private disconnectWebSocket(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.wsClient) {
+      this.wsClient.shutdown();
+      this.wsClient = undefined;
     }
-    
-    if (this.wsReconnectInterval) {
-      clearTimeout(this.wsReconnectInterval);
-      this.wsReconnectInterval = null;
-    }
-    
-    this.wsReconnectAttempts = 0;
   }
 
   /**
@@ -715,7 +682,7 @@ export class TimeInputModule extends InputModuleBase {
         targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
         millisecondDelay: this.millisecondDelay,
         enabled: this.enabled,
-        apiConnected: this.ws?.readyState === 1,
+        apiConnected: this.wsClient != null,
         apiData: data
       });
       

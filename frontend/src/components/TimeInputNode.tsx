@@ -6,57 +6,9 @@ import styles from './CustomNode.module.css';
 
 // Countdown display component
 function CountdownDisplay({ countdown }: { countdown: string }) {
-  const [countdownTimer, setCountdownTimer] = useState<number | null>(null);
-  
-  useEffect(() => {
-    if (countdown && typeof countdown === 'string') {
-      // Handle different countdown formats
-      if (countdown.includes('s to next')) {
-        // Metronome mode: "3s to next"
-        const seconds = parseInt(countdown.split('s')[0]);
-        if (!isNaN(seconds)) {
-          setCountdownTimer(seconds);
-          
-          // Start countdown timer
-          const interval = setInterval(() => {
-            setCountdownTimer(prev => {
-              if (prev === null || prev <= 0) {
-                return seconds; // Reset to original value
-              }
-              return prev - 1;
-            });
-          }, 1000);
-          
-          return () => clearInterval(interval);
-        }
-      } else if (countdown.includes('s interval')) {
-        // Legacy metronome format: "3s interval"
-        const seconds = parseInt(countdown.split('s')[0]);
-        if (!isNaN(seconds)) {
-          setCountdownTimer(seconds);
-          
-          // Start countdown timer
-          const interval = setInterval(() => {
-            setCountdownTimer(prev => {
-              if (prev === null || prev <= 0) {
-                return seconds; // Reset to original value
-              }
-              return prev - 1;
-            });
-          }, 1000);
-          
-          return () => clearInterval(interval);
-        }
-      } else {
-        // Clock mode or other formats - just display as-is
-        setCountdownTimer(null);
-      }
-    }
-  }, [countdown]);
-  
   return (
     <span className={styles.configValue}>
-      {countdownTimer !== null ? `${countdownTimer}s` : (countdown || '--')}
+      {countdown || '--'}
     </span>
   );
 }
@@ -84,6 +36,13 @@ const TimeInputNodeConfig = {
     // Get real-time data from instance (updated via WebSocket)
     const currentTime = useInstanceData<string>(instance, 'currentTime', '');
     const countdown = useInstanceData<string>(instance, 'countdown', '');
+    
+    console.log('TimeInputNode render:', {
+      id: instance?.id,
+      currentTime,
+      countdown,
+      instance
+    });
 
 
 

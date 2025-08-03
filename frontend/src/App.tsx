@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -22,6 +22,7 @@ import {
   ConsolePageState, 
   ModulesPageState 
 } from './types';
+import { ModuleManifest } from '@interactor/shared';
 import { InteractionConfig } from '@interactor/shared';
 
 import { webSocketService } from './services/WebSocketService';
@@ -30,6 +31,9 @@ import styles from './App.module.css';
 
 function App() {
   // Application state
+  // Store a stable copy of module manifests keyed by module name
+  const moduleManifestMapRef = useRef<Map<string, ModuleManifest>>(new Map());
+
   const [appState, setAppState] = useState<AppState>({
     modules: [],
     interactions: [],
@@ -99,15 +103,39 @@ function App() {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          console.log('WebSocket message received:', message);
+          
           if (message.type === 'state_update') {
-            const moduleInstances = message.data.moduleInstances || [];
-            const timeInputInstances = moduleInstances.filter((instance: any) =>
-              instance.moduleName === 'Time Input'
-            );
-            if (timeInputInstances.length > 0) {
-              // Real-time data updates only
-            }
-            // No longer processing structural changes via WebSocket here
+            console.log('Processing state update:', message.data);
+            
+            // Update module instances in app state
+            setAppState(prev => {
+              // Always start from the immutable manifest list stored in the ref
+              const manifestMap = new Map(moduleManifestMapRef.current);
+              const enrichedModules: any[] = [];
+
+              // Merge / add runtime instances that arrived via WebSocket
+              message.data.moduleInstances?.forEach((instance: any) => {
+                const manifest = manifestMap.get(instance.moduleName);
+                if (manifest) {
+                  enrichedModules.push({ ...manifest, ...instance });
+                } else {
+                  // Fallback – if somehow the manifest is missing, keep the instance as-is so the UI still updates
+                  enrichedModules.push(instance);
+                }
+              });
+
+              // Always keep the original manifest list in case some module has no running instance yet
+              const finalModules = [
+                ...Array.from(manifestMap.values()),
+                ...enrichedModules,
+              ];
+
+              return {
+                ...prev,
+                modules: finalModules,
+              };
+            });
           }
         } catch (error) {
           console.error('WebSocket message parsing error:', error);
@@ -161,6 +189,9 @@ function App() {
         apiService.getInteractions(),
         apiService.getSettings(),
       ]);
+
+      // Store a copy of module manifests for later look-ups during WebSocket updates
+      moduleManifestMapRef.current = new Map(modules.map(m => [m.name, m]));
 
       setAppState(prev => ({
         ...prev,
