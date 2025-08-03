@@ -11,7 +11,7 @@ export class ModuleLoader {
 
   private constructor() {
     this.logger = Logger.getInstance();
-    this.modulesPath = path.join(process.cwd(), 'src', 'modules');
+    this.modulesPath = path.join(__dirname, '../modules');
   }
 
   public static getInstance(): ModuleLoader {

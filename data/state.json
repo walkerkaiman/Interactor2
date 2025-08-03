@@ -20,14 +20,14 @@
           "status": "running",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754182397714,
+          "lastUpdate": 1754235799565,
           "position": {
-            "x": 172,
-            "y": 336.9375
+            "x": 193.14626865671647,
+            "y": 413.97033582089557
           },
           "mode": "metronome",
-          "currentTime": "7:53:17 PM",
-          "countdown": "3s to next",
+          "currentTime": "10:43:19 AM",
+          "countdown": "1s to next",
           "targetTime": "12:00 PM",
           "targetTime12Hour": "",
           "millisecondDelay": 10000,
@@ -39,19 +39,19 @@
           "id": "node-1754170514058",
           "moduleName": "Audio Output",
           "config": {
-            "selectedFile": "1754182595827_Sweep.wav"
+            "selectedFile": "1754185642038_Arcade.wav"
           },
-          "status": "playing",
+          "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754180815507,
+          "lastUpdate": 1754186460548,
           "position": {
-            "x": 765.1758501620046,
-            "y": 232.99233366514562
+            "x": 708.0051345909241,
+            "y": 224.78351428685966
           },
           "deviceId": "default",
           "isPlaying": true,
-          "playCount": 8,
+          "playCount": 2,
           "errorCount": 0
         }
       ],
@@ -77,34 +77,21 @@
         "apiEnabled": false,
         "apiEndpoint": ""
       },
-      "status": "running",
+      "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754185434415,
-      "mode": "metronome",
-      "currentTime": "8:43 PM",
-      "countdown": "10s interval",
-      "targetTime": "12:00 PM",
-      "targetTime12Hour": "",
-      "millisecondDelay": 10000,
-      "enabled": true,
-      "apiEnabled": false,
-      "apiEndpoint": ""
+      "lastUpdate": 1754236003036
     },
     {
       "id": "node-1754170514058",
       "moduleName": "Audio Output",
       "config": {
-        "selectedFile": "1754182595827_Sweep.wav"
+        "selectedFile": "1754185642038_Arcade.wav"
       },
-      "status": "playing",
+      "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754185419468,
-      "deviceId": "default",
-      "isPlaying": true,
-      "playCount": 2,
-      "errorCount": 0
+      "lastUpdate": 1754236003036
     }
   ],
   "routes": [],

@@ -11,6 +11,9 @@ import {
   ValidationWarning
 } from '@interactor/shared';
 
+import { ModuleUploadConfig } from '../services/FileUploader';
+import { fileUploader } from '../services/fileUploaderInstance';
+
 export abstract class ModuleBase extends EventEmitter implements IModuleBase {
   public readonly id: string;
   public readonly name: string;
@@ -18,7 +21,14 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
   public manifest: ModuleManifest;
   public state: ModuleState;
 
-  protected logger: any; // Will be injected
+  protected logger: any;
+
+  /**
+   * Register this module's upload settings with the global FileUploader.
+   */
+  protected registerUploads(moduleType: string, cfg: ModuleUploadConfig): void {
+    fileUploader.registerModule(moduleType, cfg);
+  } // Will be injected
   protected isInitialized = false;
   protected isRunning = false;
 

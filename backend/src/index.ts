@@ -15,6 +15,7 @@ import { StateManager } from './core/StateManager';
 import { SystemStats } from './core/SystemStats';
 import { ErrorHandler, InteractorError } from './core/ErrorHandler';
 import { FileUploader } from './services/FileUploader';
+import { fileUploader } from './services/fileUploaderInstance';
 
 // Types
 import {
@@ -84,7 +85,7 @@ export class InteractorServer {
    * Load configuration from file
    */
   private async loadConfig(): Promise<void> {
-    const configPath = path.join(process.cwd(), 'config', 'system.json');
+    const configPath = path.join(__dirname, '../../config/system.json');
     
     if (await fs.pathExists(configPath)) {
       const configData = await fs.readFile(configPath, 'utf-8');
@@ -126,14 +127,8 @@ export class InteractorServer {
       await this.restoreModuleInstances();
       this.logger.info('Module instances restored');
 
-      // Initialize global file uploader
-      this.fileUploader = new FileUploader({
-        port: 4000,
-        host: '0.0.0.0',
-        uploadDir: path.join(process.cwd(), 'data', 'uploads'),
-        maxFileSize: 50 * 1024 * 1024, // 50MB
-        moduleConfigs: new Map()
-      }, this.logger);
+      // Use the global file uploader instance
+      this.fileUploader = fileUploader;
 
       // Register Audio Output module
       this.fileUploader.registerModule('audio-output', {

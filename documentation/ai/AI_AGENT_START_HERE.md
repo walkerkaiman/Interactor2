@@ -170,6 +170,26 @@ Extend `OutputModuleBase` and implement:
 - `onStop()`: Cleanup
 
 ### Configuration
+
+#### Shared File Uploader (NEW ― Aug 2025)
+There is now a single `FileUploader` service running on `http://0.0.0.0:4000` for the entire backend.
+
+1. Modules that need uploads register their own rules in the constructor:
+```typescript
+this.registerUploads('audio-output', {
+  allowedExtensions: ['.wav', '.mp3', '.ogg'],
+  maxFileSize: 50 * 1024 * 1024 // 50 MB
+});
+```
+2. HTTP routes (moduleType = `audio-output`, `dmx-output`, etc.)
+```
+POST   /upload/:moduleType        // multipart field name "file"
+GET    /files/:moduleType         // list files
+DELETE /files/:moduleType/:name   // delete
+GET    /health                   // service health
+```
+3. No per-module ports anymore — all uploads share port 4000.
+
 Each module needs a `manifest.json`:
 ```json
 {

@@ -1,6 +1,27 @@
 
 # Enhanced Audio Output Module Features
 
+## 2025-08 Architecture Update
+
+The module now uses a 3-layer strategy pattern.
+
+```
+AudioOutputModule (orchestrator)
+│
+├── IAudioPlayer – runtime audio backend
+│    └── NodeSpeakerPlayer (Speaker + ffmpeg, low-latency PCM)
+│
+├── IAudioStorage – file repository
+│    └── LocalFileSystemStorage (assets/ + validation)
+│
+└── LocalUploadServer – optional Express server (/health /files /upload /files/:name DELETE)
+```
+
+Benefits: hot-swappable players, easy remote storage, test stubs, cleaner code.
+
+–––
+
+
 ## Overview
 
 The Audio Output module has been enhanced with comprehensive file management capabilities, network file upload support, and an improved user interface for better audio file handling.
@@ -9,7 +30,7 @@ The Audio Output module has been enhanced with comprehensive file management cap
 
 ### 1. Network File Upload Server
 
-- **HTTP Upload Endpoint**: `POST http://localhost:3001/upload`
+- **HTTP Upload Endpoint**: `POST http://localhost:4000/upload`
 - **File Type Validation**: Supports `.wav`, `.mp3`, `.ogg`, `.m4a`, `.flac`
 - **Size Limits**: Configurable maximum file size (default: 50MB)
 - **Progress Tracking**: Real-time upload progress indication
@@ -18,17 +39,17 @@ The Audio Output module has been enhanced with comprehensive file management cap
 ### 2. File Management API
 
 #### List Files
-- **Endpoint**: `GET http://localhost:3001/files`
+- **Endpoint**: `GET http://localhost:4000/files`
 - **Response**: List of available audio files with metadata
 - **Real-time Updates**: WebSocket events for file list changes
 
 #### Delete Files
-- **Endpoint**: `DELETE http://localhost:3001/files/{filename}`
+- **Endpoint**: `DELETE http://localhost:4000/files/{filename}`
 - **Validation**: Only allows deletion of supported audio files
 - **Safety**: Prevents deletion of non-existent files
 
 #### File Metadata
-- **Endpoint**: `GET http://localhost:3001/files/{filename}/metadata`
+- **Endpoint**: `GET http://localhost:4000/files/{filename}/metadata`
 - **Information**: File size, format, duration, sample rate, channels
 - **Caching**: Metadata is cached for performance
 
@@ -78,7 +99,7 @@ The Audio Output module has been enhanced with comprehensive file management cap
 ```json
 {
   "enableFileUpload": true,
-  "uploadPort": 3001,
+  // uploads now use global port 4000
   "uploadHost": "0.0.0.0",
   "maxFileSize": 52428800,
   "allowedExtensions": [".wav", ".mp3", ".ogg", ".m4a", ".flac"]
@@ -104,7 +125,7 @@ The Audio Output module has been enhanced with comprehensive file management cap
 const formData = new FormData();
 formData.append('audio', file);
 
-const response = await fetch('http://localhost:3001/upload', {
+const response = await fetch('http://localhost:4000/upload', {
   method: 'POST',
   body: formData
 });
@@ -115,14 +136,14 @@ console.log('Uploaded:', result.data.filename);
 
 ### List Files
 ```javascript
-const response = await fetch('http://localhost:3001/files');
+const response = await fetch('http://localhost:4000/files');
 const data = await response.json();
 console.log('Available files:', data.data.files);
 ```
 
 ### Delete a File
 ```javascript
-const response = await fetch('http://localhost:3001/files/test.wav', {
+const response = await fetch('http://localhost:4000/files/test.wav', {
   method: 'DELETE'
 });
 const result = await response.json();
@@ -131,7 +152,7 @@ console.log('Deleted:', result.data.filename);
 
 ### Get File Metadata
 ```javascript
-const response = await fetch('http://localhost:3001/files/test.wav/metadata');
+const response = await fetch('http://localhost:4000/files/test.wav/metadata');
 const data = await response.json();
 console.log('Metadata:', data.data);
 ```

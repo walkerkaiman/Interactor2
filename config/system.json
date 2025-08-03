@@ -3,6 +3,10 @@
     "port": 3001,
     "host": "0.0.0.0"
   },
+  "fileUploader": {
+    "port": 4000,
+    "host": "0.0.0.0"
+  },
   "logging": {
     "level": "info",
     "file": "logs/interactor.log",
@@ -20,10 +24,6 @@
     "backupCount": 5
   },
   "security": {
-    "enableAuth": false,
-    "rateLimit": {
-      "windowMs": 15 * 60 * 1000,
-      "max": 100
-    }
+    "enableAuth": false
   }
 } 
