@@ -80,7 +80,7 @@
         "description": "File upload server port",
         "minimum": 1024,
         "maximum": 65535,
-        "default": 3001
+        "default": 4000
       },
       "uploadHost": {
         "type": "string",
@@ -153,6 +153,16 @@
       "name": "uploadError",
       "type": "output",
       "description": "Emitted when a file upload fails"
+    },
+    {
+      "name": "fileDeleted",
+      "type": "output",
+      "description": "Emitted when an audio file is deleted successfully"
+    },
+    {
+      "name": "fileMetadata",
+      "type": "output",
+      "description": "Emitted when audio file metadata is retrieved"
     }
   ]
 } 

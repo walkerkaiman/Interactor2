@@ -26,7 +26,7 @@ cd ../backend && npm start
 **Development Mode**:
 ```bash
 # Windows  
-start-full-dev.bat
+start-interactor.bat
 
 # Manual - Terminal 1
 cd backend && npm install && npm run dev

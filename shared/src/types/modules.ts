@@ -1223,6 +1223,44 @@ export interface AudioFileListPayload {
 }
 
 /**
+ * Audio file deletion payload
+ * @interface AudioFileDeletePayload
+ */
+export interface AudioFileDeletePayload {
+  /** Filename that was deleted */
+  filename: string;
+  /** Whether deletion was successful */
+  deleted: boolean;
+  /** Timestamp when file was deleted */
+  timestamp: number;
+  /** List of remaining files */
+  remainingFiles: string[];
+}
+
+/**
+ * Audio file metadata payload
+ * @interface AudioFileMetadataPayload
+ */
+export interface AudioFileMetadataPayload {
+  /** Filename */
+  filename: string;
+  /** File size in bytes */
+  size: number;
+  /** Audio format (WAV, MP3, etc.) */
+  format: string;
+  /** Audio duration in seconds (if available) */
+  duration?: number;
+  /** Sample rate in Hz (if available) */
+  sampleRate?: number;
+  /** Number of channels (if available) */
+  channels?: number;
+  /** Bit rate in kbps (if available) */
+  bitRate?: number;
+  /** Timestamp when metadata was retrieved */
+  timestamp: number;
+}
+
+/**
  * State information for audio output module
  * @interface AudioOutputModuleState
  */

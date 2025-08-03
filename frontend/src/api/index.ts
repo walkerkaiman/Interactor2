@@ -6,7 +6,7 @@ import {
   InteractionListResponse,
 } from '@interactor/shared';
 
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:3001/api';
 
 class ApiService {
   private static instance: ApiService;
@@ -125,6 +125,168 @@ class ApiService {
   // Health check
   async getHealth(): Promise<any> {
     return this.request('/health');
+  }
+
+  // Audio file management
+  async getAudioFiles(moduleId: string): Promise<{ files: string[]; totalFiles: number; totalSize: number }> {
+    try {
+      // Get the module instance to find the upload port
+      const instance = await this.getModuleInstance(moduleId);
+      console.log('Audio module instance:', instance);
+      
+      if (!instance) {
+        console.log('Audio module instance not found, creating one...');
+        // Try to create an Audio Output module instance
+        const createdInstance = await this.createAudioOutputInstance();
+        if (!createdInstance) {
+          throw new Error('Failed to create Audio Output module instance');
+        }
+        return this.getAudioFiles(createdInstance.id);
+      }
+      
+      if (!instance.config) {
+        throw new Error('Audio module configuration not found');
+      }
+      
+      const uploadPort = instance.config.uploadPort ?? 4000;
+
+      const response = await fetch(`http://localhost:${uploadPort}/files/audio-output`);
+      if (!response.ok) {
+        throw new Error(`Failed to get audio files: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data || { files: [], totalFiles: 0, totalSize: 0 };
+    } catch (error) {
+      console.error('Failed to get audio files:', error);
+      return { files: [], totalFiles: 0, totalSize: 0 };
+    }
+  }
+
+  async createAudioOutputInstance(): Promise<any | null> {
+    try {
+      const response = await this.request('/modules/instances', {
+        method: 'POST',
+        body: JSON.stringify({
+          moduleName: 'Audio Output',
+          config: {
+            deviceId: 'default',
+            sampleRate: 44100,
+            channels: 2,
+            format: 'wav',
+            volume: 1.0,
+            enabled: true,
+            bufferSize: 4096,
+            loop: false,
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+            enableFileUpload: true,
+            uploadPort: 4000,
+            uploadHost: '0.0.0.0',
+            maxFileSize: 50 * 1024 * 1024,
+            allowedExtensions: ['.wav', '.mp3', '.ogg', '.m4a', '.flac']
+          }
+        })
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create Audio Output instance:', error);
+      return null;
+    }
+  }
+
+  async uploadAudioFile(moduleId: string, file: File): Promise<{ filename: string; originalName: string; size: number }> {
+    try {
+      // Get the module instance to find the upload port
+      const instance = await this.getModuleInstance(moduleId);
+      console.log('Upload - Audio module instance:', instance);
+      
+      if (!instance) {
+        console.log('Upload - Audio module instance not found, creating one...');
+        // Try to create an Audio Output module instance
+        const createdInstance = await this.createAudioOutputInstance();
+        if (!createdInstance) {
+          throw new Error('Failed to create Audio Output module instance');
+        }
+        return this.uploadAudioFile(createdInstance.id, file);
+      }
+      
+      if (!instance.config) {
+        throw new Error('Audio module configuration not found');
+      }
+      
+      const uploadPort = instance.config.uploadPort ?? 4000;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`http://localhost:${uploadPort}/upload/audio-output`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Failed to upload audio file:', error);
+      throw error;
+    }
+  }
+
+  async deleteAudioFile(moduleId: string, filename: string): Promise<{ filename: string; deleted: boolean }> {
+    try {
+      // Get the module instance to find the upload port
+      const instance = await this.getModuleInstance(moduleId);
+      const uploadPort = instance?.config?.uploadPort ?? 4000;
+
+      const response = await fetch(`http://localhost:${uploadPort}/files/audio-output/${filename}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Delete failed');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Failed to delete audio file:', error);
+      throw error;
+    }
+  }
+
+  async getAudioFileMetadata(moduleId: string, filename: string): Promise<{
+    filename: string;
+    size: number;
+    format: string;
+    duration?: number;
+    sampleRate?: number;
+    channels?: number;
+    bitRate?: number;
+  }> {
+    try {
+      // Get the module instance to find the upload port
+      const instance = await this.getModuleInstance(moduleId);
+      const uploadPort = instance?.config?.uploadPort ?? 4000;
+
+      const response = await fetch(`http://localhost:${uploadPort}/files/audio-output/${filename}/metadata`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get metadata');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Failed to get audio file metadata:', error);
+      throw error;
+    }
   }
 }
 

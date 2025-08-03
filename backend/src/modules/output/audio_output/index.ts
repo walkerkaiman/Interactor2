@@ -10,8 +10,11 @@ import {
   AudioFileUploadData,
   AudioFileUploadPayload,
   AudioFileListPayload,
+  AudioFileDeletePayload,
+  AudioFileMetadataPayload,
   TriggerEvent,
   StreamEvent,
+  ModuleState,
   isAudioOutputConfig
 } from '@interactor/shared';
 import { InteractorError } from '../../../core/ErrorHandler';
@@ -35,14 +38,11 @@ export class AudioOutputModule extends OutputModuleBase {
   
   // File upload server properties
   private enableFileUpload: boolean;
-  private uploadPort: number;
-  private uploadHost: string;
-  private maxFileSize: number;
-  private allowedExtensions: string[];
-  private uploadServer: Server | undefined = undefined;
-  private uploadApp: express.Application;
+  private globalUploadPort: number = 4000;
   private uploadCount = 0;
   private lastUpload: AudioFileUploadPayload | undefined = undefined;
+  private maxFileSize: number;
+  private allowedExtensions: string[];
   
   // Audio state
   private isPlaying = false;
@@ -68,10 +68,9 @@ export class AudioOutputModule extends OutputModuleBase {
       fadeInDuration: config.fadeInDuration || 0,
       fadeOutDuration: config.fadeOutDuration || 0,
       enableFileUpload: config.enableFileUpload !== false,
-      uploadPort: config.uploadPort || 3001,
-      uploadHost: config.uploadHost || '0.0.0.0',
-      maxFileSize: config.maxFileSize || 50 * 1024 * 1024, // 50MB default
-      allowedExtensions: config.allowedExtensions || ['.wav', '.mp3', '.ogg', '.m4a', '.flac']
+      uploadPort: 4000, // Global FileUploader port
+      maxFileSize: 50 * 1024 * 1024, // 50MB
+      allowedExtensions: ['.wav', '.mp3', '.ogg', '.m4a', '.flac']
     };
 
     super('audio_output', configWithDefaults, {
@@ -151,18 +150,7 @@ export class AudioOutputModule extends OutputModuleBase {
             description: 'Enable/disable file upload server',
             default: true
           },
-          uploadPort: {
-            type: 'number',
-            description: 'File upload server port',
-            minimum: 1024,
-            maximum: 65535,
-            default: 3001
-          },
-          uploadHost: {
-            type: 'string',
-            description: 'File upload server host address',
-            default: '0.0.0.0'
-          },
+
           maxFileSize: {
             type: 'number',
             description: 'Maximum file size in bytes',
@@ -247,13 +235,12 @@ export class AudioOutputModule extends OutputModuleBase {
     
     // Set file upload properties
     this.enableFileUpload = configWithDefaults.enableFileUpload !== false;
-    this.uploadPort = configWithDefaults.uploadPort || 3001;
-    this.uploadHost = configWithDefaults.uploadHost || '0.0.0.0';
+
     this.maxFileSize = configWithDefaults.maxFileSize || 50 * 1024 * 1024;
     this.allowedExtensions = configWithDefaults.allowedExtensions || ['.wav', '.mp3', '.ogg', '.m4a', '.flac'];
     
     // Initialize Express app for file uploads
-    this.uploadApp = express();
+
   }
 
   protected async onInit(): Promise<void> {
@@ -261,8 +248,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (this.sampleRate < 8000 || this.sampleRate > 48000) {
       throw InteractorError.validation(
         `Audio sample rate must be between 8000-48000 Hz`,
-        { provided: this.sampleRate, min: 8000, max: 48000 },
-        ['Use 44100 Hz for CD quality', 'Use 48000 Hz for professional audio', 'Use 22050 Hz for lower quality/bandwidth']
+        { provided: this.sampleRate, min: 8000, max: 48000 }
       );
     }
 
@@ -270,8 +256,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (this.channels < 1 || this.channels > 2) {
       throw InteractorError.validation(
         `Audio channels must be 1 (mono) or 2 (stereo)`,
-        { provided: this.channels, min: 1, max: 2 },
-        ['Use 1 for mono audio', 'Use 2 for stereo audio', 'Stereo provides better spatial audio experience']
+        { provided: this.channels, min: 1, max: 2 }
       );
     }
 
@@ -279,8 +264,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (this.volume < 0.0 || this.volume > 1.0) {
       throw InteractorError.validation(
         `Audio volume must be between 0.0-1.0`,
-        { provided: this.volume, min: 0.0, max: 1.0 },
-        ['Use 1.0 for full volume', 'Use 0.7 for comfortable listening', 'Use 0.0 to mute']
+        { provided: this.volume, min: 0.0, max: 1.0 }
       );
     }
 
@@ -288,8 +272,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (this.bufferSize < 256 || this.bufferSize > 16384) {
       throw InteractorError.validation(
         `Audio buffer size must be between 256-16384 samples`,
-        { provided: this.bufferSize, min: 256, max: 16384 },
-        ['Use 4096 for balanced performance and latency', 'Use 256 for low latency', 'Use 8192 for high performance']
+        { provided: this.bufferSize, min: 256, max: 16384 }
       );
     }
 
@@ -297,8 +280,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (!['wav', 'mp3', 'ogg'].includes(this.format)) {
       throw InteractorError.validation(
         `Audio format must be wav, mp3, or ogg`,
-        { provided: this.format, allowed: ['wav', 'mp3', 'ogg'] },
-        ['Use "wav" for uncompressed audio', 'Use "mp3" for compressed audio', 'Use "ogg" for open-source format']
+        { provided: this.format, allowed: ['wav', 'mp3', 'ogg'] }
       );
     }
 
@@ -306,34 +288,30 @@ export class AudioOutputModule extends OutputModuleBase {
     if (this.fadeInDuration < 0 || this.fadeInDuration > 10000) {
       throw InteractorError.validation(
         `Fade in duration must be between 0-10000 ms`,
-        { provided: this.fadeInDuration, min: 0, max: 10000 },
-        ['Use 0 for no fade in', 'Use 1000 for 1 second fade', 'Use 3000 for smooth fade in']
+        { provided: this.fadeInDuration, min: 0, max: 10000 }
       );
     }
 
     if (this.fadeOutDuration < 0 || this.fadeOutDuration > 10000) {
       throw InteractorError.validation(
         `Fade out duration must be between 0-10000 ms`,
-        { provided: this.fadeOutDuration, min: 0, max: 10000 },
-        ['Use 0 for no fade out', 'Use 1000 for 1 second fade', 'Use 3000 for smooth fade out']
+        { provided: this.fadeOutDuration, min: 0, max: 10000 }
       );
     }
 
     // Validate file upload settings
     if (this.enableFileUpload) {
-      if (this.uploadPort < 1024 || this.uploadPort > 65535) {
+      if (this.globalUploadPort < 1024 || this.globalUploadPort > 65535) {
         throw InteractorError.validation(
           `File upload port must be between 1024-65535`,
-          { provided: this.uploadPort, min: 1024, max: 65535 },
-          ['Use 3001 (default for Audio module)', 'Avoid ports below 1024 (system reserved)', 'Check that port is not already in use']
+          { provided: this.globalUploadPort, min: 1024, max: 65535 }
         );
       }
 
       if (this.maxFileSize < 1024 || this.maxFileSize > 100 * 1024 * 1024) {
         throw InteractorError.validation(
           `Max file size must be between 1KB-100MB`,
-          { provided: this.maxFileSize, min: 1024, max: 100 * 1024 * 1024 },
-          ['Use 52428800 (50MB) for most audio files', 'Use smaller size to save disk space', 'Use larger size for long recordings']
+          { provided: this.maxFileSize, min: 1024, max: 100 * 1024 * 1024 }
         );
       }
 
@@ -344,22 +322,12 @@ export class AudioOutputModule extends OutputModuleBase {
   }
 
   protected async onStart(): Promise<void> {
-    // Start file upload server if enabled
-    if (this.enableFileUpload) {
-      await this.startFileUploadServer();
-    }
-    
-    // Audio output module doesn't need to start anything specific
+    // Start audio output
     this.setConnectionStatus(true);
     this.logger?.info('Audio output module started');
   }
 
   protected async onStop(): Promise<void> {
-    // Stop file upload server if running
-    if (this.uploadServer) {
-      await this.stopFileUploadServer();
-    }
-    
     // Stop any currently playing audio
     await this.stopAudio();
     this.setConnectionStatus(false);
@@ -367,11 +335,6 @@ export class AudioOutputModule extends OutputModuleBase {
   }
 
   protected async onDestroy(): Promise<void> {
-    // Stop file upload server if running
-    if (this.uploadServer) {
-      await this.stopFileUploadServer();
-    }
-    
     // Stop any currently playing audio
     await this.stopAudio();
     this.setConnectionStatus(false);
@@ -409,23 +372,7 @@ export class AudioOutputModule extends OutputModuleBase {
     this.fadeOutDuration = newConfig.fadeOutDuration || 0;
     
     // Update file upload settings
-    const oldEnableUpload = this.enableFileUpload;
     this.enableFileUpload = newConfig.enableFileUpload !== false;
-    this.uploadPort = newConfig.uploadPort || 3001;
-    this.uploadHost = newConfig.uploadHost || '0.0.0.0';
-    this.maxFileSize = newConfig.maxFileSize || 50 * 1024 * 1024;
-    this.allowedExtensions = newConfig.allowedExtensions || ['.wav', '.mp3', '.ogg', '.m4a', '.flac'];
-    
-    // Restart file upload server if settings changed
-    if (oldEnableUpload !== this.enableFileUpload || 
-        (this.enableFileUpload && this.uploadServer)) {
-      if (this.uploadServer) {
-        await this.stopFileUploadServer();
-      }
-      if (this.enableFileUpload) {
-        await this.startFileUploadServer();
-      }
-    }
   }
 
   /**
@@ -435,8 +382,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (!this.enabled) {
       throw InteractorError.conflict(
         'Cannot send audio data when module is disabled',
-        { enabled: this.enabled, attempted: 'send' },
-        ['Enable the audio module in configuration', 'Check module status before sending audio', 'Verify module initialization completed successfully']
+        { enabled: this.enabled, attempted: 'send' }
       );
     }
     await this.playAudio(data);
@@ -449,8 +395,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (!this.enabled) {
       throw InteractorError.conflict(
         'Cannot handle trigger event when audio module is disabled',
-        { enabled: this.enabled, attempted: 'trigger_event' },
-        ['Enable the audio module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
+        { enabled: this.enabled, attempted: 'trigger_event' }
       );
     }
     await this.playAudio(event.payload);
@@ -463,8 +408,7 @@ export class AudioOutputModule extends OutputModuleBase {
     if (!this.enabled) {
       throw InteractorError.conflict(
         'Cannot handle streaming event when audio module is disabled',
-        { enabled: this.enabled, attempted: 'streaming_event' },
-        ['Enable the audio module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
+        { enabled: this.enabled, attempted: 'streaming_event' }
       );
     }
     // For streaming events, we might want to adjust volume based on the value
@@ -475,12 +419,11 @@ export class AudioOutputModule extends OutputModuleBase {
   /**
    * Handle manual trigger
    */
-  protected async onManualTrigger(): Promise<void> {
+  protected async handleManualTrigger(): Promise<void> {
     if (!this.enabled) {
       throw InteractorError.conflict(
         'Cannot perform manual trigger when audio module is disabled',
-        { enabled: this.enabled, attempted: 'manual_trigger' },
-        ['Enable the audio module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
+        { enabled: this.enabled, attempted: 'manual_trigger' }
       );
     }
     
@@ -545,8 +488,7 @@ export class AudioOutputModule extends OutputModuleBase {
       if (typeof audioData.audioData === 'string' && audioData.audioData.trim() === '') {
         throw InteractorError.validation(
           'Audio data cannot be empty',
-          { provided: audioData.audioData, type: typeof audioData.audioData },
-          ['Provide valid audio file path or URL', 'Check that audio file exists and is accessible', 'Ensure audio data is properly formatted']
+          { provided: audioData.audioData, type: typeof audioData.audioData }
         );
       }
       
@@ -714,36 +656,22 @@ export class AudioOutputModule extends OutputModuleBase {
       fadeInDuration: this.fadeInDuration,
       fadeOutDuration: this.fadeOutDuration,
       enableFileUpload: this.enableFileUpload,
-      uploadPort: this.uploadPort,
-      uploadHost: this.uploadHost,
-      maxFileSize: this.maxFileSize,
-      allowedExtensions: this.allowedExtensions
+      uploadPort: 4000, // Global FileUploader port
+      maxFileSize: 50 * 1024 * 1024, // 50MB
+      allowedExtensions: ['.wav', '.mp3', '.ogg', '.m4a', '.flac']
     };
   }
 
   /**
    * Get module state with proper return type
    */
-  public getState(): AudioOutputModuleState {
+  public getState(): ModuleState {
     return {
-      status: this.isPlaying ? 'playing' : 'ready',
-      deviceId: this.deviceId,
-      sampleRate: this.sampleRate,
-      channels: this.channels,
-      format: this.format,
-      volume: this.volume,
-      isPlaying: this.isPlaying,
-      currentTime: this.currentTime,
-      duration: this.duration,
-      loop: this.loop,
-      playCount: this.playCount,
-      errorCount: this.errorCount,
-      lastError: this.lastError,
-      lastUpdate: Date.now(),
-      fileUploadEnabled: this.enableFileUpload,
-      uploadPort: this.uploadPort,
-      uploadCount: this.uploadCount,
-      lastUpload: this.lastUpload
+      id: this.id,
+      messageCount: this.state.messageCount,
+      config: this.config,
+      status: this.isPlaying ? 'running' : 'stopped',
+      lastError: this.lastError?.error || undefined
     };
   }
 
@@ -893,204 +821,7 @@ export class AudioOutputModule extends OutputModuleBase {
   // FILE UPLOAD SERVER METHODS
   // ============================================================================
 
-  /**
-   * Start the file upload server
-   */
-  private async startFileUploadServer(): Promise<void> {
-    try {
-      // Setup middleware
-      this.setupUploadMiddleware();
-      
-      // Setup routes
-      this.setupUploadRoutes();
-      
-      // Start server
-      this.uploadServer = this.uploadApp.listen(this.uploadPort, this.uploadHost, () => {
-        this.logger?.info(`File upload server started on ${this.uploadHost}:${this.uploadPort}`);
-      });
-      
-      this.uploadServer.on('error', (error) => {
-        this.logger?.error('File upload server error:', error);
-        this.emitError(error, 'file_upload_server');
-      });
-      
-    } catch (error) {
-      this.logger?.error('Failed to start file upload server:', error);
-      throw error;
-    }
-  }
 
-  /**
-   * Stop the file upload server
-   */
-  private async stopFileUploadServer(): Promise<void> {
-    if (this.uploadServer) {
-      return new Promise((resolve) => {
-        this.uploadServer!.close(() => {
-          this.uploadServer = undefined;
-          this.logger?.info('File upload server stopped');
-          resolve();
-        });
-      });
-    }
-  }
-
-  /**
-   * Setup upload middleware
-   */
-  private setupUploadMiddleware(): void {
-    // CORS middleware
-    this.uploadApp.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type');
-      if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-      } else {
-        next();
-      }
-    });
-
-    // Body parsing middleware
-    this.uploadApp.use(express.json({ limit: '1mb' }));
-    this.uploadApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
-  }
-
-  /**
-   * Setup upload routes
-   */
-  private setupUploadRoutes(): void {
-    // Configure multer for file uploads
-    const storage = multer.memoryStorage();
-    const upload = multer({
-      storage,
-      limits: {
-        fileSize: this.maxFileSize
-      },
-      fileFilter: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        if (this.allowedExtensions.includes(ext)) {
-          cb(null, true);
-        } else {
-          cb(new Error(`File type not allowed. Allowed types: ${this.allowedExtensions.join(', ')}`));
-        }
-      }
-    });
-
-    // File upload endpoint
-    this.uploadApp.post('/upload', upload.single('audio'), async (req: Request, res: Response) => {
-      try {
-        if (!req.file) {
-          return res.status(400).json({ 
-            success: false,
-            error: 'No file uploaded' 
-          });
-        }
-
-        const uploadData: AudioFileUploadData = {
-          originalName: req.file.originalname,
-          size: req.file.size,
-          mimetype: req.file.mimetype,
-          buffer: req.file.buffer,
-          timestamp: Date.now()
-        };
-
-        const result = await this.saveAudioFile(uploadData);
-        
-        res.json({
-          success: true,
-          message: 'File uploaded successfully',
-          data: result
-        });
-
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger?.error('File upload error:', error);
-        
-        res.status(500).json({
-          success: false,
-          error: errorMessage
-        });
-      }
-    });
-
-    // Error handling middleware for multer
-    this.uploadApp.use((error: any, req: Request, res: Response, next: any) => {
-      if (error instanceof multer.MulterError) {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-          // Emit upload error event
-          this.emitOutput('uploadError', {
-            error: 'File too large',
-            originalName: req.file?.originalname || 'unknown',
-            timestamp: Date.now()
-          });
-          
-          return res.status(500).json({
-            success: false,
-            error: 'File too large'
-          });
-        }
-      }
-      
-      if (error.message && error.message.includes('File type not allowed')) {
-        // Try to get original filename from various sources
-        let originalName = 'unknown';
-        if (req.file?.originalname) {
-          originalName = req.file.originalname;
-        } else if (req.headers['content-disposition']) {
-          const contentDisposition = req.headers['content-disposition'] as string;
-          const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-          if (filenameMatch) {
-            originalName = filenameMatch[1];
-          }
-        }
-        
-        // Emit upload error event
-        this.emitOutput('uploadError', {
-          error: error.message,
-          originalName,
-          timestamp: Date.now()
-        });
-        
-        return res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
-      
-      // Pass other errors to default error handler
-      next(error);
-    });
-
-    // List files endpoint
-    this.uploadApp.get('/files', async (req: Request, res: Response) => {
-      try {
-        const fileList = await this.getAudioFileList();
-        res.json({
-          success: true,
-          data: fileList
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger?.error('File list error:', error);
-        
-        res.status(500).json({
-          success: false,
-          error: errorMessage
-        });
-      }
-    });
-
-    // Health check endpoint
-    this.uploadApp.get('/health', (req: Request, res: Response) => {
-      res.json({
-        success: true,
-        status: 'healthy',
-        uploadCount: this.uploadCount,
-        lastUpload: this.lastUpload
-      });
-    });
-  }
 
   /**
    * Save uploaded audio file to assets folder
@@ -1127,6 +858,9 @@ export class AudioOutputModule extends OutputModuleBase {
       const fileList = await this.getAudioFileList();
       this.emitOutput<AudioFileListPayload>('fileListUpdated', fileList);
 
+      // Emit file uploaded event (not deleted - this was leftover code)
+      this.emitOutput<AudioFileUploadPayload>('fileUploaded', this.lastUpload);
+
       this.logger?.info(`Audio file uploaded: ${safeName} (${uploadData.size} bytes)`);
 
       return this.lastUpload;
@@ -1151,17 +885,13 @@ export class AudioOutputModule extends OutputModuleBase {
    */
   private async getAvailableAudioFiles(): Promise<string[]> {
     try {
-      const assetsDir = path.join(__dirname, 'assets');
-      
-      if (!await fs.pathExists(assetsDir)) {
-        return [];
+      const response = await fetch(`http://localhost:${this.globalUploadPort}/files/audio-output`);
+      if (!response.ok) {
+        throw new Error(`Failed to get files: ${response.status}`);
       }
-
-      const files = await fs.readdir(assetsDir);
-      return files.filter(file => {
-        const ext = path.extname(file).toLowerCase();
-        return this.allowedExtensions.includes(ext);
-      });
+      
+      const data = await response.json();
+      return data.data?.files || [];
     } catch (error) {
       this.logger?.error('Failed to get available audio files:', error);
       return [];
@@ -1172,26 +902,106 @@ export class AudioOutputModule extends OutputModuleBase {
    * Get audio file list payload
    */
   private async getAudioFileList(): Promise<AudioFileListPayload> {
-    const files = await this.getAvailableAudioFiles();
-    const assetsDir = path.join(__dirname, 'assets');
-    
-    let totalSize = 0;
-    for (const file of files) {
-      try {
-        const filePath = path.join(assetsDir, file);
-        const stats = await fs.stat(filePath);
-        totalSize += stats.size;
-      } catch (error) {
-        this.logger?.warn(`Failed to get size for file ${file}:`, error);
+    try {
+      const response = await fetch(`http://localhost:${this.globalUploadPort}/files/audio-output`);
+      if (!response.ok) {
+        throw new Error(`Failed to get file list: ${response.status}`);
       }
+      
+      const data = await response.json();
+      return {
+        files: data.data?.files || [],
+        totalFiles: data.data?.totalFiles || 0,
+        totalSize: data.data?.totalSize || 0,
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      this.logger?.error('Failed to get audio file list:', error);
+      return {
+        files: [],
+        totalFiles: 0,
+        totalSize: 0,
+        timestamp: Date.now()
+      };
     }
+  }
 
-    return {
-      files,
-      totalFiles: files.length,
-      totalSize,
-      timestamp: Date.now()
-    };
+  /**
+   * Delete an audio file from assets folder
+   */
+  private async deleteAudioFile(filename: string): Promise<{
+    filename: string;
+    deleted: boolean;
+    timestamp: number;
+    remainingFiles: string[];
+  }> {
+    try {
+      const response = await fetch(`http://localhost:${this.globalUploadPort}/files/audio-output/${filename}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Delete failed');
+      }
+
+      const data = await response.json();
+      const result = {
+        filename,
+        deleted: true,
+        timestamp: Date.now(),
+        remainingFiles: data.data?.remainingFiles || []
+      };
+
+      // Emit file list updated event
+      const fileList = await this.getAudioFileList();
+      this.emitOutput<AudioFileListPayload>('fileListUpdated', fileList);
+
+      this.logger?.info(`Audio file deleted: ${filename}`);
+
+      return result;
+
+    } catch (error) {
+      this.logger?.error('Failed to delete audio file:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get metadata for an audio file
+   */
+  private async getAudioFileMetadata(filename: string): Promise<{
+    filename: string;
+    size: number;
+    format: string;
+    duration?: number;
+    sampleRate?: number;
+    channels?: number;
+    bitRate?: number;
+    timestamp: number;
+  }> {
+    try {
+      const response = await fetch(`http://localhost:${this.globalUploadPort}/files/audio-output/${filename}/metadata`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get metadata');
+      }
+      
+      const data = await response.json();
+      const metadata = {
+        ...data.data,
+        timestamp: Date.now()
+      };
+      
+      this.logger?.debug(`Retrieved metadata for: ${filename}`);
+      this.emitOutput<AudioFileMetadataPayload>('fileMetadata', metadata);
+      
+      return metadata;
+    } catch (error) {
+      this.logger?.error('Failed to get audio file metadata:', error);
+      throw error;
+    }
   }
 
   /**
@@ -1208,12 +1018,25 @@ export class AudioOutputModule extends OutputModuleBase {
   } {
     return {
       enabled: this.enableFileUpload,
-      port: this.uploadPort,
-      host: this.uploadHost,
-      maxFileSize: this.maxFileSize,
-      allowedExtensions: this.allowedExtensions,
+      port: this.globalUploadPort,
+      host: 'localhost',
+      maxFileSize: 50 * 1024 * 1024, // 50MB
+      allowedExtensions: ['.wav', '.mp3', '.ogg', '.m4a', '.flac'],
       uploadCount: this.uploadCount,
       lastUpload: this.lastUpload
     };
+  }
+
+  // Add missing methods for compatibility
+  protected setConnectionStatus(connected: boolean): void {
+    this.isConnected = connected;
+  }
+
+  protected emitStatus(status: string, data?: any): void {
+    this.emit('statusUpdate', { status, data, timestamp: Date.now() });
+  }
+
+  protected emitError(error: Error, context: string): void {
+    this.emit('error', { error: error.message, context, timestamp: Date.now() });
   }
 } 

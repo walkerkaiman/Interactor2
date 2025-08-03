@@ -14,6 +14,7 @@ import { ModuleLoader } from './core/ModuleLoader';
 import { StateManager } from './core/StateManager';
 import { SystemStats } from './core/SystemStats';
 import { ErrorHandler, InteractorError } from './core/ErrorHandler';
+import { FileUploader } from './services/FileUploader';
 
 // Types
 import {
@@ -36,6 +37,7 @@ export class InteractorServer {
   private config: any;
   private isShuttingDown = false;
   private moduleInstances: Map<string, any> = new Map(); // Live module instances registry
+  private fileUploader!: FileUploader;
 
   constructor() {
     this.app = express();
@@ -124,17 +126,21 @@ export class InteractorServer {
       await this.restoreModuleInstances();
       this.logger.info('Module instances restored');
 
-      // Register available modules (no hot reloading)
-      // TODO: Fix module registration with proper manifests
-      // this.moduleLoader.register('frames_input', {});
-      // this.moduleLoader.register('dmx_output', {});
-      // this.moduleLoader.register('http_input', {});
-      // this.moduleLoader.register('osc_input', {});
-      // this.moduleLoader.register('serial_input', {});
-      // this.moduleLoader.register('time_input', {});
-      // this.moduleLoader.register('audio_output', {});
-      // this.moduleLoader.register('http_output', {});
-      // this.moduleLoader.register('osc_output', {});
+      // Initialize global file uploader
+      this.fileUploader = new FileUploader({
+        port: 4000,
+        host: '0.0.0.0',
+        uploadDir: path.join(process.cwd(), 'data', 'uploads'),
+        maxFileSize: 50 * 1024 * 1024, // 50MB
+        moduleConfigs: new Map()
+      }, this.logger);
+
+      // Register Audio Output module
+      this.fileUploader.registerModule('audio-output', {
+        allowedExtensions: ['.wav', '.mp3', '.ogg', '.m4a', '.flac'],
+        subdirectory: 'audio',
+        maxFileSize: 50 * 1024 * 1024 // 50MB
+      });
 
       this.logger.info('All services initialized successfully');
     } catch (error) {
@@ -169,7 +175,7 @@ export class InteractorServer {
               }
             }
           } catch (error) {
-            this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, error);
+            this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
           }
         }
       }
@@ -179,7 +185,7 @@ export class InteractorServer {
       
       this.logger.info(`Successfully restored ${this.moduleInstances.size} live module instances`);
     } catch (error) {
-      this.logger.error('Failed to restore module instances:', error);
+      this.logger.error('Failed to restore module instances:', String(error));
       throw error;
     }
   }
@@ -253,6 +259,39 @@ export class InteractorServer {
         
         // Create instance with config and external ID
         const moduleInstance = new TimeInputModule(config, id);
+        moduleInstance.setLogger(this.logger);
+        
+        // Set up event listeners for state updates
+        moduleInstance.on('stateUpdate', (stateData: any) => {
+          this.handleModuleStateUpdate(id, stateData);
+        });
+        
+        moduleInstance.on('configUpdated', (configData: any) => {
+          this.handleModuleConfigUpdate(id, configData);
+        });
+        
+        // Initialize the module
+        await moduleInstance.init();
+        
+        // Store in registry
+        this.moduleInstances.set(id, moduleInstance);
+        
+        this.logger.info(`Created live instance for ${moduleName} (${id})`);
+        return moduleInstance;
+      } catch (error) {
+        this.logger.error(`Failed to create ${moduleName} instance:`, error);
+        throw error;
+      }
+    }
+    
+    // Handle Audio Output module
+    if (moduleName === 'Audio Output' || moduleName === 'audio_output') {
+      try {
+        // Import the AudioOutputModule class
+        const { AudioOutputModule } = await import('./modules/output/audio_output/index');
+        
+        // Create instance with config
+        const moduleInstance = new AudioOutputModule(config);
         moduleInstance.setLogger(this.logger);
         
         // Set up event listeners for state updates
@@ -635,12 +674,26 @@ export class InteractorServer {
           return res.status(404).json({ success: false, error: 'Module not found' });
         }
         
-        // Create module instance
-        const instance = {
-          id: `instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        // Generate instance ID
+        const instanceId = `instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create live module instance using createModuleInstance method
+        const liveInstance = await this.createModuleInstance({
+          id: instanceId,
           moduleName,
-          config: config || {},
-          status: 'stopped',
+          config: config || {}
+        });
+        
+        if (!liveInstance) {
+          return res.status(400).json({ success: false, error: 'Failed to create module instance' });
+        }
+        
+        // Create instance data for state manager
+        const instance = {
+          id: instanceId,
+          moduleName,
+          config: liveInstance.getConfig ? liveInstance.getConfig() : (config || {}),
+          status: 'stopped' as const,
           messageCount: 0,
           currentFrame: undefined,
           frameCount: 0,
@@ -1183,6 +1236,9 @@ export class InteractorServer {
     const port = this.config.server?.port || 3001;
     const host = this.config.server?.host || 'localhost';
 
+    // Start the file uploader first
+    await this.fileUploader.start();
+
     return new Promise((resolve, reject) => {
       this.server.listen(port, host, () => {
         this.logger.info(`Interactor Server started on http://${host}:${port}`);
@@ -1210,6 +1266,9 @@ export class InteractorServer {
     try {
       // Stop accepting new connections
       this.server.close();
+
+      // Stop the file uploader
+      await this.fileUploader.stop();
 
       // Destroy services
       await this.moduleLoader.destroy();

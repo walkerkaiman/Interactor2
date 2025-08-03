@@ -20,6 +20,7 @@ import 'reactflow/dist/style.css';
 import { ModuleManifest, InteractionConfig } from '@interactor/shared';
 import CustomNode from './CustomNode';
 import TimeInputNode from './TimeInputNode';
+import AudioOutputNode from './AudioOutputNode';
 import CustomEdge from './CustomEdge';
 
 import { connectionStateTracker } from '../utils/connectionStateTracker';
@@ -28,6 +29,7 @@ import styles from './NodeEditor.module.css';
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
   timeInput: TimeInputNode,
+  audioOutput: AudioOutputNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -189,7 +191,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       const newNodeId = `node-${Date.now()}`;
       
       // Determine node type based on module
-      const nodeType = moduleName === 'Time Input' ? 'timeInput' : 'custom';
+      let nodeType = 'custom';
+      if (moduleName === 'Time Input') {
+        nodeType = 'timeInput';
+      } else if (moduleName === 'Audio Output') {
+        nodeType = 'audioOutput';
+      }
       
       // Check if there's an existing module instance with the same moduleName in interactions
       // to get the correct configuration
@@ -323,7 +330,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             const nodeId = moduleInstance.id;
             
             // Determine node type based on module name
-            const nodeType = manifest.name === 'Time Input' ? 'timeInput' : 'custom';
+            let nodeType = 'custom';
+            if (manifest.name === 'Time Input') {
+              nodeType = 'timeInput';
+            } else if (manifest.name === 'Audio Output') {
+              nodeType = 'audioOutput';
+            }
             
             moduleInstancesMap.set(nodeId, {
               id: nodeId,

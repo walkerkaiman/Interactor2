@@ -118,6 +118,12 @@ export interface ModuleInstance {
   moduleName: string;
   config: ModuleConfig;
   position?: { x: number; y: number };
+  status?: 'running' | 'stopped' | 'error';
+  lastUpdate?: number;
+  currentTime?: string;
+  countdown?: string;
+  isPlaying?: boolean;
+  duration?: number;
 }
 
 // System types
