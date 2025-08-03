@@ -719,7 +719,23 @@ export class InteractorServer {
     // Manual trigger for outputs
     this.app.post('/api/trigger/:moduleId', async (req, res) => {
       try {
-        const moduleInstance = this.moduleLoader.getInstance(req.params.moduleId as string);
+        const moduleId = req.params.moduleId as string;
+
+        // Attempt to retrieve a live module instance first
+        let moduleInstance = this.moduleInstances.get(moduleId);
+
+        // If a live instance doesn't exist yet, but we have the module data in state, create it on-demand
+        if (!moduleInstance) {
+          const storedModuleData = this.stateManager.getModuleInstance(moduleId);
+          if (storedModuleData) {
+            try {
+              moduleInstance = await this.createModuleInstance(storedModuleData);
+            } catch (err) {
+              this.logger.error(`Failed to create live instance for manual trigger of ${moduleId}:`, 'InteractorServer', { error: String(err) });
+            }
+          }
+        }
+
         if (!moduleInstance) {
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }

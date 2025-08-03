@@ -1,4 +1,13 @@
 import { OutputModuleBase } from '../../OutputModuleBase';
+import Speaker from 'speaker';
+import * as fs from 'fs';
+import * as fse from 'fs-extra';
+import * as stream from 'stream';
+import * as path from 'path';
+import { Reader as WavReader } from 'wav';
+import { FFmpeg } from 'prism-media';
+import ffmpegPath from 'ffmpeg-static';
+import { execFile } from 'child_process';
 import {
   ModuleConfig,
   AudioOutputConfig,
@@ -317,7 +326,7 @@ export class AudioOutputModule extends OutputModuleBase {
 
       // Ensure assets directory exists
       const assetsDir = path.join(__dirname, 'assets');
-      await fs.ensureDir(assetsDir);
+      await fse.ensureDir(assetsDir);
     }
   }
 
@@ -427,17 +436,20 @@ export class AudioOutputModule extends OutputModuleBase {
       );
     }
     
-    // Play a test sound or beep
-    const testData: AudioPlaybackData = {
-      audioData: this.generateTestTone(),
-      volume: this.volume,
-      loop: false,
-      fadeInDuration: this.fadeInDuration,
-      fadeOutDuration: this.fadeOutDuration,
-      timestamp: Date.now()
-    };
-    
-    await this.playAudio(testData);
+    // If a file is selected, play it; otherwise fall back to test tone
+    if (this.config.selectedFile) {
+      await this.playAudio(this.config.selectedFile);
+    } else {
+      const testData: AudioPlaybackData = {
+        audioData: this.generateTestTone(),
+        volume: this.volume,
+        loop: false,
+        fadeInDuration: this.fadeInDuration,
+        fadeOutDuration: this.fadeOutDuration,
+        timestamp: Date.now()
+      };
+      await this.playAudio(testData);
+    }
   }
 
   /**
@@ -462,7 +474,17 @@ export class AudioOutputModule extends OutputModuleBase {
           fadeOutDuration: this.fadeOutDuration,
           timestamp
         };
-      } else if (typeof data === 'object' && data !== null) {
+      } else if (data === undefined || data === null) {
+        // No data provided (e.g., trigger without payload) – use selected file
+        audioData = {
+          audioData: this.config.selectedFile || this.generateTestTone(),
+          volume: this.volume,
+          loop: this.loop,
+          fadeInDuration: this.fadeInDuration,
+          fadeOutDuration: this.fadeOutDuration,
+          timestamp
+        };
+      } else if (typeof data === 'object') {
         // Assume it's already AudioPlaybackData or similar
         audioData = {
           audioData: (data as any).audioData || this.generateTestTone(),
@@ -561,33 +583,110 @@ export class AudioOutputModule extends OutputModuleBase {
   /**
    * Start audio playback
    */
+    private currentSpeaker: Speaker | null = null;
+  private currentStream: stream.Readable | null = null;
+
   private async startPlayback(audioData: AudioPlaybackData): Promise<void> {
     // Stop any currently playing audio
     if (this.isPlaying) {
       await this.stopAudio();
     }
     
-    // Set current audio data
+    // Resolve the audio source path or buffer
+    let audioStream: stream.Readable;
+    let speakerOptions = {
+      channels: this.channels,
+      bitDepth: 16,
+      sampleRate: this.sampleRate,
+      signed: true,
+    };
+
+    if (typeof audioData.audioData === 'string') {
+      const audioFilePath = path.isAbsolute(audioData.audioData)
+        ? audioData.audioData
+        : path.join(process.cwd(), 'data', 'uploads', 'audio', audioData.audioData);
+      const ext = path.extname(audioFilePath).toLowerCase();
+
+      if (ext === '.wav') {
+        audioStream = fs.createReadStream(audioFilePath).pipe(new WavReader());
+      } else if (ext === '.mp3') {
+        audioStream = new FFmpeg({
+          ffmpegPath,
+          args: [
+            '-i', audioFilePath,
+            '-f', 's16le',
+            '-ar', this.sampleRate.toString(),
+            '-ac', this.channels.toString(),
+            '-'
+          ]
+        });
+      } else {
+        throw new Error('Unsupported file format');
+      }
+    } else if (audioData.audioData instanceof ArrayBuffer) {
+      // Raw PCM test tone; wrap in readable
+      audioStream = stream.Readable.from(Buffer.from(audioData.audioData));
+    } else {
+      throw new Error('Unsupported audio data');
+    }
+
+    // Create speaker instance
+    this.currentSpeaker = new Speaker(speakerOptions);
+
+    // Pipe stream to speaker
+    this.currentStream = audioStream;
+    audioStream.pipe(this.currentSpeaker);
+
+    // Listen for end events to update state
+    this.currentSpeaker.on('close', () => {
+      this.isPlaying = false;
+      this.currentTime = 0;
+      this.emitOutput<AudioOutputPayload>('audioOutput', {
+        deviceId: this.deviceId,
+        sampleRate: this.sampleRate,
+        channels: this.channels,
+        format: this.format,
+        volume: this.volume,
+        isPlaying: false,
+        currentTime: 0,
+        duration: this.duration,
+        timestamp: Date.now(),
+        playCount: this.playCount,
+      });
+    });
+
+    audioStream.on('error', (err) => {
+      this.logger?.error('Audio pipeline error:', err);
+    });
+
+    // Mark state
     this.currentAudioData = audioData;
     this.isPlaying = true;
     this.currentTime = 0;
     this.playCount++;
-    
-    // Simulate audio duration (in a real implementation, this would be calculated from the audio file)
     this.duration = this.calculateAudioDuration(audioData.audioData);
-    
-    this.logger?.debug(`Started playback of audio with duration: ${this.duration}s`);
+    this.logger?.info('Started audio playback');
   }
 
   /**
    * Stop audio playback
    */
   private async stopAudio(): Promise<void> {
+    if (this.currentStream) {
+      try {
+        this.currentStream.unpipe();
+      } catch {}
+      this.currentStream.destroy();
+      this.currentStream = null;
+    }
+    if (this.currentSpeaker) {
+      this.currentSpeaker.end();
+      this.currentSpeaker = null;
+    }
     if (this.isPlaying) {
       this.isPlaying = false;
       this.currentTime = 0;
       this.currentAudioData = undefined;
-      
       this.logger?.debug('Audio playback stopped');
     }
   }
@@ -829,7 +928,7 @@ export class AudioOutputModule extends OutputModuleBase {
   private async saveAudioFile(uploadData: AudioFileUploadData): Promise<AudioFileUploadPayload> {
     try {
       const assetsDir = path.join(__dirname, 'assets');
-      await fs.ensureDir(assetsDir);
+      await fse.ensureDir(assetsDir);
 
       // Generate safe filename
       const timestamp = Date.now();
@@ -837,16 +936,35 @@ export class AudioOutputModule extends OutputModuleBase {
       const safeName = `${timestamp}_${uploadData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
       const filePath = path.join(assetsDir, safeName);
 
-      // Save file
-      await fs.writeFile(filePath, uploadData.buffer);
+      // Save original file
+      await fse.writeFile(filePath, uploadData.buffer);
+
+      let finalFileName = safeName;
+      let finalFilePath = filePath;
+
+      // If MP3, transcode to WAV so playback is immediate
+      if (ext === '.mp3') {
+        const wavName = safeName.replace(/\.mp3$/i, '.wav');
+        const wavPath = path.join(assetsDir, wavName);
+        await new Promise<void>((resolve, reject) => {
+          execFile(ffmpegPath, ['-y', '-i', filePath, '-ar', this.sampleRate.toString(), '-ac', this.channels.toString(), wavPath], (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+        // Remove original mp3 to save space
+        await fse.remove(filePath);
+        finalFileName = wavName;
+        finalFilePath = wavPath;
+      }
 
       this.uploadCount++;
       this.lastUpload = {
-        filename: safeName,
+        filename: finalFileName,
         originalName: uploadData.originalName,
         size: uploadData.size,
         mimetype: uploadData.mimetype,
-        filePath: `assets/${safeName}`,
+        filePath: `assets/${finalFileName}`,
         timestamp: uploadData.timestamp,
         availableFiles: await this.getAvailableAudioFiles()
       };

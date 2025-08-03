@@ -137,6 +137,36 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   /**
    * Emit a streaming event with typed value
    */
+  /**
+   * Handle manual trigger
+   */
+  public async onManualTrigger(): Promise<void> {
+    try {
+      this.logger?.debug(`Manual trigger for ${this.name}`);
+      // If subclass has its own manualTrigger method (legacy), delegate to it
+      if (typeof (this as any).manualTrigger === 'function' && (this as any).manualTrigger !== (this as any).onManualTrigger) {
+        await (this as any).manualTrigger();
+        return;
+      }
+      // Emit a generic trigger event; subclasses can override for custom behaviour
+      this.emitTrigger('manualTrigger', {
+        timestamp: Date.now(),
+        manual: true,
+      });
+      this.incrementMessageCount();
+
+      // Emit triggerEvent for frontend pulse animation consistency
+      this.emit('triggerEvent', {
+        moduleId: this.id,
+        type: 'manual',
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      this.logger?.error(`Error in manual trigger for ${this.name}:`, error as any);
+      throw error;
+    }
+  }
+
   protected emitStream<T = unknown>(value: T): void {
     this.incrementMessageCount();
     this.lastValue = value;

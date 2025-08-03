@@ -1,3 +1,4 @@
+
 # Enhanced Audio Output Module Features
 
 ## Overview
@@ -134,6 +135,59 @@ const response = await fetch('http://localhost:3001/files/test.wav/metadata');
 const data = await response.json();
 console.log('Metadata:', data.data);
 ```
+
+## Native Playback Architecture (2025-08 Update)
+
+### Why Native Playback?
+The earlier implementation relied on spawning a system media-player (CLI) each time an audio cue was needed. This worked, but it introduced platform-specific requirements and noticeable startup latency.
+
+The module now performs **all decoding and playback inside the Node process**:
+
+| Component          | Purpose                                   |
+|--------------------|-------------------------------------------|
+| `prism-media`      | Wraps FFmpeg and exposes a decoded PCM stream. |
+| `ffmpeg-static`    | Bundled cross-platform FFmpeg binary (no external install). |
+| `wav`              | Lightweight WAV header parser → PCM.      |
+| `speaker`          | Writes 16-bit PCM directly to the host audio device (CoreAudio / WASAPI / ALSA). |
+
+### Runtime Flow
+1. **Trigger received** (manual button or routed input).
+2. Audio file path is resolved.  
+   • `.wav` → streamed through `wav.Reader` (header → PCM).  
+   • `.mp3` → streamed through `FFmpeg` (`-f s16le … -`).
+3. Decoded PCM is piped to a `Speaker` instance.  
+4. On `end` event the module updates its state (`isPlaying = false`) and emits an `audioOutput` event.
+
+No external processes are spawned; latency is dominated only by FFmpeg decode startup (usually < 50 ms).
+
+### Upload-time Transcoding
+To guarantee instant playback the module **converts uploaded MP3s to LPCM WAV** once, server-side:
+
+```text
+POST /upload (audio/mpeg)
+            ▼
+assets/12345_original.mp3            ⇢   ffmpeg -i … 12345_converted.wav
+            ▼                                   ▼
+         deleted                  final file in assets/
+```
+
+• Transcoding is invoked via `execFile(ffmpeg-static)` in `saveAudioFile()`.  
+• Original MP3 is removed after successful conversion.  
+• WAVs remain untouched.  
+• All entries returned by `getAvailableAudioFiles()` are therefore WAV, ensuring a single playback path.
+
+### Configuration Hints
+```jsonc
+{
+  "sampleRate": 44100,      // DECODING & SPEAKER OUTPUT
+  "channels":   2,
+  "selectedFile": "12345_converted.wav"
+}
+```
+
+> You can still upload MP3s; the module handles the format internally.
+
+---
 
 ## Security Considerations
 
