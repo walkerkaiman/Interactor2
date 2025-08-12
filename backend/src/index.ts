@@ -86,27 +86,35 @@ export class InteractorServer {
    * Load configuration from file
    */
   private async loadConfig(): Promise<void> {
-    const configPath = path.join(__dirname, '../../config/system.json');
-    
-    if (await fs.pathExists(configPath)) {
-      const configData = await fs.readFile(configPath, 'utf-8');
-      this.config = JSON.parse(configData);
-    } else {
-      // Default configuration
-      this.config = {
-        server: {
-          port: 3001,
-          host: 'localhost'
-        },
-        logging: {
-          level: 'info',
-          file: 'logs/interactor.log'
-        },
-        modules: {
-          autoLoad: true
-        }
-      };
+    // Try multiple locations so running from ts-node-dev works
+    const candidatePaths = [
+      path.join(__dirname, '../../../../config/system.json'), // repo root
+      path.join(__dirname, '../../../config/system.json'),     // backend/config
+      path.join(__dirname, '../../config/system.json')         // dist/config fallback
+    ];
+
+    for (const configPath of candidatePaths) {
+      if (await fs.pathExists(configPath)) {
+        const configData = await fs.readFile(configPath, 'utf-8');
+        this.config = JSON.parse(configData);
+        return;
+      }
     }
+
+    // Default configuration
+    this.config = {
+      server: {
+        port: 3001,
+        host: '0.0.0.0'
+      },
+      logging: {
+        level: 'info',
+        file: 'logs/interactor.log'
+      },
+      modules: {
+        autoLoad: true
+      }
+    };
   }
 
   /**
