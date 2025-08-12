@@ -107,7 +107,7 @@ const ConsolePage: React.FC<ConsolePageProps> = ({ state, onStateUpdate }) => {
 
   if (loading && logs.length === 0) {
     return (
-      <div className={styles.consolePage}>
+      <div className={styles.consolePage} data-testid="console-page">
         <div className={styles.loading}>Loading console logs...</div>
       </div>
     );
@@ -115,7 +115,7 @@ const ConsolePage: React.FC<ConsolePageProps> = ({ state, onStateUpdate }) => {
 
   if (error) {
     return (
-      <div className={styles.consolePage}>
+      <div className={styles.consolePage} data-testid="console-page">
         <div className={styles.error}>
           <h3>Error Loading Logs</h3>
           <p>{error}</p>
@@ -128,7 +128,7 @@ const ConsolePage: React.FC<ConsolePageProps> = ({ state, onStateUpdate }) => {
   }
 
   return (
-    <div className={styles.consolePage}>
+    <div className={styles.consolePage} data-testid="console-page">
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <h1>System Console</h1>

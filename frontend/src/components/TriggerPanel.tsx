@@ -67,6 +67,7 @@ const TriggerPanel: React.FC<TriggerPanelProps> = ({ interactions, onClose }) =>
                     className={`${styles.triggerButton} ${triggering === module.id ? styles.triggering : ''}`}
                     onClick={() => handleTrigger(module.id)}
                     disabled={triggering === module.id}
+                    data-testid="trigger-button"
                   >
                     {triggering === module.id ? 'Triggering...' : 'Trigger'}
                   </button>

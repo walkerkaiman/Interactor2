@@ -9,7 +9,7 @@ interface PerformancePageProps {
 
 const PerformancePage: React.FC<PerformancePageProps> = ({ state }) => {
   return (
-    <div className={styles.performancePage}>
+    <div className={styles.performancePage} data-testid="performance-page">
       <h2>Performance</h2>
       <p>Performance monitoring and statistics will be displayed here.</p>
     </div>

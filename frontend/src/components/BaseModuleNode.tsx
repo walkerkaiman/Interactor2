@@ -4,6 +4,7 @@ import { FrontendNodeData } from '../types';
 
 import { connectionStateTracker } from '../utils/connectionStateTracker';
 import { useNodeConfig, useInstanceData } from '../hooks/useNodeConfig';
+import { useUnregisteredChanges } from '../state/useUnregisteredChanges';
 import styles from './CustomNode.module.css';
 
 export interface BaseModuleNodeProps extends NodeProps<FrontendNodeData> {
@@ -46,6 +47,10 @@ export function useBaseModuleNode(
   const edges = props.data.edges || [];
   const [isPulsing, setIsPulsing] = useState(false);
   const [connectionStateVersion, setConnectionStateVersion] = useState(0);
+
+  // Get unregistered changes
+  const { hasConfigChange } = useUnregisteredChanges();
+  const hasUnregisteredChanges = hasConfigChange(nodeId);
 
   // Pulse animation handling
   useEffect(() => {
@@ -333,6 +338,7 @@ export function useBaseModuleNode(
     instance,
     edges,
     isPulsing,
+    hasUnregisteredChanges,
     handleDelete,
     handleSelect,
     handleManualTrigger,
@@ -351,6 +357,7 @@ export function createModuleNode(config: ModuleNodeConfig) {
     
     const {
       instance,
+      hasUnregisteredChanges,
       handleSelect,
       renderDeleteButton,
       renderHeader,
@@ -415,7 +422,7 @@ export function createModuleNode(config: ModuleNodeConfig) {
     // @ts-ignore - Variables are used in the hook but TypeScript doesn't recognize it
     return (
       <div 
-        className={`${styles.node} ${props.selected ? styles.selected : ''}`}
+        className={`${styles.node} ${props.selected ? styles.selected : ''} ${hasUnregisteredChanges ? styles.hasUnregisteredChanges : ''}`}
         onClick={handleSelect}
       >
         {renderDeleteButton()}

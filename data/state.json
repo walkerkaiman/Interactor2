@@ -44,7 +44,7 @@
           "status": "stopped",
           "messageCount": 0,
           "frameCount": 0,
-          "lastUpdate": 1754186460548,
+          "lastUpdate": 1754365713447,
           "position": {
             "x": 708.0051345909241,
             "y": 224.78351428685966
@@ -67,29 +67,14 @@
   ],
   "modules": [
     {
-      "id": "node-1754170499899",
-      "moduleName": "Time Input",
-      "config": {
-        "mode": "metronome",
-        "targetTime": "12:00 PM",
-        "millisecondDelay": 10000,
-        "enabled": true,
-        "apiEnabled": false,
-        "apiEndpoint": ""
-      },
-      "status": "ready",
+      "id": "b97f4ec7-e18e-4695-99b8-346ae9caaf37",
+      "moduleName": "time_input",
+      "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754240871163,
-      "mode": "metronome",
-      "currentTime": "12:07:51 PM",
-      "countdown": "9s to next",
-      "targetTime": "12:00 PM",
-      "targetTime12Hour": "",
-      "millisecondDelay": 10000,
-      "enabled": true,
-      "apiEnabled": false,
-      "apiEndpoint": ""
+      "lastUpdate": 1754975088100,
+      "currentTime": "12:04:48 AM",
+      "countdown": "11h 55m 11s"
     },
     {
       "id": "node-1754170514058",
@@ -100,9 +85,14 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754236003036
+      "lastUpdate": 1754365734362
     }
   ],
   "routes": [],
-  "settings": {}
+  "settings": {
+    "test-setting": {
+      "enabled": true,
+      "theme": "dark"
+    }
+  }
 }

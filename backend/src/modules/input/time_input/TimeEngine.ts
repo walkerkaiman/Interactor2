@@ -3,7 +3,7 @@ import { convertTo12Hour, convertTo24Hour, getCountdownToTarget, getMetronomeCou
 
 export interface TimeEngineOptions {
   mode: 'clock' | 'metronome';
-  targetTime: string;        // 12-hour string e.g. "2:30 PM"
+  targetTime?: string;        // 12-hour string e.g. "2:30 PM" - optional for metronome mode
   delayMs: number;           // metronome delay
   enabled: boolean;
 }
@@ -87,11 +87,10 @@ export class TimeEngine extends EventEmitter {
       this.emit('pulse');
     }, this.opts.delayMs);
 
-    // extra display refresh between pulses (at most 1s)
-    const updateInterval = Math.min(1000, Math.floor(this.opts.delayMs / 4));
+    // Display updates only once per second for UI consistency
     this.displayIntervalId = setInterval(() => {
       if (this.opts.enabled && this.opts.mode === 'metronome') this.handleDisplayTick();
-    }, updateInterval);
+    }, 1000); // Fixed at 1 second for display updates
   }
 
   private handleDisplayTick(): void {
@@ -100,7 +99,7 @@ export class TimeEngine extends EventEmitter {
     this.currentTime = convertTo12Hour(convertTo24(now), now.getSeconds());
 
     // countdown
-    if (this.opts.mode === 'clock') {
+    if (this.opts.mode === 'clock' && this.opts.targetTime) {
       this.countdown = getCountdownToTarget(now, this.opts.targetTime);
     } else {
       this.countdown = getMetronomeCountdown(Date.now(), this.opts.delayMs);
@@ -110,6 +109,7 @@ export class TimeEngine extends EventEmitter {
   }
 
   private isClockHit(): boolean {
+    if (!this.opts.targetTime) return false;
     const now = new Date();
     const current24 = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     return current24 === convertTo24Hour(this.opts.targetTime);

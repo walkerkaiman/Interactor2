@@ -37,7 +37,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClo
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel}>
+      <div className={styles.panel} data-testid="settings-panel">
         <div className={styles.header}>
           <h2 className={styles.title}>Settings</h2>
           <button className={styles.closeButton} onClick={onClose}>

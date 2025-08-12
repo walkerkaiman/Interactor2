@@ -32,9 +32,9 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
   protected isInitialized = false;
   protected isRunning = false;
 
-  constructor(name: string, config: ModuleConfig, manifest: ModuleManifest) {
+  constructor(name: string, config: ModuleConfig, manifest: ModuleManifest, id?: string) {
     super();
-    this.id = uuidv4();
+    this.id = id || uuidv4();
     this.name = name;
     this.config = { ...config };
     this.manifest = manifest;
@@ -175,6 +175,10 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
       await this.onConfigUpdate(oldConfig, newConfig);
       
       this.logger?.info(`Config updated for module: ${this.name}`);
+      
+      // Emit configuration update event
+      this.emitConfigUpdate();
+      
       this.emit('configUpdated', { 
         moduleId: this.id, 
         moduleName: this.name, 
@@ -192,6 +196,133 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
    */
   public getState(): ModuleState {
     return { ...this.state };
+  }
+
+  /**
+   * Get comprehensive module state including all possible settings
+   * This ensures all settings are preserved regardless of current mode
+   */
+  public getComprehensiveState(): any {
+    return {
+      id: this.id,
+      moduleName: this.name,
+      status: this.state.status,
+      messageCount: this.state.messageCount,
+      lastUpdate: Date.now(),
+      // Include the full configuration with all possible settings
+      config: this.config,
+      // Include any additional runtime state
+      runtimeState: this.getRuntimeState(),
+    };
+  }
+
+  /**
+   * Get runtime state (data that changes frequently, not configuration)
+   * Override in subclasses to provide module-specific runtime data
+   */
+  protected getRuntimeState(): Record<string, any> {
+    return {
+      // Default runtime state - subclasses can override
+      isRunning: this.isRunning,
+      isInitialized: this.isInitialized,
+    };
+  }
+
+  /**
+   * Get mode-specific configuration (for UI display)
+   * This returns only the settings relevant to the current mode
+   */
+  public getModeSpecificConfig(): Record<string, any> {
+    const mode = this.config.mode || 'default';
+    return this.getConfigForMode(mode);
+  }
+
+  /**
+   * Get configuration settings for a specific mode
+   * Override in subclasses to provide mode-specific configuration filtering
+   */
+  protected getConfigForMode(mode: string): Record<string, any> {
+    // Default implementation returns all config
+    // Subclasses should override to provide mode-specific filtering
+    return { ...this.config };
+  }
+
+  /**
+   * Get all available modes for this module
+   * Override in subclasses to provide available modes
+   */
+  public getAvailableModes(): string[] {
+    // Default implementation - subclasses should override
+    return ['default'];
+  }
+
+  /**
+   * Get mode-specific UI schema (which settings to show for current mode)
+   * Override in subclasses to provide mode-specific UI configuration
+   */
+  public getModeSpecificUISchema(): any {
+    const mode = this.config.mode || 'default';
+    return this.getUISchemaForMode(mode);
+  }
+
+  /**
+   * Get UI schema for a specific mode
+   * Override in subclasses to provide mode-specific UI schemas
+   */
+  protected getUISchemaForMode(mode: string): any {
+    // Default implementation returns full schema
+    // Subclasses should override to provide mode-specific UI schemas
+    return this.manifest.configSchema;
+  }
+
+  /**
+   * Emit runtime state update (excludes configuration data)
+   * This prevents overwriting user's unregistered configuration changes
+   */
+  protected emitRuntimeStateUpdate(runtimeData: Record<string, any> = {}): void {
+    const stateUpdate = {
+      id: this.id,
+      moduleName: this.name,
+      status: this.state.status,
+      messageCount: this.state.messageCount,
+      lastUpdate: Date.now(),
+      // Include any additional runtime data
+      ...runtimeData,
+      // Explicitly exclude configuration data to prevent overwriting user changes
+      config: undefined,
+      mode: undefined,
+      enabled: undefined,
+      // Add any other configuration fields that should be excluded
+    };
+
+    this.logger?.debug(`Emitting runtime state update for ${this.name}:`, stateUpdate);
+    
+    // Emit runtime state update event for targeted updates
+    this.emit('runtimeStateUpdate', runtimeData);
+    
+    // Also emit stateUpdate for backward compatibility
+    this.emit('stateUpdate', stateUpdate);
+    
+    // Also emit moduleStateChanged for real-time updates
+    this.emit('moduleStateChanged', stateUpdate);
+  }
+
+  /**
+   * Emit configuration update (for when configuration actually changes)
+   * This should only be called when configuration is explicitly updated
+   */
+  protected emitConfigUpdate(): void {
+    const configUpdate = {
+      id: this.id,
+      moduleName: this.name,
+      config: this.config,
+      lastUpdate: Date.now(),
+    };
+
+    this.logger?.debug(`Emitting config update for ${this.name}:`, configUpdate);
+    
+    // Emit config update event
+    this.emit('configUpdated', configUpdate);
   }
 
   /**

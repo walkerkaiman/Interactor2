@@ -51,6 +51,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           className={styles.toolbarButton}
           onClick={onToggleSettings}
           title="Settings"
+          data-testid="settings-button"
         >
           ⚙️
         </button>

@@ -38,6 +38,7 @@ export class InteractorServer {
   private config: any;
   private isShuttingDown = false;
   private moduleInstances: Map<string, any> = new Map(); // Live module instances registry
+  private idMapping: Map<string, string> = new Map(); // Map external IDs to internal IDs
   private fileUploader!: FileUploader;
 
   constructor() {
@@ -156,11 +157,17 @@ export class InteractorServer {
       
       // Create live instances for all modules in the data store
       for (const moduleInstance of moduleInstances) {
-        if (moduleInstance.moduleName === 'Time Input' || moduleInstance.moduleName === 'time_input') {
+        const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
+        const internalName = this.getInternalModuleName(displayName);
+        
+        if (displayName === 'Time Input' || internalName === 'time_input') {
           try {
             // Create live module instance
             const liveInstance = await this.createModuleInstance(moduleInstance);
             if (liveInstance) {
+              // Set up state listeners for this module
+              this.setupModuleStateListener(moduleInstance);
+              
               // Start the live module instance if it was previously running
               if (moduleInstance.status === 'running') {
                 await liveInstance.start();
@@ -241,77 +248,163 @@ export class InteractorServer {
   }
 
   /**
+   * Get the correct module name from manifest
+   */
+  private getModuleNameFromManifest(moduleName: string): string {
+    // Try to get the manifest to get the correct display name
+    const manifest = this.moduleLoader.getManifest(moduleName);
+    if (manifest) {
+      return manifest.name;
+    }
+    
+    // Fallback to the provided name
+    return moduleName;
+  }
+
+  /**
+   * Get the internal module reference (directory name)
+   */
+  private getInternalModuleName(moduleName: string): string {
+    // Map display names to internal names
+    const nameMap: Record<string, string> = {
+      'Time Input': 'time_input',
+      'Audio Output': 'audio_output',
+      'DMX Output': 'dmx_output',
+      'OSC Input': 'osc_input',
+      'OSC Output': 'osc_output',
+      'HTTP Input': 'http_input',
+      'HTTP Output': 'http_output',
+      'Serial Input': 'serial_input',
+      'Frames Input': 'frames_input'
+    };
+    
+    return nameMap[moduleName] || moduleName;
+  }
+
+  /**
+   * Update module ID in state manager
+   */
+  private async updateModuleIdInStateManager(oldId: string, newId: string): Promise<void> {
+    try {
+      const moduleInstances = this.stateManager.getModuleInstances();
+      const moduleInstance = moduleInstances.find(m => m.id === oldId);
+      
+      if (moduleInstance) {
+        moduleInstance.id = newId;
+        await this.stateManager.replaceState({ modules: moduleInstances });
+        this.logger.debug(`Updated module ID in state manager: ${oldId} -> ${newId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to update module ID in state manager:`, error);
+    }
+  }
+
+  /**
    * Create a live module instance
    */
   private async createModuleInstance(moduleData: any): Promise<any> {
     const { id, moduleName, config } = moduleData;
     
-    // Handle Time Input module (check for both possible names)
-    if (moduleName === 'Time Input' || moduleName === 'time_input') {
+    // Normalize the module name to use the display name from manifest
+    const displayName = this.getModuleNameFromManifest(moduleName);
+    const internalName = this.getInternalModuleName(displayName);
+    
+    // Handle Time Input module
+    if (displayName === 'Time Input' || internalName === 'time_input') {
       try {
-        // Import the TimeInputModule class
         const { TimeInputModule } = await import('./modules/input/time_input/index');
-        
-        // Create instance with config and external ID
         const moduleInstance = new TimeInputModule(config, id);
         moduleInstance.setLogger(this.logger);
-        
-        // Set up event listeners for state updates
         moduleInstance.on('stateUpdate', (stateData: any) => {
           this.handleModuleStateUpdate(id, stateData);
         });
-        
         moduleInstance.on('configUpdated', (configData: any) => {
           this.handleModuleConfigUpdate(id, configData);
         });
-        
-        // Initialize the module
+        moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
+          this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
+          const moduleInstances = this.stateManager.getModuleInstances();
+          const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
+          if (stateModuleInstance) {
+            const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
+            runtimeFields.forEach(field => {
+              if (runtimeData[field] !== undefined) {
+                stateModuleInstance[field] = runtimeData[field];
+              }
+            });
+            stateModuleInstance.lastUpdate = Date.now();
+            this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+              this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
+            }).catch(error => {
+              this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
+            });
+          } else {
+            this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
+          }
+        });
+        moduleInstance.on('trigger', (triggerEvent: any) => {
+          this.logger.debug(`Received trigger event from ${moduleName}:`, triggerEvent);
+          const message = {
+            id: `msg_${Date.now()}_${Math.random()}`,
+            source: moduleInstance.id,
+            target: '',
+            event: triggerEvent.event,
+            payload: triggerEvent.payload,
+            timestamp: Date.now()
+          };
+          this.messageRouter.routeMessage(message);
+        });
         await moduleInstance.init();
-        
-        // Store in registry
-        this.moduleInstances.set(id, moduleInstance);
-        
-        this.logger.info(`Created live instance for ${moduleName} (${id})`);
+        this.moduleInstances.set(moduleInstance.id, moduleInstance);
+        this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
         return moduleInstance;
       } catch (error) {
         this.logger.error(`Failed to create ${moduleName} instance:`, error);
         throw error;
       }
     }
-    
     // Handle Audio Output module
-    if (moduleName === 'Audio Output' || moduleName === 'audio_output') {
+    if (displayName === 'Audio Output' || internalName === 'audio_output') {
       try {
-        // Import the AudioOutputModule class
         const { AudioOutputModule } = await import('./modules/output/audio_output/index');
-        
-        // Create instance with config
-        const moduleInstance = new AudioOutputModule(config);
+        const moduleInstance = new AudioOutputModule(config, id);
         moduleInstance.setLogger(this.logger);
-        
-        // Set up event listeners for state updates
         moduleInstance.on('stateUpdate', (stateData: any) => {
           this.handleModuleStateUpdate(id, stateData);
         });
-        
         moduleInstance.on('configUpdated', (configData: any) => {
           this.handleModuleConfigUpdate(id, configData);
         });
-        
-        // Initialize the module
+        moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
+          this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
+          const moduleInstances = this.stateManager.getModuleInstances();
+          const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
+          if (stateModuleInstance) {
+            const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
+            runtimeFields.forEach(field => {
+              if (runtimeData[field] !== undefined) {
+                stateModuleInstance[field] = runtimeData[field];
+              }
+            });
+            stateModuleInstance.lastUpdate = Date.now();
+            this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+              this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
+            }).catch(error => {
+              this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
+            });
+          } else {
+            this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
+          }
+        });
         await moduleInstance.init();
-        
-        // Store in registry
-        this.moduleInstances.set(id, moduleInstance);
-        
-        this.logger.info(`Created live instance for ${moduleName} (${id})`);
+        this.moduleInstances.set(moduleInstance.id, moduleInstance);
+        this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
         return moduleInstance;
       } catch (error) {
         this.logger.error(`Failed to create ${moduleName} instance:`, error);
         throw error;
       }
     }
-    
     return null; // Module type not supported yet
   }
   
@@ -324,8 +417,17 @@ export class InteractorServer {
       const moduleInstance = moduleInstances.find(m => m.id === moduleId);
       
       if (moduleInstance) {
-        // Update the stored state with the new data
-        Object.assign(moduleInstance, stateData);
+        // Only update runtime fields, not configuration
+        // Runtime fields that should be updated: currentTime, countdown, status, etc.
+        const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
+        
+        // Update only runtime fields
+        runtimeFields.forEach(field => {
+          if (stateData[field] !== undefined) {
+            moduleInstance[field] = stateData[field];
+          }
+        });
+        
         moduleInstance.lastUpdate = Date.now();
         
         // Save to StateManager
@@ -334,7 +436,7 @@ export class InteractorServer {
         // Broadcast to frontend
         this.broadcastStateUpdate();
         
-        this.logger.debug(`Updated state for module ${moduleId}`, stateData);
+        this.logger.debug(`Updated runtime state for module ${moduleId}`, stateData);
       }
     } catch (error) {
       this.logger.error(`Failed to handle state update for module ${moduleId}:`, error);
@@ -1060,61 +1162,11 @@ export class InteractorServer {
     if (this.wss.clients.size === 0) return;
     
     try {
-      // Update current time for Time Input modules
-      const moduleInstances = this.stateManager.getModuleInstances();
-      let hasTimeInputUpdates = false;
-      
-      moduleInstances.forEach(moduleInstance => {
-        if (moduleInstance.moduleName === 'Time Input' && moduleInstance.status === 'running') {
-          const now = new Date();
-          
-          // Update current time in 12-hour format
-          const hours = now.getHours();
-          const minutes = now.getMinutes();
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-          const newCurrentTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
-          
-          // Update countdown based on mode
-          let newCountdown = '';
-          const mode = moduleInstance.config?.mode || 'clock';
-          if (mode === 'metronome') {
-            const millisecondDelay = moduleInstance.config?.millisecondDelay || 1000;
-            const seconds = millisecondDelay / 1000;
-            newCountdown = `${seconds}s interval`;
-          } else if (mode === 'clock') {
-            newCountdown = 'Clock mode - target time calculation needed';
-          }
-          
-          // Only update if the time or countdown has changed
-          if (moduleInstance.currentTime !== newCurrentTime || moduleInstance.countdown !== newCountdown) {
-            moduleInstance.currentTime = newCurrentTime;
-            moduleInstance.countdown = newCountdown;
-            moduleInstance.lastUpdate = Date.now();
-            hasTimeInputUpdates = true;
-            this.logger.info(`Updated Time Input module ${moduleInstance.id}: currentTime = ${moduleInstance.currentTime}, countdown = ${moduleInstance.countdown}`);
-          }
-        }
-      });
-      
-      // Update state if there were changes
-      if (hasTimeInputUpdates) {
-        this.stateManager.replaceState({ modules: moduleInstances });
-        this.logger.info(`Updated state with Time Input changes`);
-      }
-      
-      // Get the updated instances for the WebSocket message
-      const updatedModuleInstances = this.stateManager.getModuleInstances();
-      const timeInputInstance = updatedModuleInstances.find(m => m.moduleName === 'Time Input');
-      if (timeInputInstance) {
-        this.logger.info(`Time Input module in WebSocket message: currentTime = ${timeInputInstance.currentTime}, countdown = ${timeInputInstance.countdown}`);
-      }
-      
       const state = {
         type: 'state_update',
         data: {
           interactions: this.stateManager.getInteractions(),
-          moduleInstances: updatedModuleInstances
+          moduleInstances: this.stateManager.getModuleInstances()
         }
       };
       
@@ -1128,6 +1180,35 @@ export class InteractorServer {
       this.logger.debug(`Broadcasted state update to ${this.wss.clients.size} clients`);
     } catch (error) {
       this.logger.error('Error broadcasting state update:', String(error));
+    }
+  }
+
+  /**
+   * Broadcast a module-specific runtime update to all connected WebSocket clients
+   * This allows updating read-only fields without affecting user configuration
+   */
+  public broadcastModuleRuntimeUpdate(moduleId: string, runtimeData: Record<string, any>): void {
+    if (this.wss.clients.size === 0) return;
+    
+    try {
+      const runtimeUpdate = {
+        type: 'module_runtime_update',
+        data: {
+          moduleId,
+          runtimeData
+        }
+      };
+      
+      const message = JSON.stringify(runtimeUpdate);
+      this.wss.clients.forEach((client) => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(message);
+        }
+      });
+      
+      this.logger.debug(`Broadcasted runtime update for module ${moduleId} to ${this.wss.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('Error broadcasting module runtime update:', String(error));
     }
   }
 
@@ -1176,8 +1257,108 @@ export class InteractorServer {
             this.logger.debug(`Received trigger event from module: ${event.moduleId}`, event);
             this.broadcastTriggerEvent(event.moduleId, event.type);
           });
+          
+          // Set up message router listener for this output module
+          this.messageRouter.on(moduleInstance.id, (message: any) => {
+            this.logger.debug(`Message router sending message to ${moduleInstance.moduleName}:`, message);
+            
+            // Create the appropriate event type for the output module
+            if (message.event === 'trigger' || message.event === 'timeTrigger' || message.event === 'manualTrigger') {
+              const triggerEvent = {
+                moduleId: message.source,
+                moduleName: 'Input Module',
+                event: message.event,
+                payload: message.payload,
+                timestamp: message.timestamp
+              };
+              actualModule.onTriggerEvent(triggerEvent);
+            } else if (message.event === 'stream') {
+              const streamEvent = {
+                moduleId: message.source,
+                moduleName: 'Input Module',
+                value: message.payload,
+                timestamp: message.timestamp
+              };
+              actualModule.onStreamingEvent(streamEvent);
+            }
+          });
         }
       }
+    });
+  }
+
+  /**
+   * Setup listeners for a specific module
+   */
+  private setupModuleStateListener(moduleInstance: any): void {
+    // Try to find the module by the instance ID first
+    let actualModule = this.moduleLoader.getInstance(moduleInstance.id);
+    
+    // If not found, try to find it in the moduleInstances registry
+    if (!actualModule) {
+      actualModule = this.moduleInstances.get(moduleInstance.id);
+    }
+    
+    // If still not found, try to find it by matching the module name and checking all instances
+    if (!actualModule) {
+      for (const [id, module] of this.moduleInstances.entries()) {
+        if (module.name === moduleInstance.moduleName || module.name === moduleInstance.name) {
+          actualModule = module;
+          this.logger.debug(`Found module by name match: ${moduleInstance.moduleName} -> ${id}`);
+          break;
+        }
+      }
+    }
+    
+    if (!actualModule) {
+      this.logger.warn(`Cannot set up listeners for module ${moduleInstance.id} (${moduleInstance.moduleName}) - module not found`);
+      return;
+    }
+
+    // Remove existing listeners to prevent duplicates
+    actualModule.removeAllListeners('stateUpdate');
+    actualModule.removeAllListeners('runtimeStateUpdate');
+
+    // Listen for stateUpdate events from this module
+    actualModule.on('stateUpdate', (stateData: any) => {
+      this.logger.debug(`Received state update from module ${moduleInstance.moduleName} (${moduleInstance.id}):`, stateData);
+      
+      // Update the module instance with the new state
+      Object.assign(moduleInstance, stateData);
+      moduleInstance.lastUpdate = Date.now();
+      
+      // Save to StateManager
+      const moduleInstances = this.stateManager.getModuleInstances();
+      this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+        // Broadcast to frontend
+        this.broadcastStateUpdate();
+      }).catch(error => {
+        this.logger.error(`Failed to save state update for module ${moduleInstance.id}:`, error);
+      });
+    });
+    
+    // Listen for runtime state updates specifically
+    actualModule.on('runtimeStateUpdate', (runtimeData: any) => {
+      this.logger.debug(`Received runtime state update from module ${moduleInstance.moduleName} (${moduleInstance.id}):`, runtimeData);
+      
+      // Update only runtime fields
+      const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
+      runtimeFields.forEach(field => {
+        if (runtimeData[field] !== undefined) {
+          moduleInstance[field] = runtimeData[field];
+        }
+      });
+      
+      moduleInstance.lastUpdate = Date.now();
+      
+      // Save to StateManager
+      const moduleInstances = this.stateManager.getModuleInstances();
+      this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+        // Broadcast targeted runtime update to frontend
+        this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
+      }).catch(error => {
+        this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
+      });
     });
   }
 
@@ -1185,29 +1366,19 @@ export class InteractorServer {
    * Setup listeners for module state updates
    */
   private setupModuleStateListeners(): void {
-    // Listen for stateUpdate events from any module
-    // Note: This approach doesn't work because modules emit events on their own instances
-    // We need to handle this differently by updating the state manager directly
-    // when modules emit stateUpdate events
+    // Get all module instances and set up state update listeners
+    const moduleInstances = this.stateManager.getModuleInstances();
     
-    // For now, we'll rely on the modules to update their state through the state manager
-    // The frames input module should call this.stateManager.updateModuleInstance() directly
+    moduleInstances.forEach(moduleInstance => {
+      this.setupModuleStateListener(moduleInstance);
+    });
     
-    // We'll also set up a periodic broadcast to ensure frontend gets updates
+    // Also set up a periodic broadcast to ensure frontend gets updates
     setInterval(() => {
       if (this.wss.clients.size > 0) {
         this.broadcastStateUpdate();
       }
-    }, 5000); // Broadcast every 5 seconds instead of every second
-    
-    // Also broadcast when module instances are updated
-    // We'll override the state manager's updateModuleInstance method to broadcast
-    const originalUpdateModuleInstance = this.stateManager.updateModuleInstance.bind(this.stateManager);
-    this.stateManager.updateModuleInstance = async (moduleInstance: any) => {
-      await originalUpdateModuleInstance(moduleInstance);
-      // Broadcast state update after module instance is updated
-      this.broadcastStateUpdate();
-    };
+    }, 5000); // Broadcast every 5 seconds as a fallback
     
     // Set up trigger event listeners for output modules
     this.setupTriggerEventListeners();

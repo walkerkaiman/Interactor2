@@ -35,7 +35,7 @@ class ApiService {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
   // Module management
@@ -100,6 +100,13 @@ class ApiService {
     await this.request(`/modules/instances/${moduleId}/config`, {
       method: 'PUT',
       body: JSON.stringify({ config }),
+    });
+  }
+
+  // Sync interactions with modules (explicit sync)
+  async syncInteractions(): Promise<void> {
+    await this.request('/interactions/sync', {
+      method: 'POST',
     });
   }
 

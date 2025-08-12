@@ -1,269 +1,324 @@
-# Interactor Integration Test Suite
+# Integration Tests
 
-This directory contains comprehensive integration tests for the Interactor backend system. These tests verify that all components work together correctly in a realistic environment.
+This directory contains integration tests that run against **real, running servers** to ensure authentic behavior and validate the complete system functionality.
 
-## Test Overview
+## Overview
 
-The integration test suite consists of four main test files, each focusing on different aspects of the system:
+Integration tests use real HTTP requests, real WebSocket connections, and real state changes to validate that the Interactor system works as expected in production-like conditions.
 
-### 1. BackendIntegration.test.ts
-**Core backend functionality and system integration**
+## Prerequisites
 
-- **Module Registration and Discovery**: Tests module discovery, manifest validation, and hot reloading
-- **Message Routing and Signal Flow**: Tests one-to-one, one-to-many, and many-to-one message routing
-- **Trigger and Streaming Events**: Tests event handling and real-time data flow
-- **API Updates and State Management**: Tests configuration updates and state persistence
-- **Error Handling and Recovery**: Tests graceful error handling and system recovery
-- **Performance and Metrics**: Tests system performance under load
-- **System Integration**: Tests complete system lifecycle and concurrent operations
+### Required Servers
 
-### 2. MessageRouting.test.ts
-**Message routing system and middleware**
+Before running integration tests, ensure these servers are running:
 
-- **Complex Routing Patterns**: Tests wildcard patterns, nested patterns, and multiple conditions
-- **Middleware Integration**: Tests middleware chains, error handling, and processing order
-- **Message Queue and Performance**: Tests queue overflow handling and message ordering
-- **Route Management**: Tests dynamic route addition/removal and enabling/disabling
-- **Error Recovery and Resilience**: Tests error recovery and circular route detection
+1. **Backend Server** (Required)
+   - URL: `http://localhost:3001`
+   - Start: `cd backend && npm start`
+   - Must include WebSocket support
 
-### 3. ModuleLifecycle.test.ts
-**Module lifecycle and management**
+2. **Frontend Server** (Optional for API tests)
+   - URL: `http://localhost:5173`
+   - Start: `cd frontend && npm run dev`
 
-- **Module Discovery and Loading**: Tests valid/invalid manifests and duplicate handling
-- **Module Instance Lifecycle**: Tests creation, initialization, and destruction
-- **Hot Reloading**: Tests file watching, module updates, and rapid changes
-- **State Persistence and Recovery**: Tests state saving and restoration
-- **Module Configuration Updates**: Tests runtime configuration changes
-- **Module Dependencies and Loading Order**: Tests dependency resolution
+3. **File Uploader Service** (Optional for API tests)
+   - URL: `http://localhost:4000`
+   - Start: `cd backend && npm run start:uploader`
 
-### 4. APIWebSocket.test.ts
-**REST API and WebSocket communication**
-
-- **REST API Endpoints**: Tests all API endpoints (status, modules, instances, routes, triggers)
-- **WebSocket Communication**: Tests connection handling, authentication, and message validation
-- **Real-time Event Broadcasting**: Tests event broadcasting to multiple clients
-- **Performance and Load Testing**: Tests high load scenarios and concurrent connections
-- **Error Recovery and Resilience**: Tests connection failures and server restart handling
-
-## Running the Tests
-
-### Prerequisites
-
-1. Ensure all dependencies are installed:
-   ```bash
-   cd Tests
-   npm install
-   ```
-
-2. Make sure the backend and shared packages are built:
-   ```bash
-   cd ../backend && npm run build
-   cd ../shared && npm run build
-   ```
-
-### Running All Integration Tests
+### Quick Start
 
 ```bash
-# Run all integration tests with the test runner
-npm run integration
+# Start all servers (if you have the scripts)
+npm run start:servers
 
-# Run with verbose output
-npm run integration:verbose
-
-# Run with coverage
-npm run integration:coverage
-
-# Run in watch mode
-npm run integration:watch
+# Or start them individually
+cd backend && npm start &
+cd frontend && npm run dev &
+cd backend && npm run start:uploader &
 ```
 
-### Running Individual Test Suites
+## Test Files
 
+### API.test.ts
+Tests all HTTP API endpoints with real server communication.
+
+**What it tests:**
+- Health and status endpoints
+- Module management (create, read, update, start, stop)
+- Interaction management (register, update)
+- Manual triggering
+- Settings management
+- Error handling
+- State persistence
+
+**To run:**
 ```bash
-# Run specific test suites
-npm run test:backend    # BackendIntegration.test.ts
-npm run test:routing    # MessageRouting.test.ts
-npm run test:modules    # ModuleLifecycle.test.ts
-npm run test:api        # APIWebSocket.test.ts
+npm run test:integration:api
 ```
 
-### Running All Tests (Unit + Integration)
+### WebSocket.test.ts
+Tests real-time WebSocket communication with the server.
 
+**What it tests:**
+- WebSocket connection establishment
+- Initial state reception
+- State update broadcasting
+- Trigger event broadcasting
+- Multiple concurrent connections
+- Message format validation
+- Error handling
+
+**To run:**
 ```bash
-# Run all tests
-npm run test:all
+npm run test:integration:websocket
+```
 
-# Run all tests with coverage
-npm run test:all:coverage
+## Test Strategy
 
-# Generate and open coverage report
-npm run test:report
+### Real Server Integration
+- Tests communicate with actual running servers
+- Uses real HTTP requests and WebSocket connections
+- Validates actual state changes in the system
+- Tests real error conditions and edge cases
+
+### State Management
+- Tests backup original state before running
+- Clear test data between tests
+- Restore original state after tests complete
+- Clean up running module instances
+
+### Error Handling
+- Tests validate proper error responses
+- Tests handle network failures gracefully
+- Tests verify error message formats
+- Tests ensure system remains stable
+
+## Running Tests
+
+### Individual Test Files
+```bash
+# Run API tests only
+npm run test:integration:api
+
+# Run WebSocket tests only
+npm run test:integration:websocket
+
+# Run all integration tests
+npm run test:integration
+```
+
+### With Coverage
+```bash
+# Run with coverage reporting
+npm run test:integration:coverage
+```
+
+### With Verbose Output
+```bash
+# Run with detailed logging
+npm run test:integration:verbose
+```
+
+### Automated Integration Runner
+```bash
+# Start servers, run tests, shut down (if available)
+npm run test:integration:auto
 ```
 
 ## Test Configuration
 
-### Environment Variables
+### Timeouts
+- Default timeout: 15 seconds per test
+- WebSocket tests: 5-10 second timeouts for message reception
+- State change tests: 5 second timeouts for updates
 
-- `VITEST_VERBOSE=true`: Enable verbose console output
-- `VITEST_UI=true`: Launch the Vitest UI interface
+### Test Data
+- Tests use isolated test data to avoid conflicts
+- Each test cleans up after itself
+- Test data is prefixed with `test-` or `ws-test-`
 
-### Test Timeouts
+### Server Verification
+- Tests verify servers are running before starting
+- Tests provide helpful error messages if servers are unavailable
+- Tests continue with available servers (frontend/uploader optional)
 
-- Individual tests: 30 seconds
-- Setup/teardown hooks: 10 seconds
-- Integration test runner: 5 minutes total
-
-### Test Isolation
-
-Tests run in isolated processes to prevent interference. Each test suite:
-- Creates its own test directories
-- Uses unique port numbers
-- Cleans up after completion
-
-## Test Data and Artifacts
-
-### Generated Directories
-
-- `test-modules/`: Temporary modules for testing
-- `test-modules-lifecycle/`: Modules for lifecycle tests
-- `test-data/`: Test data files
-- `test-logs/`: Test log files
-
-### Output Files
-
-- `test-results.json`: Detailed test results
-- `coverage/`: Code coverage reports
-- `*.log`: Test log files
-
-## Understanding Test Results
-
-### Test Runner Output
-
-The integration test runner provides:
-- **Progress indicators**: Shows which test suite is running
-- **Pass/fail counts**: Number of tests passed and failed
-- **Error details**: Specific error messages for failed tests
-- **Summary report**: Overall success rate and duration
-
-### Coverage Reports
-
-Coverage reports show:
-- **Line coverage**: Percentage of code lines executed
-- **Branch coverage**: Percentage of code branches taken
-- **Function coverage**: Percentage of functions called
-- **Statement coverage**: Percentage of statements executed
-
-## Troubleshooting
+## Debugging
 
 ### Common Issues
 
-1. **Port conflicts**: Tests use ports 3001-3010. Ensure these are available
-2. **File permissions**: Tests create temporary files. Ensure write permissions
-3. **Memory issues**: Large test suites may require more memory
-4. **Timeout errors**: Increase timeout values for slow systems
+1. **Server Not Running**
+   ```
+   Error: Backend server not responding: 500
+   ```
+   **Solution:** Start the backend server first
 
-### Debug Mode
+2. **WebSocket Connection Failed**
+   ```
+   Error: WebSocket connection failed
+   ```
+   **Solution:** Ensure backend has WebSocket support enabled
 
-Run tests in debug mode for more information:
+3. **Test Timeouts**
+   ```
+   Error: No state update received within timeout
+   ```
+   **Solution:** Check server performance, increase timeouts if needed
+
+### Debug Commands
 
 ```bash
-# Enable verbose output
-VITEST_VERBOSE=true npm run integration
+# Run single test with verbose output
+npm run test:integration:api -- --reporter=verbose
 
-# Run specific test with debugging
-VITEST_VERBOSE=true npm run test:backend
+# Run specific test
+npm run test:integration:api -- --grep "GET /health"
+
+# Run with UI
+npm run test:integration:api -- --ui
 ```
 
-### Cleaning Up
+### Manual Testing
 
-Clean up test artifacts:
+You can also test the APIs manually:
 
 ```bash
-npm run test:clean
+# Test health endpoint
+curl http://localhost:3001/health
+
+# Test modules endpoint
+curl http://localhost:3001/api/modules
+
+# Test WebSocket connection
+wscat -c ws://localhost:3001
 ```
 
-## Contributing
+## Test Structure
 
-### Adding New Tests
-
-1. Create test file in appropriate directory
-2. Follow naming convention: `*.test.ts`
-3. Use descriptive test names and descriptions
-4. Include proper setup and teardown
-5. Add to test runner if needed
-
-### Test Best Practices
-
-- **Isolation**: Each test should be independent
-- **Cleanup**: Always clean up resources
-- **Descriptive names**: Use clear, descriptive test names
-- **Error handling**: Test both success and failure scenarios
-- **Performance**: Keep tests fast and efficient
-
-### Test Structure
-
+### API Tests
 ```typescript
-describe('Feature Name', () => {
-  beforeEach(() => {
-    // Setup
+describe('API Integration Tests', () => {
+  beforeAll(async () => {
+    await verifyServersRunning();
+    originalState = await getCurrentState();
   });
 
-  afterEach(() => {
-    // Cleanup
+  afterAll(async () => {
+    await restoreState(originalState);
   });
 
-  it('should do something specific', async () => {
-    // Test implementation
+  beforeEach(async () => {
+    await clearTestData();
   });
+
+  afterEach(async () => {
+    await cleanupTestData();
+  });
+
+  // Test cases...
 });
 ```
 
-## Performance Considerations
+### WebSocket Tests
+```typescript
+describe('WebSocket Integration Tests', () => {
+  let ws: WebSocket;
 
-### Test Optimization
+  beforeEach(async () => {
+    await clearTestData();
+  });
 
-- **Parallel execution**: Tests run in parallel where possible
-- **Resource pooling**: Reuse expensive resources
-- **Mocking**: Mock external dependencies
-- **Caching**: Cache test data where appropriate
+  afterEach(async () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
+    await cleanupTestData();
+  });
 
-### Monitoring
-
-Monitor test performance:
-- Test execution time
-- Memory usage
-- Resource utilization
-- Coverage trends
-
-## Continuous Integration
-
-### CI/CD Integration
-
-The test suite is designed for CI/CD pipelines:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run Integration Tests
-  run: |
-    cd Tests
-    npm run integration
+  // Test cases...
+});
 ```
 
-### Automated Reporting
+## Adding New Tests
 
-- Test results are saved to `test-results.json`
-- Coverage reports are generated automatically
-- Failed tests provide detailed error information
+### API Test Pattern
+```typescript
+test('descriptive test name', async () => {
+  // 1. Setup test data
+  const testData = { /* ... */ };
 
-## Support
+  // 2. Make API call
+  const response = await fetch(`${BACKEND_URL}/api/endpoint`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(testData)
+  });
 
-For issues with the integration test suite:
+  // 3. Validate response
+  expect(response.status).toBe(200);
+  const data = await response.json();
+  expect(data.success).toBe(true);
 
-1. Check the troubleshooting section above
-2. Review test logs in `test-logs/` directory
-3. Run tests in verbose mode for more details
-4. Check the main project documentation
+  // 4. Verify side effects
+  const verifyResponse = await fetch(`${BACKEND_URL}/api/verify`);
+  const verifyData = await verifyResponse.json();
+  expect(verifyData).toMatchObject(expectedData);
+});
+```
 
----
+### WebSocket Test Pattern
+```typescript
+test('receives message when event occurs', (done) => {
+  ws = new WebSocket(WS_URL);
+  
+  ws.on('open', async () => {
+    // Trigger event via HTTP API
+    await fetch(`${BACKEND_URL}/api/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ /* ... */ })
+    });
+  });
+  
+  ws.on('message', (data) => {
+    const message = JSON.parse(data.toString());
+    if (message.type === 'expected_type') {
+      expect(message.data).toMatchObject(expectedData);
+      done();
+    }
+  });
+  
+  // Timeout for safety
+  setTimeout(() => {
+    done(new Error('No message received within timeout'));
+  }, 5000);
+});
+```
 
-**Note**: These integration tests are designed to be comprehensive and may take several minutes to complete. They provide confidence that the entire system works correctly together. 
+## Best Practices
+
+1. **Always clean up** - Tests should not leave state behind
+2. **Use timeouts** - WebSocket tests need timeouts to prevent hanging
+3. **Verify servers** - Check server availability before testing
+4. **Isolate test data** - Use unique IDs to avoid conflicts
+5. **Handle errors gracefully** - Tests should provide helpful error messages
+6. **Test real scenarios** - Focus on actual use cases, not edge cases only
+
+## Troubleshooting
+
+### Server Issues
+- Check server logs for errors
+- Verify ports are not in use
+- Ensure all dependencies are installed
+- Check firewall settings
+
+### Test Issues
+- Increase timeouts if tests are slow
+- Check server performance
+- Verify test data isolation
+- Review error messages for clues
+
+### Network Issues
+- Check localhost connectivity
+- Verify no proxy interference
+- Ensure consistent network environment
+- Test with curl/wscat first 

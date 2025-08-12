@@ -101,8 +101,8 @@ export class ModuleLoader {
         return;
       }
 
-      this.modules.set(moduleName, manifest);
-      this.logger.debug(`Module loaded: ${moduleName}`, 'ModuleLoader');
+      this.modules.set(manifest.name, manifest);
+      this.logger.debug(`Module loaded: ${manifest.name}`, 'ModuleLoader');
 
     } catch (error) {
       this.logger.error(`Error loading module: ${moduleName}`, 'ModuleLoader', { error: String(error) });

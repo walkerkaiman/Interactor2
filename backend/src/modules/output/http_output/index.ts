@@ -11,7 +11,6 @@ import {
   isHttpOutputConfig
 } from '@interactor/shared';
 import { InteractorError } from '../../../core/ErrorHandler';
-import { RetryHandler } from '../../../core/RetryHandler';
 
 export class HttpOutputModule extends OutputModuleBase {
   private url: string;
@@ -19,17 +18,24 @@ export class HttpOutputModule extends OutputModuleBase {
   private headers: Record<string, string>;
   private timeout: number;
   private enabled: boolean;
-  private lastRequest: HttpOutputRequestData | undefined = undefined;
-  private lastError: HttpErrorData | undefined = undefined;
+
+  // Runtime state
+  private lastRequestTime?: number;
+  private lastResponseTime?: number;
+  private lastStatusCode?: number;
+  private lastResponseBody?: string;
+  private lastError?: string;
   private requestCount = 0;
+  private successCount = 0;
   private errorCount = 0;
+  private isRequesting = false;
 
   constructor(config: HttpOutputConfig) {
     // Apply defaults to config before passing to base class
     const configWithDefaults: HttpOutputConfig = {
       ...config,
       method: config.method || 'POST',
-      headers: config.headers || {},
+      headers: config.headers || { 'Content-Type': 'application/json' },
       timeout: config.timeout || 5000,
       enabled: config.enabled !== false
     };
@@ -57,12 +63,12 @@ export class HttpOutputModule extends OutputModuleBase {
           headers: {
             type: 'object',
             description: 'Additional HTTP headers',
-            default: {}
+            default: { 'Content-Type': 'application/json' }
           },
           timeout: {
             type: 'number',
             description: 'Request timeout in milliseconds',
-            minimum: 1000,
+            minimum: 100,
             maximum: 30000,
             default: 5000
           },
@@ -98,140 +104,97 @@ export class HttpOutputModule extends OutputModuleBase {
       ]
     });
 
-    // Set private properties from the config with defaults
+    // Extract configuration
     this.url = configWithDefaults.url;
     this.method = configWithDefaults.method;
-    this.headers = configWithDefaults.headers || {};
+    this.headers = configWithDefaults.headers || { 'Content-Type': 'application/json' };
     this.timeout = configWithDefaults.timeout || 5000;
     this.enabled = configWithDefaults.enabled !== false;
   }
 
   protected async onInit(): Promise<void> {
+    this.logger?.info(`HTTP Output module ${this.id} initializing...`);
+    
     // Validate URL format
     if (!this.isValidUrl(this.url)) {
-      throw InteractorError.validation(
-        `HTTP URL format is invalid`,
-        { provided: this.url, expected: 'http:// or https:// URL' },
-        ['Use "http://localhost:3000/api" for local testing', 'Use "https://api.example.com/webhook" for secure endpoints', 'Include protocol (http:// or https://)']
-      );
+      throw new Error(`Invalid URL format: ${this.url}`);
     }
-
-    // Validate timeout range
-    if (this.timeout < 1000 || this.timeout > 30000) {
-      throw InteractorError.validation(
-        `HTTP timeout must be between 1000-30000 ms`,
-        { provided: this.timeout, min: 1000, max: 30000 },
-        ['Use 5000ms (5 seconds) for most APIs', 'Use 1000ms for fast local requests', 'Use 15000ms for slow external services']
-      );
-    }
-
-    // Validate method
-    if (!['GET', 'POST', 'PUT', 'DELETE'].includes(this.method)) {
-      throw InteractorError.validation(
-        `HTTP method must be GET, POST, PUT, or DELETE`,
-        { provided: this.method, allowed: ['GET', 'POST', 'PUT', 'DELETE'] },
-        ['Use "POST" for sending data to API', 'Use "GET" for retrieving data', 'Use "PUT" for updating resources']
-      );
-    }
+    
+    this.logger?.info(`HTTP Output module ${this.id} initialized with URL: ${this.url}`);
   }
 
   protected async onStart(): Promise<void> {
-    // HTTP output module doesn't need to start anything
-    this.setConnectionStatus(true);
+    this.logger?.info(`HTTP Output module ${this.id} starting...`);
+    this.isConnected = true;
+    this.logger?.info(`HTTP Output module ${this.id} started`);
   }
 
   protected async onStop(): Promise<void> {
-    // HTTP output module doesn't need to stop anything
-    this.setConnectionStatus(false);
+    this.logger?.info(`HTTP Output module ${this.id} stopping...`);
+    this.isConnected = false;
+    this.logger?.info(`HTTP Output module ${this.id} stopped`);
   }
 
   protected async onDestroy(): Promise<void> {
-    // Clean up any pending requests if needed
-    this.setConnectionStatus(false);
+    this.logger?.info(`HTTP Output module ${this.id} destroying...`);
+    this.isConnected = false;
+    this.logger?.info(`HTTP Output module ${this.id} destroyed`);
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
-    // Use type guard to ensure we have HTTP output config
-    if (!isHttpOutputConfig(newConfig)) {
-      throw InteractorError.validation(
-        'Invalid HTTP output configuration provided',
-        { providedConfig: newConfig },
-        ['Check that all required fields are present: url', 'Ensure URL format is valid (http:// or https://)', 'Verify method is one of: GET, POST, PUT, DELETE']
-      );
-    }
+    this.logger?.info(`HTTP Output module ${this.id} config updated`);
     
-    // Validate URL format
-    if (!this.isValidUrl(newConfig.url)) {
-      throw InteractorError.validation(
-        `HTTP URL format is invalid`,
-        { provided: newConfig.url, expected: 'http:// or https:// URL' },
-        ['Use "http://localhost:3000/api" for local testing', 'Use "https://api.example.com/webhook" for secure endpoints', 'Include protocol (http:// or https://)']
-      );
+    // Update local properties
+    if (isHttpOutputConfig(newConfig)) {
+      this.url = newConfig.url;
+      this.method = newConfig.method || 'POST';
+      this.headers = newConfig.headers || { 'Content-Type': 'application/json' };
+      this.timeout = newConfig.timeout || 5000;
+      this.enabled = newConfig.enabled !== false;
+      
+      // Validate new URL
+      if (!this.isValidUrl(this.url)) {
+        throw new Error(`Invalid URL format: ${this.url}`);
+      }
     }
-    
-    this.url = newConfig.url;
-    this.method = newConfig.method || 'POST';
-    this.headers = newConfig.headers || {};
-    this.timeout = newConfig.timeout || 5000;
-    this.enabled = newConfig.enabled !== false;
   }
 
-  /**
-   * Send data with proper typing
-   */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot send HTTP request when module is disabled',
-        { enabled: this.enabled, attempted: 'send' },
-        ['Enable the HTTP module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
-      );
+      this.logger?.warn(`HTTP Output module ${this.id} is disabled, ignoring send request`);
+      return;
     }
+    
     await this.sendHttpRequest(data);
   }
 
-  /**
-   * Handle trigger events with proper typing
-   */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle trigger event when HTTP module is disabled',
-        { enabled: this.enabled, attempted: 'trigger_event' },
-        ['Enable the HTTP module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
-      );
+      this.logger?.warn(`HTTP Output module ${this.id} is disabled, ignoring trigger event`);
+      return;
     }
+    
     await this.sendHttpRequest(event.payload);
   }
 
-  /**
-   * Handle streaming events with proper typing
-   */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle streaming event when HTTP module is disabled',
-        { enabled: this.enabled, attempted: 'streaming_event' },
-        ['Enable the HTTP module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
-      );
+      this.logger?.warn(`HTTP Output module ${this.id} is disabled, ignoring streaming event`);
+      return;
     }
+    
     await this.sendHttpRequest(event.value);
   }
 
-  /**
-   * Handle manual trigger with proper typing
-   */
-  protected async onManualTrigger(): Promise<void> {
+  protected async handleManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot perform manual trigger when HTTP module is disabled',
-        { enabled: this.enabled, attempted: 'manual_trigger' },
-        ['Enable the HTTP module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
-      );
+      this.logger?.warn(`HTTP Output module ${this.id} is disabled, ignoring manual trigger`);
+      return;
     }
     
+    // Send a test payload
     const testData = {
-      message: 'Manual trigger from HTTP output module',
+      type: 'manual_trigger',
       timestamp: Date.now(),
       moduleId: this.id
     };
@@ -239,194 +202,122 @@ export class HttpOutputModule extends OutputModuleBase {
     await this.sendHttpRequest(testData);
   }
 
-  /**
-   * Send HTTP request with proper typing, error handling, and retry logic
-   */
   private async sendHttpRequest<T = unknown>(data: T): Promise<void> {
-    const timestamp = Date.now();
-    
-    // Use retry logic for network requests
-    const { result, attempts } = await RetryHandler.withNetworkRetry(async () => {
-      this.logger?.debug(`Sending HTTP ${this.method} request to ${this.url} (attempt ${attempts || 1})`, data);
-      
-      // Prepare request options
-      const requestOptions: RequestInit = {
-        method: this.method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.headers
-        },
-        signal: AbortSignal.timeout(this.timeout)
-      };
+    if (!this.enabled) {
+      this.logger?.debug('HTTP Output module is disabled');
+      return;
+    }
 
-      // Add body for non-GET requests
-      if (this.method !== 'GET') {
-        requestOptions.body = JSON.stringify(data);
-      }
+    if (this.isRequesting) {
+      this.logger?.debug('HTTP request already in progress, skipping');
+      return;
+    }
 
-      // Send the request
-      const response = await fetch(this.url, requestOptions);
-      const responseText = await response.text();
+    this.isRequesting = true;
+    this.requestCount++;
+    this.lastRequestTime = Date.now();
+
+    try {
+      const requestBody = data ? JSON.stringify(data) : undefined;
       
-      // Create request data object
-      const requestData: HttpOutputRequestData = {
-        url: this.url,
-        method: this.method,
-        status: response.status,
-        response: responseText,
-        timestamp
-      };
-      
-      this.lastRequest = requestData;
-      this.lastSentValue = data;
-      
-      if (response.ok) {
-        // Success response
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+      try {
+        const fetchOptions: RequestInit = {
+          method: this.method,
+          headers: this.headers,
+          signal: controller.signal
+        };
+
+        if (requestBody) {
+          fetchOptions.body = requestBody;
+        }
+
+        const response = await fetch(this.url, fetchOptions);
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const responseBody = await response.text();
+        
+        this.lastResponseTime = Date.now();
+        this.lastStatusCode = response.status;
+        this.lastResponseBody = responseBody;
+        this.lastError = undefined;
+        this.successCount++;
+
+        this.logger?.info(`HTTP request successful: ${response.status} - ${responseBody.substring(0, 100)}`);
+        
+        // Emit success response
         const responsePayload: HttpResponsePayload = {
           url: this.url,
           method: this.method,
           status: response.status,
-          response: responseText,
-          timestamp
+          response: responseBody,
+          timestamp: this.lastResponseTime
         };
         
-        this.requestCount++;
         this.emitOutput<HttpResponsePayload>('httpResponse', responsePayload);
-        this.emitStatus('success', { status: response.status, responseLength: responseText.length });
         
-        this.logger?.info(`HTTP request successful: ${response.status} ${response.statusText}`);
-        return; // Success - exit the retry handler
-      } else {
-        // Error response
-        const errorData: HttpErrorData = {
-          url: this.url,
-          method: this.method,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          timestamp
-        };
-        
-        const errorPayload: HttpErrorPayload = {
-          url: this.url,
-          method: this.method,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          timestamp
-        };
-        
-        this.lastError = errorData;
-        
-        this.emitError(new Error(errorData.error), 'http_request');
-        this.emitOutput<HttpErrorPayload>('httpError', errorPayload);
-        
-        this.logger?.error(`HTTP request failed: ${response.status} ${response.statusText}`, responseText);
-        
-        // Throw proper InteractorError for retry handler to process
-        throw InteractorError.networkError(
-          `HTTP request failed: ${response.status} ${response.statusText}`,
-          new Error(`HTTP ${response.status}: ${response.statusText}`)
-        );
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
       }
-    }, {
-      maxAttempts: this.enabled ? 3 : 1, // Only retry if module is enabled
-      onRetry: (error, attempt, delay) => {
-        this.logger?.warn(`HTTP request retry ${attempt}/3 in ${delay}ms due to: ${error.message}`, 'HttpOutput');
-      }
-    });
       
     } catch (error) {
+      this.lastResponseTime = Date.now();
+      this.lastError = error instanceof Error ? error.message : String(error);
       this.errorCount++;
+
+      this.logger?.error(`HTTP request failed: ${this.lastError}`);
       
-      // Categorize the error for better user experience
-      let interactorError: InteractorError;
-      if (error instanceof InteractorError) {
-        interactorError = error;
-      } else if (error instanceof Error) {
-        if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
-          interactorError = InteractorError.networkError(
-            `Cannot connect to ${this.url}`,
-            error
-          );
-        } else if (error.message.includes('timeout')) {
-          interactorError = InteractorError.networkError(
-            `Request to ${this.url} timed out after ${this.timeout}ms`,
-            error
-          );
-        } else if (error.message.includes('certificate') || error.message.includes('SSL')) {
-          interactorError = new InteractorError(
-            'network_error' as any,
-            `SSL/Certificate error connecting to ${this.url}`,
-            {
-              suggestions: [
-                'Check if the URL uses HTTPS correctly',
-                'Verify the SSL certificate is valid',
-                'Try using HTTP instead of HTTPS for testing'
-              ],
-              retryable: false,
-              cause: error
-            }
-          );
-        } else {
-          interactorError = InteractorError.networkError(
-            `HTTP request failed: ${error.message}`,
-            error
-          );
-        }
-      } else {
-        interactorError = InteractorError.internal(
-          'Unknown HTTP request error',
-          new Error(String(error))
-        );
-      }
-      
-      const errorData: HttpErrorData = {
-        url: this.url,
-        method: this.method,
-        error: interactorError.message,
-        timestamp
-      };
-      
+      // Emit error response
       const errorPayload: HttpErrorPayload = {
         url: this.url,
         method: this.method,
-        error: interactorError.message,
-        timestamp
+        error: this.lastError,
+        timestamp: this.lastResponseTime
       };
       
-      this.lastError = errorData;
-      
-      this.emitError(interactorError, 'http_request');
       this.emitOutput<HttpErrorPayload>('httpError', errorPayload);
       
-      this.logger?.error(`HTTP request error:`, interactorError);
+    } finally {
+      this.isRequesting = false;
       
-      // Re-throw the InteractorError for the calling method to handle
-      throw interactorError;
+      // Emit state update
+      this.emit('stateUpdate', {
+        status: this.isConnected ? 'ready' : 'stopped',
+        requestCount: this.requestCount,
+        successCount: this.successCount,
+        errorCount: this.errorCount,
+        lastRequestTime: this.lastRequestTime,
+        lastResponseTime: this.lastResponseTime,
+        lastStatusCode: this.lastStatusCode,
+        lastResponseBody: this.lastResponseBody,
+        lastError: this.lastError,
+        isRequesting: this.isRequesting
+      });
     }
-    
-    // Emit state update
-    this.emit('stateUpdate', {
-      status: this.isConnected ? 'ready' : 'stopped',
+  }
+
+  protected getRuntimeState(): Record<string, any> {
+    return {
+      lastRequestTime: this.lastRequestTime,
+      lastResponseTime: this.lastResponseTime,
+      lastStatusCode: this.lastStatusCode,
+      lastResponseBody: this.lastResponseBody,
+      lastError: this.lastError,
       requestCount: this.requestCount,
+      successCount: this.successCount,
       errorCount: this.errorCount,
-      lastRequest: this.lastRequest,
-      lastError: this.lastError
-    });
+      isRequesting: this.isRequesting
+    };
   }
 
-  /**
-   * Validate URL format with proper return type
-   */
-  private isValidUrl(url: string): boolean {
-    try {
-      new URL(url);
-      return url.startsWith('http://') || url.startsWith('https://');
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get configuration with proper return type
-   */
   public getConfig(): HttpOutputConfig {
     return {
       url: this.url,
@@ -437,9 +328,6 @@ export class HttpOutputModule extends OutputModuleBase {
     };
   }
 
-  /**
-   * Get module state with proper return type
-   */
   public getState(): {
     id: string;
     status: 'initializing' | 'running' | 'stopped' | 'error';
@@ -456,18 +344,20 @@ export class HttpOutputModule extends OutputModuleBase {
     };
   }
 
-  /**
-   * Get detailed state for testing purposes
-   */
   public getDetailedState(): {
     url: string;
     method: 'GET' | 'POST' | 'PUT' | 'DELETE';
     enabled: boolean;
     isConnected: boolean;
-    lastRequest: HttpOutputRequestData | undefined;
-    lastError: HttpErrorData | undefined;
+    lastRequestTime?: number;
+    lastResponseTime?: number;
+    lastStatusCode?: number;
+    lastResponseBody?: string;
+    lastError?: string;
     requestCount: number;
+    successCount: number;
     errorCount: number;
+    isRequesting: boolean;
     status: string;
   } {
     return {
@@ -475,44 +365,66 @@ export class HttpOutputModule extends OutputModuleBase {
       method: this.method,
       enabled: this.enabled,
       isConnected: this.isConnected,
-      lastRequest: this.lastRequest,
+      lastRequestTime: this.lastRequestTime,
+      lastResponseTime: this.lastResponseTime,
+      lastStatusCode: this.lastStatusCode,
+      lastResponseBody: this.lastResponseBody,
       lastError: this.lastError,
       requestCount: this.requestCount,
+      successCount: this.successCount,
       errorCount: this.errorCount,
+      isRequesting: this.isRequesting,
       status: this.isConnected ? 'ready' : 'stopped'
     };
   }
 
-  /**
-   * Reset counters
-   */
   public reset(): void {
     this.requestCount = 0;
+    this.successCount = 0;
     this.errorCount = 0;
-    this.lastRequest = undefined;
+    this.lastRequestTime = undefined;
+    this.lastResponseTime = undefined;
+    this.lastStatusCode = undefined;
+    this.lastResponseBody = undefined;
     this.lastError = undefined;
+    this.isRequesting = false;
+    
     this.emit('stateUpdate', {
       status: this.isConnected ? 'ready' : 'stopped',
       requestCount: this.requestCount,
+      successCount: this.successCount,
       errorCount: this.errorCount
     });
   }
 
-  /**
-   * Test connection with proper return type
-   */
   public async testConnection(): Promise<boolean> {
     if (!this.enabled) {
       return false;
     }
     
     try {
-      const testData = { test: true, timestamp: Date.now() };
+      const testData = {
+        type: 'connection_test',
+        timestamp: Date.now(),
+        moduleId: this.id
+      };
+      
       await this.sendHttpRequest(testData);
       return true;
     } catch (error) {
-      this.logger?.error('Connection test failed:', error);
+      this.logger?.error(`Connection test failed:`, error);
       return false;
     }
   }
-} 
+
+  private isValidUrl(url: string): boolean {
+    try {
+      new URL(url);
+      return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+      return false;
+    }
+  }
+}
+
+export default HttpOutputModule; 

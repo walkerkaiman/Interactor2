@@ -79,6 +79,15 @@ await this.syncInteractionsWithModules(); // Sync related data
 this.broadcastStateUpdate();
 ```
 
+### **6. Event remapping at registration time**
+```typescript
+// ❌ BAD - Remapping route.event to target input event breaks matching
+route.event = outputManifest.events[0].name;
+
+// ✅ GOOD - Preserve the source event name as declared in the route
+route.event remains the event emitted by the source (e.g., 'timeTrigger')
+```
+
 ---
 
 ## ✅ **Encouraged Patterns** (AI-Friendly)
@@ -148,6 +157,15 @@ protected async onStop(): Promise<void> {
   if (this.timer) clearInterval(this.timer);
 }
 ```
+
+### **Router & Instance Registry**
+- The server maintains a live instance registry (map of `moduleId` → instance). Use it for wiring.
+- Router matches by `{ source, event }`. The server forwards to outputs by `moduleId` using `onTriggerEvent`/`onStreamingEvent`.
+- Do not fetch instances from `ModuleLoader` (it handles manifests only).
+
+### **Validation at Register**
+- Validate interaction maps before commit: unique ids, manifests exist, routes reference valid ids, source emits `route.event`.
+- Return structured `InteractorError.validation` with suggestions.
 
 ---
 

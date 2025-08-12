@@ -259,7 +259,7 @@ export interface TimeInputConfig extends ModuleConfig {
   enabled?: boolean;
   /** Enable WebSocket API for external time sources */
   apiEnabled?: boolean;
-  /** WebSocket endpoint for external time API (e.g., wss://api.example.com/time) */
+  /** WebSocket endpoint for external time API */
   apiEndpoint?: string;
 }
 

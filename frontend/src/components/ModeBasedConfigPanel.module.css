@@ -1,0 +1,144 @@
+.configPanel {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.primarySettings {
+  margin-bottom: 16px;
+}
+
+.secondarySettings {
+  border-top: 1px solid #e9ecef;
+  padding-top: 16px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.configField {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #212529;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fieldDescription {
+  font-size: 11px;
+  color: #6c757d;
+  font-weight: normal;
+  font-style: italic;
+}
+
+.textInput,
+.numberInput,
+.select {
+  padding: 6px 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.textInput:focus,
+.numberInput:focus,
+.select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.toggleButton {
+  background: #e9ecef;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.toggleButton:hover {
+  background: #dee2e6;
+  border-color: #adb5bd;
+}
+
+.toggleButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.secondaryFields {
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+/* Primary settings styling */
+.primarySettings .configField {
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.primarySettings .fieldLabel {
+  color: #212529;
+  font-weight: 600;
+}
+
+/* Secondary settings styling */
+.secondaryFields .configField {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 6px;
+}
+
+.secondaryFields .fieldLabel {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.secondaryFields .fieldDescription {
+  color: #adb5bd;
+}
+
+/* Mode-specific styling */
+.configField[data-mode="clock"] .fieldLabel {
+  color: #28a745;
+}
+
+.configField[data-mode="metronome"] .fieldLabel {
+  color: #007bff;
+} 

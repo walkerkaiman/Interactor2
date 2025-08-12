@@ -56,9 +56,9 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
   };
 
   return (
-    <div className={styles.sidebar}>
+    <div className={styles.sidebar} data-testid="sidebar">
       <div className={styles.header}>
-        <button className={styles.titleButton} onClick={cycleToNextPage}>
+        <button className={styles.titleButton} onClick={cycleToNextPage} data-testid="title-button">
           <h2 className={styles.title}>{getPageTitle(currentPage)}</h2>
           <span className={styles.cycleIndicator}>↻</span>
         </button>
@@ -73,6 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
               <div
                 key={module.name}
                 className={styles.moduleCard}
+                data-testid="module-card"
                 draggable
                 onDragStart={(e) => handleDragStart(e, module)}
               >
@@ -98,6 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
               <div
                 key={module.name}
                 className={styles.moduleCard}
+                data-testid="module-card"
                 draggable
                 onDragStart={(e) => handleDragStart(e, module)}
               >

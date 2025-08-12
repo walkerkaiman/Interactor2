@@ -11,6 +11,7 @@ Documentation is now organized into two main categories:
 ### 🤖 **For AI Agents** (`documentation/ai/`)
 - [**AI Agent Start Here**](ai/AI_AGENT_START_HERE.md) - Essential onboarding for AI development
 - [**AI Quick Reference**](ai/AI_QUICK_REFERENCE.md) - Copy-paste templates and common patterns  
+- [**AI Frontend Development Guide**](ai/AI_FRONTEND_DEVELOPMENT_GUIDE.md) - **NEW**: Strict frontend development rules and patterns
 - [**Template Input Module**](ai/TEMPLATE_INPUT_MODULE.md) - Complete input module template
 - [**Template Output Module**](ai/TEMPLATE_OUTPUT_MODULE.md) - Complete output module template
 - [**AI-Friendly Architecture Rules**](ai/AI_FRIENDLY_ARCHITECTURE_RULES.md) - Guidelines for maintainable code

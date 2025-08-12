@@ -23,6 +23,13 @@
   stroke: #059669 !important;
 }
 
+/* Selected edge styles */
+.selectedEdge {
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
 /* Edge label styles */
 .edgeLabel {
   position: absolute;

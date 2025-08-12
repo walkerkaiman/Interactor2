@@ -18,9 +18,10 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
   constructor(
     name: string, 
     config: ModuleConfig, 
-    manifest: ModuleManifest
+    manifest: ModuleManifest,
+    id?: string
   ) {
-    super(name, config, manifest);
+    super(name, config, manifest, id);
   }
 
   /**

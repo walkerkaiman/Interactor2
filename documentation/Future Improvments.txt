@@ -1,0 +1,189 @@
+Future Improvements – Design Document
+
+Overview
+This document specifies two backend-first features to enhance interactivity and offline operations. It is written for an autonomous AI agent to implement safely in background mode, following existing architecture and conventions.
+
+Features
+1) NAS Library Integration (Local Network Share)
+2) Scenes: Save/Load Interaction Configurations
+
+====================================================
+1) NAS Library Integration (Local Network Share)
+====================================================
+Goal
+- Allow the backend to browse read-only network shares (NAS) on the local network and import files into module-specific storage (initially Audio Output).
+- Keep the backend the source of truth; frontend remains a thin UI.
+
+Assumptions & Constraints
+- All machines are on the same LAN; NAS is reachable via UNC paths on Windows (e.g., \\NAS\media\audio) or mounted paths on Linux.
+- The backend process runs under a user account that already has permission to access NAS paths (no credentials handling in app).
+- Read-only access to NAS; files are COPIED/IMPORTED into backend-managed assets.
+
+Configuration (config/system.json)
+- Add a new `nas` section. Do not break existing keys.
+{
+  "nas": {
+    "enabled": true,
+    "roots": [
+      { "name": "main-audio", "path": "\\\\NAS\\media\\audio" }
+    ],
+    "scanIntervalMs": 60000,
+    "cacheDir": "backend/data/library/audio",
+    "watch": false,
+    "maxListingPage": 500
+  }
+}
+- Notes:
+  - Use escaped backslashes for UNC paths in JSON.
+  - `roots[].name` is a short identifier; `path` must be absolute.
+  - `cacheDir` is for optional index caches; not required for MVP.
+  - `watch` enables chokidar-based indexing (optional).
+
+Service: NasLibraryService
+- File: `backend/src/services/NasLibraryService.ts`
+- Responsibilities:
+  - Validate configured roots on startup (`exists`, `isDirectory`).
+  - List files in a root/subfolder with optional filters (extension whitelist, size, page).
+  - Stream-copy a selected NAS file into a module’s storage.
+  - Optional: maintain a simple cache/index to accelerate listings.
+- API (internal methods):
+  - `listRoots(): { name: string; path: string; reachable: boolean }[]`
+  - `listFiles(rootName: string, sub?: string, opts?: { exts?: string[]; page?: number; pageSize?: number }): Promise<{ files: string[]; total: number; root: string; sub: string }>`
+  - `importToModule(rootName: string, relativePath: string, moduleType: 'audio-output' | string): Promise<{ filename: string; size: number; savedPath: string; timestamp: number }>`
+- Implementation notes:
+  - Prevent path traversal: normalize and ensure `resolvedPath.startsWith(rootPath)`.
+  - Use Node streams for copying (fs.createReadStream → fs.createWriteStream) with backpressure.
+  - Validate extension against target module’s allowedExtensions before import.
+  - On error, throw `InteractorError.validation` or `.moduleError('nas_import', err)` with suggestions.
+
+Storage Integration (Audio Output)
+- Extend `backend/src/modules/output/audio_output/storage/LocalFileSystemStorage.ts`:
+  - Add `importFromPath(srcAbsolutePath: string): Promise<SavedFilePayload>`
+    - Validate ext + size against existing checks.
+    - Reuse naming/sanitization; optionally dedupe via hash (future flag).
+
+Backend API Endpoints
+- Add routes in `backend/src/index.ts`:
+  - `GET /api/nas/roots` → list configured roots and reachability.
+  - `GET /api/nas/list?root=<name>&sub=<subfolder>&ext=wav&ext=mp3&page=1&pageSize=200`
+    - Returns paginated list and totals.
+  - `POST /api/nas/copy` JSON body:
+    {
+      "root": "main-audio",
+      "subPath": "fx/alert.wav",
+      "moduleType": "audio-output"
+    }
+    - Copies file into module assets; returns `SavedFilePayload` from storage.
+- Security & Limits:
+  - Only available when `nas.enabled` is true.
+  - Enforce extension whitelist and max page size (`nas.maxListingPage`).
+  - Return `InteractorError.validation` with clear guidance on misconfig.
+
+Platform Notes
+- Windows: UNC paths require the service account to have credentials; do not implement credential prompts.
+- Linux/macOS: use mounted paths; same logic.
+
+Performance & Reliability
+- Large directories: paginate; avoid recursive deep scans by default.
+- Optional watcher: when `nas.watch=true`, index changes with chokidar into a lightweight cache (feature-flagged; safe to defer).
+- Logging/metrics: add counters for listing/copy ops; include durations.
+
+Smoke Testing
+- Precondition: place a small .wav on NAS under a configured root.
+- Steps:
+  - GET `/api/nas/roots` → `reachable: true` for root.
+  - GET `/api/nas/list?root=main-audio&ext=wav&page=1&pageSize=50` → file appears.
+  - POST `/api/nas/copy` with that file → payload shows imported filename under audio assets.
+  - Use Time→Audio route to play it; observe `audioOutput` runtime events.
+
+Implementation Order (NAS)
+1) Add config keys and plumb into server init (validate). 2) Implement NasLibraryService. 3) Extend LocalFileSystemStorage.importFromPath. 4) Add /api endpoints. 5) Logs/metrics. 6) Docs update.
+
+====================================================
+2) Scenes: Save/Load Interaction Configurations
+====================================================
+Goal
+- Snapshot the current interaction map (modules + routes) to a named file and load it later atomically. Provide dry-run validation and rollback on failure.
+
+Data Model
+- Scene file path: `config/interactions/<name>.json`
+- Format (reuse InteractionConfig[] payload):
+{
+  "name": "evening-show",
+  "version": "1.0.0",
+  "created": "2025-08-12T20:00:00Z",
+  "interactions": [ InteractionConfig, ... ]
+}
+- Include only module configs and routes. Exclude runtime fields (status, lastUpdate, currentTime, etc.).
+
+Backend API Endpoints
+- `GET /api/scenes` → list available scene names + metadata (read from files).
+- `POST /api/scenes/save` { name: string, overwrite?: boolean }
+  - Reads current `StateManager.getInteractions()`; filters out runtime fields; writes file.
+- `POST /api/scenes/load` { name: string, startInputs?: boolean, dryRun?: boolean }
+  - Flow:
+    1) Read file → parse → validate manifests/ids/routes (reuse interaction validation).
+    2) If `dryRun=true`: return report only. Don’t mutate state.
+    3) Else, snapshot current state; clear routes; replace interactions in StateManager.
+    4) Create live instances for all modules (inputs + outputs); wire router; if `startInputs`, start input instances where `config.enabled !== false`.
+    5) On failure at any step: rollback to snapshot; return error.
+- `DELETE /api/scenes/:name` (optional housekeeping).
+
+Validation Details
+- Unique module ids within scene. Manifests exist for `moduleName`. Routes reference ids within same interaction. `route.event` exists on source manifest (type: output). Provide `InteractorError.validation` suggestions on mismatch.
+
+Server Integration
+- File: `backend/src/index.ts`
+- Add methods:
+  - `private async saveScene(name: string, overwrite=false)`
+  - `private async loadScene(name: string, opts: { startInputs?: boolean, dryRun?: boolean })`
+- Use/extend existing helpers from the TODO plan: `ensureLiveInstance`, `startInstance`, `setupTriggerEventListeners`, `syncInteractionsWithModules`.
+
+WebSocket Notifications
+- On successful load:
+  - Broadcast `state_update` with new interactions.
+  - Optionally emit `scene_loaded` event `{ name, timestamp }` for UI consumption.
+
+Rollback Strategy
+- Before mutating, snapshot `{ interactions, modules }` from StateManager. If a create/start/wire step throws, restore snapshot and re-broadcast `state_update`.
+
+Safety & Naming Rules
+- Scene name constraints: `[a-zA-Z0-9-_]{1,64}`. Reject others.
+- If `overwrite=false` and file exists, return validation error with suggestion to set `overwrite=true`.
+
+CLI/HTTP Examples
+- Save current scene:
+  - `POST /api/scenes/save` { "name": "evening-show", "overwrite": true }
+- Dry-run load:
+  - `POST /api/scenes/load` { "name": "evening-show", "dryRun": true }
+- Load and start inputs:
+  - `POST /api/scenes/load` { "name": "evening-show", "startInputs": true }
+
+Smoke Testing
+- Create a minimal Time→Audio interaction and save as `metronome-demo`.
+- Dry-run load; expect a valid report.
+- Load with `startInputs: true`; verify router stats increment and audio output receives events.
+
+Implementation Order (Scenes)
+1) Define file format and validate naming. 2) Implement save/load endpoints and server helpers. 3) Integrate validation and rollback. 4) WS notifications. 5) Docs update.
+
+References to Existing Code
+- Module manifests: `backend/src/core/ModuleLoader.ts`
+- Server lifecycle and routes: `backend/src/index.ts`
+- Base classes & events: `backend/src/modules/InputModuleBase.ts`, `backend/src/modules/OutputModuleBase.ts`
+- Audio storage: `backend/src/modules/output/audio_output/storage/LocalFileSystemStorage.ts`
+- Shared types: `shared/src/types/index.ts`, `shared/src/types/modules.ts`
+
+Acceptance Criteria
+- NAS
+  - Configured roots show reachable=true when online.
+  - Listing returns paginated files; copy/import succeeds and file becomes playable by Audio Output.
+- Scenes
+  - Save produces a file excluding runtime fields.
+  - Dry-run returns validation report; load swaps interactions atomically and wires modules; rollback works on error.
+
+Operational Notes for Background AI Agent
+- Always back up `backend/data/state.json` before scene load.
+- Default to `dryRun` first; only proceed to actual load if validation passes.
+- Do not store credentials; assume OS-level access to NAS.
+- Respect existing logging and error patterns (`InteractorError`).

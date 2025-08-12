@@ -1,112 +1,136 @@
-import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { EventEmitter } from 'events';
-import { existsSync, mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { expect, vi, beforeAll, afterAll } from 'vitest';
 import '@testing-library/jest-dom';
 
-// React testing setup
-import React from 'react';
-import { render } from '@testing-library/react';
-
-// Increase event emitter limit for tests
-EventEmitter.defaultMaxListeners = 50;
-
-// Global test timeout
-beforeAll(() => {
-  // Set up any global test configuration
-  console.log('🧪 Setting up test environment...');
-  
-  // Create test directories if they don't exist
-  const testDirs = [
-    'test-modules',
-    'test-modules-lifecycle',
-    'test-data',
-    'test-logs'
-  ];
-
-  for (const dir of testDirs) {
-    const fullPath = join(__dirname, dir);
-    if (!existsSync(fullPath)) {
-      mkdirSync(fullPath, { recursive: true });
-    }
-  }
+// Mock React and React DOM for frontend tests
+vi.mock('react', () => {
+  const originalReact = vi.importActual('react');
+  return {
+    ...originalReact,
+    useState: vi.fn(),
+    useEffect: vi.fn(),
+    useCallback: vi.fn(),
+    useRef: vi.fn(),
+    useMemo: vi.fn(),
+  };
 });
 
-afterAll(() => {
-  // Clean up any global test resources
-  console.log('🧹 Cleaning up test environment...');
-  
-  // Clean up test directories
-  const testDirs = [
-    'test-modules',
-    'test-modules-lifecycle',
-    'test-data',
-    'test-logs'
-  ];
+vi.mock('react-dom', () => {
+  const originalReactDom = vi.importActual('react-dom');
+  return {
+    ...originalReactDom,
+  };
+});
 
-  for (const dir of testDirs) {
-    const fullPath = join(__dirname, dir);
-    if (existsSync(fullPath)) {
-      rmSync(fullPath, { recursive: true, force: true });
-    }
-  }
+// Global test setup
+beforeAll(() => {
+  // Set up test environment variables
+  process.env.NODE_ENV = 'test';
+  process.env.PORT = '3001';
+  process.env.WS_PORT = '3002';
+  process.env.UPLOAD_PORT = '4000';
+});
+
+// Global test teardown
+afterAll(() => {
+  // Clean up any global resources
 });
 
 // Mock console methods to reduce noise in tests
-const originalConsole = { ...console };
-beforeAll(() => {
-  // Only mock console in non-verbose mode
-  if (process.env.VITEST_VERBOSE !== 'true') {
-    console.log = vi.fn();
-    console.warn = vi.fn();
-    console.error = vi.fn();
+global.console = {
+  ...console,
+  log: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
+
+// Mock process.exit to prevent tests from actually exiting
+const originalExit = process.exit;
+process.exit = vi.fn() as any;
+
+// Restore process.exit after tests
+afterAll(() => {
+  process.exit = originalExit;
+});
+
+// Test utilities
+export const createMockLogger = () => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+});
+
+export const createMockStateManager = () => ({
+  getState: vi.fn(),
+  setState: vi.fn(),
+  updateState: vi.fn(),
+  getModuleInstances: vi.fn(),
+  getInteractions: vi.fn(),
+  updateInteractions: vi.fn(),
+});
+
+export const createMockMessageRouter = () => ({
+  routeMessage: vi.fn(),
+  broadcastMessage: vi.fn(),
+  addRoute: vi.fn(),
+  removeRoute: vi.fn(),
+});
+
+export const createMockSystemStats = () => ({
+  getStats: vi.fn(),
+  startMonitoring: vi.fn(),
+  stopMonitoring: vi.fn(),
+});
+
+// Test data factories
+export const createTestModuleConfig = (overrides = {}) => ({
+  id: 'test-module-1',
+  type: 'test_input',
+  config: {
+    enabled: true,
+    ...overrides
   }
 });
 
-afterAll(() => {
-  console.log = originalConsole.log;
-  console.warn = originalConsole.warn;
-  console.error = originalConsole.error;
+export const createTestInteraction = (overrides = {}) => ({
+  id: 'test-interaction-1',
+  triggers: ['test-trigger'],
+  actions: ['test-action'],
+  ...overrides
 });
 
-// Global test utilities
-export const testUtils = {
-  // React testing utilities
-  renderWithProviders: (component: React.ReactElement) => {
-    return render(component);
-  },
-  
-  // Create a temporary test module
-  createTestModule: (name: string, manifest: any) => {
-    const moduleDir = join(__dirname, 'test-modules', name);
-    if (!existsSync(moduleDir)) {
-      mkdirSync(moduleDir, { recursive: true });
-    }
+// Async test utilities
+export const waitFor = (condition: () => boolean, timeout = 5000) => {
+  return new Promise<void>((resolve, reject) => {
+    const startTime = Date.now();
     
-    const manifestPath = join(moduleDir, 'manifest.json');
-    require('fs').writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    const check = () => {
+      if (condition()) {
+        resolve();
+      } else if (Date.now() - startTime > timeout) {
+        reject(new Error(`Timeout waiting for condition after ${timeout}ms`));
+      } else {
+        setTimeout(check, 10);
+      }
+    };
     
-    return moduleDir;
-  },
-  
-  // Clean up test module
-  cleanupTestModule: (name: string) => {
-    const moduleDir = join(__dirname, 'test-modules', name);
-    if (existsSync(moduleDir)) {
-      rmSync(moduleDir, { recursive: true, force: true });
-    }
-  },
-  
-  // Wait for async operations
-  wait: (ms: number) => new Promise(resolve => setTimeout(resolve, ms)),
-  
-  // Generate unique test ID
-  generateTestId: () => `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    check();
+  });
 };
 
-// Global test configuration
-export const testConfig = {
-        server: { port: 3003, host: 'localhost' },
-  logging: { level: 'debug', file: 'test.log' },
-  modules: { autoLoad: false, hotReload: false }
+// Network test utilities
+export const createTestServer = async (app: any, port = 3001) => {
+  return new Promise<{ server: any; url: string }>((resolve) => {
+    const server = app.listen(port, () => {
+      resolve({ server, url: `http://localhost:${port}` });
+    });
+  });
+};
+
+export const closeTestServer = (server: any) => {
+  return new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
 }; 

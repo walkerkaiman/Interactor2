@@ -7,12 +7,9 @@ import { WsClient } from './WsClient';
 import { convertTo12Hour, convertTo24Hour } from './DisplayFormatter';
 
 export class TimeInputModule extends InputModuleBase {
-  private intervalId?: NodeJS.Timeout;
-  private metronomeIntervalId?: NodeJS.Timeout;
   private engine: TimeEngine;
   private wsClient?: WsClient;
-  private displayUpdateIntervalId?: NodeJS.Timeout;
-  private targetTime: string;
+  private targetTime?: string;
   private enabled: boolean;
   private currentTime: string = '';
   private countdown: string = '';
@@ -31,7 +28,7 @@ export class TimeInputModule extends InputModuleBase {
   private apiEndpoint?: string;
   private externalId?: string; // Store external ID for state updates
 
-  constructor(config: TimeInputConfig, externalId?: string) {
+  constructor(config: TimeInputConfig, id?: string) {
     super('time_input', config, {
       name: 'Time Input',
       type: 'input',
@@ -99,20 +96,28 @@ export class TimeInputModule extends InputModuleBase {
           description: 'Emitted when WebSocket API connection is lost'
         }
       ]
-    });
+    }, id);
 
-    this.targetTime = config.targetTime || '12:00 PM';
-    this.enabled = config.enabled !== false;
-    this.timeMode = config.mode || 'clock';
-    this.millisecondDelay = config.millisecondDelay || 1000;
+    // Ensure config is not undefined
+    const safeConfig = config || {};
+    
+    this.enabled = safeConfig.enabled !== false;
+    this.timeMode = safeConfig.mode || 'clock';
+    this.millisecondDelay = safeConfig.millisecondDelay || 1000;
+    // Set targetTime only for clock mode, undefined for metronome
+    if (this.timeMode === 'clock') {
+      this.targetTime = safeConfig.targetTime || '12:00 PM';
+    } else {
+      this.targetTime = undefined;
+    }
     // StateManager access removed - using proper event emission instead
     
     // WebSocket configuration
-    this.apiEnabled = config.apiEnabled || false;
-    this.apiEndpoint = config.apiEndpoint;
+    this.apiEnabled = safeConfig.apiEnabled || false;
+    this.apiEndpoint = safeConfig.apiEndpoint;
     
     // Store external ID if provided
-    this.externalId = externalId;
+    this.externalId = id;
 
     // Create engine instance
     this.engine = new TimeEngine({
@@ -150,7 +155,7 @@ export class TimeInputModule extends InputModuleBase {
     // Validate configuration first
     if (this.timeMode === 'clock') {
       // Validate time format for clock mode
-      if (!this.isValidTimeFormat(this.targetTime)) {
+      if (!this.isValidTimeFormat(this.targetTime || '')) {
         throw InteractorError.validation(
           `Invalid time format: ${this.targetTime}`,
           { provided: this.targetTime, expected: '12-hour format' },
@@ -230,7 +235,7 @@ export class TimeInputModule extends InputModuleBase {
     
     if (newTimeConfig.targetTime !== this.targetTime) {
       this.targetTime = newTimeConfig.targetTime || this.targetTime;
-      if (this.timeMode === 'clock' && !this.isValidTimeFormat(this.targetTime)) {
+      if (this.timeMode === 'clock' && !this.isValidTimeFormat(this.targetTime || '')) {
         throw InteractorError.validation(
           `Invalid time format: ${this.targetTime}`,
           { provided: this.targetTime, expected: '12-hour format' },
@@ -272,39 +277,22 @@ export class TimeInputModule extends InputModuleBase {
       }
     }
     
-    // CRITICAL: Notify core system about configuration changes
-    // This ensures the frontend receives the updated state
-    this.emitStateUpdate();
+    // Emit configuration update using the standardized method
+    this.emitConfigUpdate();
   }
   
   /**
    * Emit current module state - called after config changes and periodic updates
    */
   private emitStateUpdate(): void {
-    const moduleId = this.externalId ?? this.id;
-    const stateUpdate = {
-      id: moduleId,
-      moduleName: 'Time Input', // Use the display name that frontend expects
-      status: this.enabled ? (this.isRunning ? 'running' : 'ready') : 'stopped',
-      mode: this.timeMode,
+    // Use the standardized runtime state update method
+    // This prevents overwriting user's unregistered configuration changes
+    this.emitRuntimeStateUpdate({
       currentTime: this.currentTime,
       countdown: this.countdown,
-      targetTime: this.targetTime,
-      targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
-      millisecondDelay: this.millisecondDelay,
-      enabled: this.enabled,
-      apiEnabled: this.apiEnabled,
-      apiEndpoint: this.apiEndpoint,
-      lastUpdate: Date.now()
-    };
+    });
 
-    this.logger?.info(`Time Input ${moduleId}: Emitting state update - currentTime = ${this.currentTime}, countdown = ${this.countdown}`);
-    
-    // Emit state update event for core system to handle
-    this.emit('stateUpdate', stateUpdate);
-    
-    // Also emit moduleStateChanged for real-time updates
-    this.emit('moduleStateChanged', stateUpdate);
+    this.logger?.info(`Time Input ${this.id}: Emitting runtime state update - currentTime = ${this.currentTime}, countdown = ${this.countdown}`);
   }
 
   protected handleInput(data: any): void {
@@ -354,128 +342,6 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   /**
-   * Start metronome mode
-   */
-  private startMetronome(): void {
-    if (this.metronomeIntervalId) {
-      clearInterval(this.metronomeIntervalId);
-    }
-    if (this.displayUpdateIntervalId) {
-      clearInterval(this.displayUpdateIntervalId);
-    }
-
-    this.logger?.info(`Starting metronome with ${this.millisecondDelay}ms delay`);
-    
-    // Update display immediately
-    this.updateTimeDisplay();
-    
-    // Emit initial trigger
-    this.emitTrigger('timeTrigger', {
-      mode: 'metronome',
-      millisecondDelay: this.millisecondDelay,
-      currentTime: new Date().toISOString(),
-      timestamp: Date.now()
-    });
-
-    // Set up interval for metronome pulses
-    this.metronomeIntervalId = setInterval(() => {
-      if (!this.enabled || this.timeMode !== 'metronome') {
-        this.stopMetronome();
-        return;
-      }
-      
-      this.updateTimeDisplay(); // Update display before emitting trigger
-      
-      this.emitTrigger('timeTrigger', {
-        mode: 'metronome',
-        millisecondDelay: this.millisecondDelay,
-        currentTime: new Date().toISOString(),
-        timestamp: Date.now()
-      });
-    }, this.millisecondDelay);
-    
-    // Set up a separate interval for more frequent display updates
-    const updateInterval = Math.min(1000, Math.floor(this.millisecondDelay / 4)); // Update at least every second, or 1/4 of the delay
-    this.displayUpdateIntervalId = setInterval(() => {
-      if (this.enabled && this.timeMode === 'metronome') {
-        this.updateTimeDisplay();
-      }
-    }, updateInterval);
-  }
-
-  /**
-   * Stop metronome mode
-   */
-  private stopMetronome(): void {
-    if (this.metronomeIntervalId) {
-      clearInterval(this.metronomeIntervalId);
-      this.metronomeIntervalId = undefined as any;
-    }
-    if (this.displayUpdateIntervalId) {
-      clearInterval(this.displayUpdateIntervalId);
-      this.displayUpdateIntervalId = undefined as any;
-    }
-  }
-
-  /**
-   * Start checking for target time (Clock mode)
-   */
-  private startTimeCheck(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-    }
-    if (this.displayUpdateIntervalId) {
-      clearInterval(this.displayUpdateIntervalId);
-    }
-
-    // Update display immediately
-    this.updateTimeDisplay();
-
-    // Check every second
-    this.intervalId = setInterval(() => {
-      this.updateTimeDisplay();
-      
-      if (this.enabled && this.timeMode === 'clock' && this.checkTime()) {
-        this.emitTrigger('timeTrigger', {
-          mode: 'clock',
-          targetTime: this.targetTime,
-          currentTime: new Date().toISOString(),
-          timestamp: Date.now()
-        });
-      }
-    }, 1000);
-    
-    // Set up a separate interval for more frequent display updates
-    this.displayUpdateIntervalId = setInterval(() => {
-      if (this.enabled && this.timeMode === 'clock') {
-        this.updateTimeDisplay();
-      }
-    }, 1000);
-  }
-
-  /**
-   * Stop checking for target time
-   */
-  private stopTimeCheck(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = undefined as any;
-    }
-  }
-
-  /**
-   * Check if current time matches target time (Clock mode)
-   */
-  private checkTime(): boolean {
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    // Convert target time to 24-hour format for comparison
-    const targetTime24 = this.convertTo24Hour(this.targetTime);
-    return currentTime === targetTime24;
-  }
-
-  /**
    * Validate time format (12-hour format)
    */
   private isValidTimeFormat(time: string): boolean {
@@ -497,12 +363,12 @@ export class TimeInputModule extends InputModuleBase {
   } {
     return {
       mode: this.timeMode,
-      targetTime: this.targetTime,
+      targetTime: this.targetTime || '',
       millisecondDelay: this.millisecondDelay,
       enabled: this.enabled,
       currentTime: this.currentTime,
       countdown: this.countdown,
-      targetTime12Hour: this.convertTo12Hour(this.targetTime)
+      targetTime12Hour: this.convertTo12Hour(this.targetTime || '')
     };
   }
 
@@ -537,7 +403,7 @@ export class TimeInputModule extends InputModuleBase {
     // Calculate countdown based on mode
     if (this.timeMode === 'clock') {
       // Calculate countdown to target time
-      const targetTime24 = this.convertTo24Hour(this.targetTime);
+      const targetTime24 = this.convertTo24Hour(this.targetTime || '');
       const parts = targetTime24.split(':').map(Number);
       const targetHours = parts[0];
       const targetMinutes = parts[1];
@@ -679,7 +545,7 @@ export class TimeInputModule extends InputModuleBase {
         mode: this.timeMode,
         currentTime: this.currentTime,
         countdown: this.countdown,
-        targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime) : '',
+        targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime || '') : '',
         millisecondDelay: this.millisecondDelay,
         enabled: this.enabled,
         apiConnected: this.wsClient != null,
@@ -688,6 +554,146 @@ export class TimeInputModule extends InputModuleBase {
       
     } catch (error) {
       this.logger?.error('Failed to handle API time data:', error);
+    }
+  }
+
+  /**
+   * Get runtime state (data that changes frequently, not configuration)
+   */
+  protected getRuntimeState(): Record<string, any> {
+    return {
+      isRunning: this.isRunning,
+      isInitialized: this.isInitialized,
+      currentTime: this.currentTime,
+      countdown: this.countdown,
+      isListening: this.isListening,
+    };
+  }
+
+  /**
+   * Get configuration settings for a specific mode
+   */
+  protected getConfigForMode(mode: string): Record<string, any> {
+    const baseConfig = { ...this.config };
+    
+    switch (mode) {
+      case 'clock':
+        // For clock mode, emphasize clock-specific settings
+        return {
+          ...baseConfig,
+          // Clock-specific settings are primary
+          targetTime: baseConfig.targetTime,
+          mode: 'clock',
+          // Other settings are still available but secondary
+          millisecondDelay: baseConfig.millisecondDelay,
+          enabled: baseConfig.enabled,
+          apiEnabled: baseConfig.apiEnabled,
+          apiEndpoint: baseConfig.apiEndpoint,
+        };
+        
+      case 'metronome':
+        // For metronome mode, emphasize metronome-specific settings
+        return {
+          ...baseConfig,
+          // Metronome-specific settings are primary
+          millisecondDelay: baseConfig.millisecondDelay,
+          mode: 'metronome',
+          // Other settings are still available but secondary
+          targetTime: baseConfig.targetTime,
+          enabled: baseConfig.enabled,
+          apiEnabled: baseConfig.apiEnabled,
+          apiEndpoint: baseConfig.apiEndpoint,
+        };
+        
+      default:
+        return baseConfig;
+    }
+  }
+
+  /**
+   * Get all available modes for this module
+   */
+  public getAvailableModes(): string[] {
+    return ['clock', 'metronome'];
+  }
+
+  /**
+   * Get UI schema for a specific mode
+   */
+  protected getUISchemaForMode(mode: string): any {
+    const baseSchema = {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          description: 'Operating mode',
+          enum: ['clock', 'metronome'],
+          default: 'clock'
+        },
+        enabled: {
+          type: 'boolean',
+          description: 'Enable/disable the time trigger',
+          default: true
+        },
+        apiEnabled: {
+          type: 'boolean',
+          description: 'Enable WebSocket API for external time sources',
+          default: false
+        },
+        apiEndpoint: {
+          type: 'string',
+          description: 'WebSocket endpoint for external time API (e.g., wss://api.example.com/time)',
+          pattern: '^wss?://.+'
+        }
+      },
+      required: ['mode']
+    };
+
+    switch (mode) {
+      case 'clock':
+        return {
+          ...baseSchema,
+          properties: {
+            ...baseSchema.properties,
+            targetTime: {
+              type: 'string',
+              description: 'Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only',
+              pattern: '^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$'
+            },
+            // Include metronome settings but mark as secondary
+            millisecondDelay: {
+              type: 'number',
+              description: 'Delay between pulses in milliseconds - Metronome mode only (secondary in clock mode)',
+              minimum: 100,
+              maximum: 60000,
+              default: 1000
+            }
+          }
+        };
+        
+      case 'metronome':
+        return {
+          ...baseSchema,
+          properties: {
+            ...baseSchema.properties,
+            millisecondDelay: {
+              type: 'number',
+              description: 'Delay between pulses in milliseconds - Metronome mode only',
+              minimum: 100,
+              maximum: 60000,
+              default: 1000
+            },
+            // Include clock settings but mark as secondary
+            targetTime: {
+              type: 'string',
+              description: 'Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only (secondary in metronome mode)',
+              pattern: '^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$'
+            }
+          }
+        };
+        
+      default:
+        return baseSchema;
     }
   }
 } 

@@ -51,11 +51,14 @@ export class MyModule extends InputModuleBase {
 ### Core Endpoints
 - `GET /api/modules` - Get all modules
 - `GET /api/interactions` - Get all interactions
-- `POST /api/interactions` - Register interactions
+- `POST /api/interactions/register` - Register interactions (atomic)
 - `PUT /api/modules/instances/:id` - Update module config
 
 ### WebSocket Events
-- `state_update` - Real-time module data updates
+- `state_update` - Debounced state snapshot (structural state still flows via REST)
+- `module_runtime_update` - Immediate, targeted runtime-only updates (no config)
+- `trigger_event` - Pulse notifications for UI effects
+- `error` - Error frames with codes/suggestions
 
 ## Common Patterns
 
@@ -132,9 +135,8 @@ await this.syncInteractionsWithModules();
 ```typescript
 ws.onmessage = (event) => {
   const message = JSON.parse(event.data);
-  if (message.type === 'state_update') {
-    // Handle real-time data only
-    // Don't process structural changes via WebSocket
+  if (message.type === 'module_runtime_update') {
+    // Handle runtime-only data
   }
 };
 ```

@@ -42,12 +42,11 @@ export class AudioOutputModule extends OutputModuleBase {
 
   constructor(
     config: AudioOutputConfig,
+    id?: string,
     player?: IAudioPlayer,
     storage?: IAudioStorage
   ) {
-    // Apply defaults expected by tests
     const cfgWithDefaults: AudioOutputConfig = {
-      // Incoming base
       ...config,
       deviceId: config.deviceId || 'default',
       sampleRate: config.sampleRate || 44100,
@@ -59,12 +58,10 @@ export class AudioOutputModule extends OutputModuleBase {
       loop: config.loop || false,
       fadeInDuration: config.fadeInDuration || 0,
       fadeOutDuration: config.fadeOutDuration || 0,
-      // File-upload specific
       enableFileUpload: config.enableFileUpload !== false,
-      maxFileSize: config.maxFileSize || DEFAULT_MAX_FILE_SIZE,
-      allowedExtensions: config.allowedExtensions || [...DEFAULT_ALLOWED_EXTENSIONS]
+      maxFileSize: config.maxFileSize || 50 * 1024 * 1024,
+      allowedExtensions: config.allowedExtensions || ['.wav', '.mp3', '.ogg', '.m4a', '.flac']
     };
-
     const manifest = {
       name: 'Audio Output',
       type: 'output' as const,
@@ -83,15 +80,10 @@ export class AudioOutputModule extends OutputModuleBase {
       },
       events: []
     };
-
-    super('audio_output', cfgWithDefaults, manifest);
-
+    super('audio_output', cfgWithDefaults, manifest, id);
     this.cfg = cfgWithDefaults;
-
-    // Create strategies
     this.player = player || new NodeSpeakerPlayer(this.cfg.sampleRate, this.cfg.channels);
     this.storage = storage || new LocalFileSystemStorage(this.cfg.allowedExtensions!, this.cfg.sampleRate, this.cfg.channels, this.cfg.maxFileSize!);
-
     if (this.cfg.enableFileUpload) {
       this.registerUploads('audio-output', {
         allowedExtensions: this.cfg.allowedExtensions!,

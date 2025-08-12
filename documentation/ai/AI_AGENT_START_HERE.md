@@ -155,18 +155,35 @@ class InteractorError extends Error {
 - Include relevant context in error details
 - Use try-catch blocks around async operations
 
+## Backend Direction Updates (2025-08)
+
+- Routing semantics
+  - Routes preserve the source event name (e.g., `timeTrigger`). Do not remap route events to target module "input events" at registration time.
+  - The server wires outputs by `moduleId` and delivers messages matched by `{ source, event }` via `MessageRouter`.
+- Live instance lifecycle
+  - The server maintains a canonical `moduleInstances` registry for live module instances.
+  - On restore/register, create live instances for both input and output modules and wire router subscriptions from the server (not via `ModuleLoader`).
+  - Do not rely on `ModuleLoader.getInstance()` for live instances.
+- WebSocket envelopes (runtime-only)
+  - `state_update` (debounced): structural snapshots suitable for UI state.
+  - `module_runtime_update` (immediate): runtime-only updates; must not include config.
+  - `trigger_event`: pulse notifications for UI effects.
+  - Structural changes flow via REST; WS is not used to mutate structure.
+- Interaction validation
+  - On `/api/interactions/register`, validate: unique ids; manifests exist; routes reference valid ids; source manifest emits route.event.
+
 ## Module Development
 
 ### Input Modules
 Extend `InputModuleBase` and implement:
 - `onInit()`: Setup and validation
-- `onStart()`: Begin processing
+- `onStart()`: Begin processing (gate on `config.enabled !== false`)
 - `onStop()`: Cleanup
 
 ### Output Modules  
 Extend `OutputModuleBase` and implement:
 - `onInit()`: Setup and validation
-- `onStart()`: Begin processing
+- `onStart()`: Mark ready/connected; wait for routed messages
 - `onStop()`: Cleanup
 
 ### Configuration

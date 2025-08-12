@@ -6,12 +6,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./setup.ts'],
-    include: ['**/*.{test,spec}.ts'],
+    include: process.env.VITEST_INCLUDE ? [process.env.VITEST_INCLUDE] : ['**/*.{test,spec}.ts'],
     exclude: ['node_modules', 'dist'],
+    testNamePattern: process.env.VITEST_TEST_NAME_PATTERN,
     
     // React testing setup
     deps: {
-      inline: ['react', 'react-dom']
+      inline: ['react', 'react-dom', 'node-fetch']
     },
     
     // Test execution settings - simplified architecture allows faster tests

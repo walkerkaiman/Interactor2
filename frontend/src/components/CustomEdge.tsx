@@ -15,6 +15,7 @@ interface CustomEdgeProps {
   style?: any;
   data?: FrontendEdgeData;
   selected?: boolean;
+  markerEnd?: string;
 }
 
 const CustomEdge: React.FC<CustomEdgeProps> = ({
@@ -27,7 +28,18 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   targetPosition,
   style = {},
   data,
+  selected = false,
+  markerEnd,
 }) => {
+  console.log(`CustomEdge rendering for ${id}:`, {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    data,
+    style
+  });
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -56,7 +68,20 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
     edgeClasses.push(styles.streamEdge);
   }
   
+  // Add selection class
+  if (selected) {
+    edgeClasses.push(styles.selectedEdge);
+  }
+  
   const className = edgeClasses.join(' ');
+  
+  console.log(`CustomEdge ${id} classes:`, {
+    edgeClasses,
+    className,
+    edgePath,
+    isRegistered: data?.isRegistered,
+    event: data?.route?.event
+  });
   
   // Generate label text based on event type
   const getLabelText = () => {
@@ -104,7 +129,8 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
         d={edgePath}
         className={className}
         fill="none"
-        strokeWidth="2"
+        strokeWidth={selected ? "3" : "2"}
+        markerEnd={markerEnd}
       />
       {labelText && (
         <EdgeLabelRenderer>
