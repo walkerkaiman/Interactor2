@@ -49,7 +49,7 @@ export class FileUploader extends EventEmitter {
   constructor(config: FileUploaderConfig, logger?: Logger) {
     super();
     this.config = config;
-    this.logger = logger || new Logger('FileUploader');
+    this.logger = logger || Logger.getInstance();
     this.uploadDir = path.resolve(config.uploadDir);
     
     this.app = express();

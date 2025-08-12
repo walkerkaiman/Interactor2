@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc && npm run copy-assets",
     "copy-assets": "copyfiles -u 1 \"src/**/*.json\" dist && copyfiles -u 1 \"src/**/*.ts\" dist",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --require tsconfig-paths/register src/index.ts",
     "start": "npm run dev",
     "start:prod": "node dist/index.js",
     "test": "vitest",

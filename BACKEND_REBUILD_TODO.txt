@@ -1,14 +1,14 @@
 Interactor Backend Rebuild – TODO Checklist
 
-[ ] 0. Baseline sanity checks
-    [ ] Confirm config/system.json is present and valid (server + fileUploader ports/hosts)
+[x] 0. Baseline sanity checks
+    [x] Confirm config/system.json is present and valid (server + fileUploader ports/hosts)
         - Notes: File path `config/system.json`. Required keys: `server.port`, `server.host`, `fileUploader.port`, `fileUploader.host`.
-    [ ] Start backend and verify /health, /api/modules, /api/interactions endpoints
+    [x] Start backend and verify /health, /api/modules, /api/interactions endpoints
         - Notes: Run from `backend/`: `npm run dev`. Verify:
           - GET `/health` returns JSON with status/uptime
           - GET `/api/modules` returns manifests loaded by `ModuleLoader`
           - GET `/api/interactions` returns array (may be empty on first run)
-    [ ] Verify manifests load (ModuleLoader) and logs directory is writable
+    [x] Verify manifests load (ModuleLoader) and logs directory is writable
         - Notes: `backend/src/core/ModuleLoader.ts` loads from `backend/src/modules/**/manifest.json`.
           Ensure `backend/logs/` exists or can be created; check file permissions.
 
