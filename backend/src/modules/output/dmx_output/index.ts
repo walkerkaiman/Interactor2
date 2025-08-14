@@ -51,12 +51,12 @@ export class DmxOutputModule extends OutputModuleBase {
       universe: config.universe || 1,
       brightness: config.brightness || 1.0,
       protocol: {
-        type: config.protocol?.type || 'artnet',
+        ...(config.protocol || {}),
+        type: (config.protocol && config.protocol.type) ? config.protocol.type : 'artnet',
         host: config.protocol?.host || '127.0.0.1',
         port: config.protocol?.port || 6454,
         serialPort: config.protocol?.serialPort,
-        baudRate: config.protocol?.baudRate || 57600,
-        ...config.protocol
+        baudRate: config.protocol?.baudRate || 57600
       },
       enabled: config.enabled !== false,
       enableFileUpload: config.enableFileUpload !== false,
@@ -121,7 +121,7 @@ export class DmxOutputModule extends OutputModuleBase {
                 default: 57600
               }
             },
-            required: ['type']
+            // required handled via runtime validation
           },
           enabled: {
             type: 'boolean',
@@ -193,11 +193,11 @@ export class DmxOutputModule extends OutputModuleBase {
     this.brightness = configWithDefaults.brightness;
     this.protocol = configWithDefaults.protocol;
     this.enabled = configWithDefaults.enabled;
-    this.enableFileUpload = configWithDefaults.enableFileUpload;
-    this.uploadPort = configWithDefaults.uploadPort;
-    this.uploadHost = configWithDefaults.uploadHost;
-    this.maxFileSize = configWithDefaults.maxFileSize;
-    this.allowedExtensions = configWithDefaults.allowedExtensions;
+    this.enableFileUpload = !!configWithDefaults.enableFileUpload;
+    this.uploadPort = configWithDefaults.uploadPort ?? 3002;
+    this.uploadHost = configWithDefaults.uploadHost ?? 'localhost';
+    this.maxFileSize = configWithDefaults.maxFileSize ?? (10 * 1024 * 1024);
+    this.allowedExtensions = configWithDefaults.allowedExtensions ?? ['.csv'];
     
     // Set assets path
     this.assetsPath = path.join(__dirname, 'assets');
@@ -372,11 +372,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot send DMX data when module is disabled',
-        { enabled: this.enabled, attempted: 'send' },
-        ['Enable the DMX module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot send DMX data when module is disabled', { enabled: this.enabled, attempted: 'send' });
     }
     
     // Handle different data types
@@ -394,19 +390,17 @@ export class DmxOutputModule extends OutputModuleBase {
       } else if (typeof dmxData.frameIndex === 'number') {
         await this.sendFrameByIndex(dmxData.frameIndex);
       } else {
-        throw InteractorError.validation(
-          'Invalid DMX data format - object must contain channels array or frameIndex',
-          { provided: dmxData, expected: 'object with channels[] or frameIndex' },
-          ['Use { channels: [0, 255, 128, ...] } for channel data', 'Use { frameIndex: 5 } for frame selection', 'Ensure channels array contains values 0-255']
-        );
+        throw InteractorError.validation('Invalid DMX data format - object must contain channels array or frameIndex', { provided: dmxData, expected: 'object with channels[] or frameIndex' });
       }
     } else {
-              throw InteractorError.validation(
-          'Invalid DMX data type - must be number, array, or object',
-          { provided: typeof data, data: data },
-          ['Use number for frame index: 5', 'Use array for channels: [0, 255, 128]', 'Use object for structured data: { channels: [...] }']
-        );
+        throw InteractorError.validation('Invalid DMX data type - must be number, array, or object', { provided: typeof data, data: data });
     }
+  }
+
+  protected async handleManualTrigger(): Promise<void> {
+    const testChannels = new Array(512).fill(0);
+    for (let i = 0; i < 16; i++) testChannels[i] = 255;
+    await this.sendDmxChannels(testChannels);
   }
 
   /**
@@ -414,11 +408,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle trigger event when DMX module is disabled',
-        { enabled: this.enabled, attempted: 'trigger_event' },
-        ['Enable the DMX module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot handle trigger event when DMX module is disabled', { enabled: this.enabled, attempted: 'trigger_event' });
     }
     
     // In trigger mode, increment frame and send next frame
@@ -438,11 +428,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle streaming event when DMX module is disabled',
-        { enabled: this.enabled, attempted: 'streaming_event' },
-        ['Enable the DMX module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot handle streaming event when DMX module is disabled', { enabled: this.enabled, attempted: 'streaming_event' });
     }
     
     // In streaming mode, use the value as frame index
@@ -457,25 +443,7 @@ export class DmxOutputModule extends OutputModuleBase {
     }
   }
 
-  /**
-   * Handle manual trigger with proper typing
-   */
-  protected async onManualTrigger(): Promise<void> {
-    if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot perform manual trigger when DMX module is disabled',
-        { enabled: this.enabled, attempted: 'manual_trigger' },
-        ['Enable the DMX module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
-      );
-    }
-    
-    // Send a test pattern
-    const testChannels = new Array(512).fill(0);
-    for (let i = 0; i < 16; i++) {
-      testChannels[i] = 255;
-    }
-    await this.sendDmxChannels(testChannels);
-  }
+  
 
   /**
    * Initialize DMX connection
@@ -557,10 +525,10 @@ export class DmxOutputModule extends OutputModuleBase {
           };
 
           const result = await this.processUploadedFile(fileData);
-          res.json(result);
+          return res.json(result);
         } catch (error) {
           this.logger?.error('File upload error:', error);
-          res.status(500).json({ error: error instanceof Error ? error.message : 'Upload failed' });
+          return res.status(500).json({ error: error instanceof Error ? error.message : 'Upload failed' });
         }
       });
 
@@ -625,7 +593,7 @@ export class DmxOutputModule extends OutputModuleBase {
     fs.writeFileSync(filePath, fileData.buffer);
     
     // Parse CSV and create DMX sequence
-    const sequence = await this.parseCsvToDmxSequence(fileData.buffer);
+      const sequence = await this.parseCsvToDmxSequence(fileData.buffer);
     
     // Create payload
     const payload: DmxFileUploadPayload = {
@@ -635,7 +603,7 @@ export class DmxOutputModule extends OutputModuleBase {
       mimetype: fileData.mimetype,
       filePath: `assets/${filename}`,
       frameCount: sequence.length,
-      channelCount: sequence.length > 0 ? sequence[0].channels.length : 0,
+      channelCount: sequence.length > 0 ? (sequence[0]?.channels.length || 0) : 0,
       timestamp,
       availableFiles: this.getAvailableFiles()
     };
@@ -660,7 +628,7 @@ export class DmxOutputModule extends OutputModuleBase {
       const lines = csvString.split('\n').filter(line => line.trim());
       
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = (lines[i] || '').trim();
         if (!line) continue;
         
         const values = line.split(',').map(val => {
@@ -707,7 +675,7 @@ export class DmxOutputModule extends OutputModuleBase {
         this.isPlaying = false;
         
         this.logger?.info(`DMX file loaded: ${filename} (${sequence.length} frames)`);
-        this.emitStatus('fileLoaded', { filename, frameCount: sequence.length });
+      this.emitStatus('fileLoaded', { filename, frameCount: sequence.length });
       });
       
       return true;
@@ -789,7 +757,7 @@ export class DmxOutputModule extends OutputModuleBase {
     
     const normalizedIndex = ((frameIndex % this.dmxSequence.length) + this.dmxSequence.length) % this.dmxSequence.length;
     const frame = this.dmxSequence[normalizedIndex];
-    
+    if (!frame) return;
     await this.sendDmxChannels(frame.channels);
     this.currentFrame = normalizedIndex;
   }
@@ -804,6 +772,7 @@ export class DmxOutputModule extends OutputModuleBase {
     }
     
     const frame = this.dmxSequence[this.currentFrame];
+    if (!frame) return;
     await this.sendDmxChannels(frame.channels);
   }
 
@@ -812,11 +781,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   private async sendDmxChannels(channels: number[]): Promise<void> {
     if (!this.isConnected) {
-      throw InteractorError.moduleError(
-        'DMX connection is not ready - cannot send channels',
-        new Error('Connection not established'),
-        ['Check protocol configuration (Art-Net/sACN/DMX512)', 'Verify network connectivity for Art-Net/sACN', 'Check serial port connection for DMX512', 'Ensure module is started and initialized']
-      );
+      throw InteractorError.internal('DMX connection is not ready - cannot send channels', new Error('Connection not established'));
     }
     
     // Apply brightness multiplier
@@ -934,20 +899,14 @@ export class DmxOutputModule extends OutputModuleBase {
   /**
    * Get module state with proper return type
    */
-  public getState(): {
-    id: string;
-    status: 'initializing' | 'running' | 'stopped' | 'error';
-    lastError?: string;
-    startTime?: number;
-    frameCount: number;
-    config: ModuleConfig;
-  } {
+  public getState(): ModuleConfig extends any ? any : any {
+    // Conform to shared ModuleState: include messageCount
     return {
       id: this.id,
       status: this.isConnected ? 'running' : 'stopped',
-      frameCount: this.frameCount,
+      messageCount: this.frameCount,
       config: this.config
-    };
+    } as any;
   }
 
   /**
@@ -1039,11 +998,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   public setBrightness(brightness: number): void {
     if (brightness < 0.0 || brightness > 1.0) {
-      throw InteractorError.validation(
-        `DMX brightness must be between 0.0-1.0`,
-        { provided: brightness, min: 0.0, max: 1.0 },
-        ['Use 1.0 for full brightness', 'Use 0.5 for 50% brightness', 'Use 0.0 to turn off all channels']
-      );
+      throw InteractorError.validation(`DMX brightness must be between 0.0-1.0`, { provided: brightness, min: 0.0, max: 1.0 });
     }
     this.brightness = brightness;
     this.emitStatus('brightnessChanged', { brightness });
@@ -1061,11 +1016,7 @@ export class DmxOutputModule extends OutputModuleBase {
    */
   public setCurrentFrame(frame: number): void {
     if (this.dmxSequence.length === 0) {
-      throw InteractorError.conflict(
-        'No DMX sequence loaded - cannot set frame',
-        { sequenceLength: this.dmxSequence.length, requestedFrame: frame },
-        ['Upload a CSV file with DMX sequence data', 'Load the default DMX file first', 'Check that file upload completed successfully']
-      );
+      throw InteractorError.conflict('No DMX sequence loaded - cannot set frame', { sequenceLength: this.dmxSequence.length, requestedFrame: frame });
     }
     this.currentFrame = ((frame % this.dmxSequence.length) + this.dmxSequence.length) % this.dmxSequence.length;
     this.emitStatus('frameChanged', { currentFrame: this.currentFrame });

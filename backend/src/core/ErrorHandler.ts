@@ -108,23 +108,24 @@ export class InteractorError extends Error {
   }
 
   static networkError(message: string, cause?: Error): InteractorError {
-    return new InteractorError(ErrorType.NETWORK_ERROR, message, {
+    const opts: any = {
       code: 'NETWORK_ERROR',
       suggestions: [
         'Check your network connection.',
         'Verify the target host is reachable.',
         'Try again in a few seconds.'
       ],
-      retryable: true,
-      cause
-    });
+      retryable: true
+    };
+    if (cause) opts.cause = cause;
+    return new InteractorError(ErrorType.NETWORK_ERROR, message, opts);
   }
 
   static fileError(operation: string, filename: string, cause?: Error): InteractorError {
     return new InteractorError(
       ErrorType.FILE_ERROR,
       `File ${operation} failed for '${filename}'`,
-      {
+      (() => { const o: any = {
         code: `FILE_${operation.toUpperCase()}_ERROR`,
         details: { operation, filename, originalError: cause?.message },
         suggestions: [
@@ -132,9 +133,8 @@ export class InteractorError extends Error {
           'Verify the file path is correct.',
           'Ensure sufficient disk space.'
         ],
-        retryable: operation === 'read',
-        cause
-      }
+        retryable: operation === 'read'
+      }; if (cause) o.cause = cause; return o; })()
     );
   }
 
@@ -147,15 +147,16 @@ export class InteractorError extends Error {
   }
 
   static internal(message: string, cause?: Error): InteractorError {
-    return new InteractorError(ErrorType.INTERNAL, message, {
+    const opts: any = {
       code: 'INTERNAL_ERROR',
       suggestions: [
         'Try again in a few seconds.',
         'Contact support if the problem persists.'
       ],
-      retryable: true,
-      cause
-    });
+      retryable: true
+    };
+    if (cause) opts.cause = cause;
+    return new InteractorError(ErrorType.INTERNAL, message, opts);
   }
 }
 
@@ -174,12 +175,12 @@ export class ErrorHandler {
         error: {
           type: error.type,
           message: error.message,
-          code: error.code,
+          ...(error.code ? { code: error.code } : {}),
           details: error.details,
           suggestions: error.suggestions,
           retryable: error.retryable,
           timestamp,
-          requestId
+          ...(requestId ? { requestId } : {}),
         }
       };
     }
@@ -195,7 +196,7 @@ export class ErrorHandler {
           suggestions: ['Please check your input and try again.'],
           retryable: false,
           timestamp,
-          requestId
+          ...(requestId ? { requestId } : {}),
         }
       };
     }
@@ -214,7 +215,7 @@ export class ErrorHandler {
           ],
           retryable: true,
           timestamp,
-          requestId
+          ...(requestId ? { requestId } : {}),
         }
       };
     }
@@ -233,7 +234,7 @@ export class ErrorHandler {
           ],
           retryable: false,
           timestamp,
-          requestId
+          ...(requestId ? { requestId } : {}),
         }
       };
     }

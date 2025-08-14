@@ -20,12 +20,12 @@ export interface ModuleNodeConfig {
   // Instance data keys to track
   instanceDataKeys?: string[];
   
-  // Custom render functions
+  // Custom render components
   renderHeader?: (moduleName: string, manifest: any) => React.ReactNode;
-  renderConfig?: (config: any, updateConfig: (key: string, value: any) => void, instance?: any) => React.ReactNode;
   renderInputHandles?: (manifest: any, edges: any[]) => React.ReactNode;
   renderOutputHandles?: (manifest: any, edges: any[], nodeId: string) => React.ReactNode;
-  renderActions?: (instance: any) => React.ReactNode;
+  ConfigComponent?: React.ComponentType<{ instance: any; updateConfig: (key: string, value: any) => void }>;
+  ActionsComponent?: React.ComponentType<{ instance: any }>;
   
   // Custom event handlers
   onManualTrigger?: (nodeId: string) => Promise<void>;
@@ -390,34 +390,20 @@ export function createModuleNode(config: ModuleNodeConfig) {
       });
     }
 
-    // Custom render functions
-    const renderConfig = useCallback((): React.ReactNode => {
-      if (config.renderConfig) {
-        const updateConfig = (key: string, value: any) => {
-          if (instance) {
-            const updatedConfig = {
-              ...instance.config,
-              [key]: value
-            };
-            instance.config = updatedConfig;
-            if (props.data.onConfigChange && instance.id) {
-              props.data.onConfigChange(instance.id, updatedConfig);
-            }
-            // Force re-render by updating a state variable
-            setConfigVersion(prev => prev + 1);
-          }
+    // Config and actions components rendering (safe for hooks inside)
+    const updateConfigCb = useCallback((key: string, value: any) => {
+      if (instance) {
+        const updatedConfig = {
+          ...instance.config,
+          [key]: value
         };
-        return config.renderConfig(instance?.config || {}, updateConfig, instance);
+        instance.config = updatedConfig;
+        if (props.data.onConfigChange && instance.id) {
+          props.data.onConfigChange(instance.id, updatedConfig);
+        }
+        setConfigVersion(prev => prev + 1);
       }
-      return null; // Override in specific implementations
-    }, [config.renderConfig, instance, props.data.onConfigChange, configVersion]);
-
-    const renderActions = useCallback((): React.ReactNode => {
-      if (config.renderActions) {
-        return config.renderActions(instance);
-      }
-      return null; // Override in specific implementations
-    }, [config.renderActions, instance]);
+    }, [instance, props.data.onConfigChange]);
 
     // @ts-ignore - Variables are used in the hook but TypeScript doesn't recognize it
     return (
@@ -427,8 +413,12 @@ export function createModuleNode(config: ModuleNodeConfig) {
       >
         {renderDeleteButton()}
         {renderHeader()}
-        {renderConfig()}
-        {renderActions()}
+        {config.ConfigComponent ? (
+          <config.ConfigComponent instance={instance} updateConfig={updateConfigCb} />
+        ) : null}
+        {config.ActionsComponent ? (
+          <config.ActionsComponent instance={instance} />
+        ) : null}
         {renderHandles()}
         {renderMeta()}
       </div>

@@ -36,7 +36,7 @@ export class RetryHandler {
     } = options;
 
     const startTime = Date.now();
-    let lastError: Error;
+    let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -108,11 +108,11 @@ export class RetryHandler {
     RetryHandler.logger.error(
       `Operation failed after ${maxAttempts} attempts`,
       'RetryHandler',
-      { maxAttempts, totalTime, finalError: lastError.message }
+      { maxAttempts, totalTime, finalError: lastError ? lastError.message : 'unknown' }
     );
     
     // Wrap the final error with retry context
-    if (lastError instanceof InteractorError) {
+    if (lastError && lastError instanceof InteractorError) {
       throw new InteractorError(
         lastError.type,
         `${lastError.message} (failed after ${maxAttempts} attempts)`,
@@ -128,8 +128,8 @@ export class RetryHandler {
     }
     
     throw InteractorError.internal(
-      `Operation failed after ${maxAttempts} retry attempts: ${lastError.message}`,
-      lastError
+      `Operation failed after ${maxAttempts} retry attempts: ${lastError ? lastError.message : 'unknown'}`,
+      lastError || new Error('Unknown error')
     );
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -30,18 +30,24 @@ import styles from './App.module.css';
 
 function App() {
   // Backend sync
-  const { modules, interactions: backendInteractions, settings } = useBackendSync();
+  const { modules, interactions: backendInteractions, settings, refresh } = useBackendSync();
+  // Persistent client id for origin filtering
+  useEffect(() => {
+    try {
+      const key = 'interactorClientId';
+      let id = localStorage.getItem(key);
+      if (!id && (window as any).crypto?.randomUUID) {
+        id = (window as any).crypto.randomUUID();
+        localStorage.setItem(key, id);
+      }
+    } catch {}
+  }, []);
   
   // Local interactions state for unregistered changes
   const [localInteractions, setLocalInteractions] = useState<InteractionConfig[]>([]);
   
-  // Merge backend interactions with local changes
-  const interactions = useMemo(() => {
-    if (localInteractions.length > 0) {
-      return localInteractions;
-    }
-    return backendInteractions;
-  }, [backendInteractions, localInteractions]);
+  // The canvas renders exactly what we intend to register: local draft if present, else backend
+  const interactions = useMemo(() => (localInteractions.length > 0 ? localInteractions : backendInteractions), [backendInteractions, localInteractions]);
   
   // Unregistered changes management
   const { hasChanges, clearAllChanges, applyChangesToInteractions } = useUnregisteredChanges();
@@ -104,19 +110,27 @@ function App() {
     try {
       // Apply unregistered changes to interactions before registering
       const interactionsWithChanges = applyChangesToInteractions(interactions);
-      
-      await apiService.registerInteractions(interactionsWithChanges);
-      
-      // Clear unregistered changes after successful registration
-      clearAllChanges();
-      
+      // Keep the current draft visible to avoid flicker while backend refresh completes
+      setLocalInteractions(interactionsWithChanges);
+      const clientId = (() => {
+        try { return localStorage.getItem('interactorClientId') || undefined; } catch { return undefined; }
+      })();
+      await apiService.registerInteractions(interactionsWithChanges, clientId);
+      // Refresh structural state from backend, then clear local draft only if backend is non-empty
+      const refreshed = await refresh();
+      if ((refreshed?.interactions?.length || 0) > 0) {
+        clearAllChanges();
+        setLocalInteractions([]);
+      } else {
+        console.warn('Refresh returned empty interactions; preserving local draft to avoid flicker');
+      }
       setLastSuccess('Interactions registered successfully!');
     } catch (error) {
       setLastError(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegistering(false);
     }
-  }, [interactions, applyChangesToInteractions, clearAllChanges]);
+  }, [interactions, applyChangesToInteractions, clearAllChanges, refresh]);
 
   // Handle node selection
   const handleNodeSelect = useCallback((nodeId: string | null) => {

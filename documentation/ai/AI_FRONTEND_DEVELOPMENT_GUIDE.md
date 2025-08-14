@@ -37,6 +37,57 @@ This document provides strict guardrails for AI agents developing frontend code 
   - `error` (structured error frames)
 - Structural operations (modules, routes, scenes) flow via REST first; then the backend broadcasts updated `state_update`.
 
+## Runtime Updates and Node Editor Behavior (Must Follow)
+
+- One-way runtime updates:
+  - Modules display live values pushed by the backend via `module_runtime_update` only.
+  - Runtime data must not mutate interactions, module config, or positions.
+  - Implement a small runtime-update bus and a single hook to consume it:
+    - `frontend/src/state/runtimeBus.ts`: emits/retains latest runtime fields per `moduleId`.
+    - `frontend/src/hooks/useModuleRuntime.ts`: read-only hook to subscribe to updates for a module and selected keys.
+
+- Stable Node Editor state:
+  - The Node Editor holds a local draft graph (interactions, positions, routes) in memory.
+  - Draft changes are NEVER sent to backend until the user presses Register.
+  - Positions are preserved in `interactions.modules[].position` and updated on drag stop.
+  - Ignore structural data (`interactions`) sent over WS. Only REST refresh after successful Register may replace the editor state.
+  - After Register: rely on one REST refresh; do not process any WS structural frames for this operation (self-originated updates are ignored via `originClientId`).
+
+- Avoid double updates (client origin):
+  - Backend includes an optional `data.originClientId` in `state_update` when a registration was initiated by a client.
+  - Frontend generates a persistent `clientId` (e.g., localStorage `interactorClientId`). If `originClientId` matches, do not re-apply structural changes. The editor has already updated its draft and will refresh via REST.
+
+- UX conventions in the editor:
+  - Remove edges by dragging a connection to an empty canvas area.
+  - Each node shows a delete “X” that removes the node plus related routes from the draft; show the Unregistered Changes indicator.
+  - Sidebar with draggable modules is visible only on the Node Editor page.
+  - Show “Current Time” once at the editor header (not inside each Time node).
+  - Audio Output node: keep simple file selection and volume controls; omit decorative waveform/status.
+  - Style badges consistently: inputs = green, outputs = red.
+  - When dropping a module from the sidebar, seed its draft config from the manifest’s `configSchema` defaults (fallback to `{ enabled: true }`) so the correct inputs/fields render immediately.
+
+### Code Pattern (Runtime Bus + Hook)
+```ts
+// runtimeBus.ts (simple event emitter)
+type RuntimeUpdate = { moduleId: string; runtimeData: Record<string, any>; timestamp?: number };
+export const runtimeBus = createBus<RuntimeUpdate>(); // onUpdate(cb), offUpdate(cb), emit(update), getLatest(moduleId)
+
+// useModuleRuntime.ts
+export function useModuleRuntime(moduleId: string, keys?: string[]) {
+  const [values, setValues] = useState<Record<string, any>>(() => runtimeBus.getLatest(moduleId));
+  useEffect(() => runtimeBus.onUpdate((u) => {
+    if (u.moduleId !== moduleId) return;
+    if (!keys) setValues((prev) => ({ ...prev, ...u.runtimeData }));
+    else {
+      const picked: Record<string, any> = {};
+      keys.forEach(k => { if (u.runtimeData[k] !== undefined) picked[k] = u.runtimeData[k]; });
+      if (Object.keys(picked).length) setValues((prev) => ({ ...prev, ...picked }));
+    }
+  }), [moduleId, keys]);
+  return values;
+}
+```
+
 ## ✅ **REQUIRED PATTERNS**
 
 ### **1. Hook Architecture Pattern**

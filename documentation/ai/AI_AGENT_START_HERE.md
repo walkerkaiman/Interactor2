@@ -169,8 +169,59 @@ class InteractorError extends Error {
   - `module_runtime_update` (immediate): runtime-only updates; must not include config.
   - `trigger_event`: pulse notifications for UI effects.
   - Structural changes flow via REST; WS is not used to mutate structure.
+  - Optional: `data.originClientId` may be included on `state_update` when a registration originated from a client. Frontend should generate a persistent `clientId` (e.g., localStorage `interactorClientId`) and ignore structural `state_update` frames where `originClientId === clientId` (the registering client already updated its draft and will refresh via REST).
 - Interaction validation
   - On `/api/interactions/register`, validate: unique ids; manifests exist; routes reference valid ids; source manifest emits route.event.
+
+## Frontend/Backend State Sync Contract (Behavior Intent)
+
+This is the definitive behavior AI agents must preserve when modifying sync logic.
+
+1) Startup (authoritative load)
+- Frontend loads from REST only: `GET /api/modules`, `GET /api/interactions`, `GET /api/settings`.
+- Frontend initializes an in-memory draft for unregistered changes (`useUnregisteredChanges`). This draft is the only source for edits before registration.
+
+2) Local draft (temporary memory)
+- Drag/drop, connect, and per-node config edits update ONLY the local draft state.
+- The draft is not written to the backend until the user clicks Register.
+- Node positions are non-authoritative (purely UX). Do not persist or rely on positions in backend logic.
+
+3) Registration
+- On Register, the frontend POSTs `/api/interactions/register` with the full draft (interactions + module configs merged with local changes).
+- The backend persists, (re)creates live instances, rewires routing, and then broadcasts a `state_update` to all clients. The broadcast includes an `originClientId` field in `data` for the submitting client.
+
+4) Post-register fanout (multi-client consistency)
+- All clients accept the non-empty `interactions` snapshot from `state_update` and replace their local authoritative structure with it.
+- The submitting client MAY ignore the `state_update` if `originClientId` matches its own persistent client id to avoid flicker while it already displays the submitted draft; it should refresh via REST to confirm persistence shortly after.
+- Clients must never treat an empty `moduleInstances` array in `state_update` as an instruction to clear structure. Ignore empty `moduleInstances` payloads; structure comes from REST and non-empty snapshots.
+
+5) Runtime updates via WS (never structural mutations)
+- `module_runtime_update` is merged into local module instances to update runtime-only fields (e.g., `currentTime`, `countdown`). It must never overwrite user config or draft edits.
+- `trigger_event` is for visual pulses and has no structural impact.
+
+6) Do / Don’t
+- Do: Keep REST the source of truth for structure; keep WS for runtime and fanout snapshots only.
+- Do: Preserve user config edits locally until Register.
+- Don’t: Clear the canvas/graph on transient WS frames; never derive structure from empty WS payloads.
+- Don’t: Remap route events at registration; event equality must be preserved end-to-end.
+
+## Backend layout and module structure (must follow)
+
+- Layered layout:
+  - `backend/src/app/` — application services and composition (e.g., `ModuleRegistry`, `InteractorApp`)
+  - `backend/src/appapi/` — HTTP/WS edge controllers only (no business logic)
+  - `backend/src/core/` — cross-cutting services (logging, state, router, errors)
+  - `backend/src/modules/<feature>/` — module code split into:
+    - `api/` (public API + `moduleRegistry.register(...)` factory)
+    - `domain/` (pure logic; no IO)
+    - `infra/` (IO/adapters)
+- Import rules:
+  - Only import another module via its `api/` entry. Never import `domain/` or `infra/` from outside the module.
+  - The router implements the shared `EventBus` interface (`publish/subscribe/unsubscribe/once`).
+- Registry:
+  - Every module registers a factory in `api/index.ts` with `moduleRegistry.register('<Manifest Name>', (config, id) => new Module(...))`.
+  - The app uses the registry to instantiate modules; do not hardcode module classes in the server.
+- See `documentation/ai/ArchitectureAtAGlance.md` and the templates `TEMPLATE_INPUT_MODULE.md`, `TEMPLATE_OUTPUT_MODULE.md` for canonical structure.
 
 ## Module Development
 

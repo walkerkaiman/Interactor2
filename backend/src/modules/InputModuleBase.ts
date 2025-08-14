@@ -3,9 +3,7 @@ import {
   ModuleConfig,
   ModuleManifest,
   InputModule,
-  EventHandler,
-  TriggerEvent,
-  StreamEvent
+  EventHandler
 } from '@interactor/shared';
 
 export abstract class InputModuleBase extends ModuleBase implements InputModule {
@@ -109,7 +107,7 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
     this.incrementMessageCount();
     this.logger?.debug(`Emitting trigger event from ${this.name}: ${event}`, payload);
     
-    const triggerEvent: TriggerEvent = {
+    const triggerEvent: any = {
       moduleId: this.id,
       moduleName: this.name,
       event,
@@ -173,7 +171,7 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
     this.lastValue = value;
     this.logger?.debug(`Emitting stream value from ${this.name}:`, value);
     
-    const streamEvent: StreamEvent = {
+    const streamEvent: any = {
       moduleId: this.id,
       moduleName: this.name,
       value,

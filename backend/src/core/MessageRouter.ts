@@ -1,7 +1,7 @@
-import { Message, MessageRoute } from '@interactor/shared';
+import { EventBus, EventHandler, Message, MessageRoute } from '@interactor/shared';
 import { Logger } from './Logger';
 
-export class MessageRouter {
+export class MessageRouter implements EventBus {
   private static instance: MessageRouter;
   private routes: Map<string, MessageRoute> = new Map();
   private logger: Logger;
@@ -206,6 +206,14 @@ export class MessageRouter {
     this.listeners.get(event)!.push(listener);
   }
 
+  public once(event: string, listener: Function): void {
+    const onceWrapper = (...args: any[]) => {
+      this.off(event, onceWrapper);
+      (listener as any)(...args);
+    };
+    this.on(event, onceWrapper);
+  }
+
   public off(event: string, listener: Function): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
@@ -220,7 +228,11 @@ export class MessageRouter {
     this.listeners.clear();
   }
 
-  private emit(event: string, data: any): void {
+  public emit(event: string, data?: any): void {
+    this.emitEvent(event, data);
+  }
+
+  private emitEvent(event: string, data: any): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       eventListeners.forEach(listener => {
@@ -233,41 +245,45 @@ export class MessageRouter {
     }
   }
 
+  // EventBus API (normalized names)
+  public publish(topic: string, payload?: any): void {
+    this.emitEvent(topic, payload);
+  }
+
+  public subscribe(pattern: string, handler: EventHandler): void {
+    this.on(pattern, handler as unknown as Function);
+  }
+
+  public unsubscribe(pattern: string, handler: EventHandler): void {
+    this.off(pattern, handler as unknown as Function);
+  }
+
   /**
    * Publish a message (for testing and direct usage)
    */
-  public publish(source: string, message: Message): void {
-    this.routeMessage(message);
-  }
+  // Deprecated legacy aliases (avoid name conflicts with EventBus methods)
+  public addPattern(pattern: string, handler: Function): void { this.on(pattern, handler); }
+  public removePattern(pattern: string, handler: Function): void { this.off(pattern, handler); }
 
   /**
    * Subscribe to messages (for compatibility with tests)
    */
-  public subscribe(topic: string, handler: Function): void {
-    this.on(topic, handler);
-  }
+  // Removed duplicate legacy subscribe/unsubscribe/addPattern/removePattern variants
 
   /**
    * Unsubscribe from messages (for compatibility with tests)
    */
-  public unsubscribe(topic: string, handler: Function): void {
-    this.off(topic, handler);
-  }
+  
 
   /**
    * Add pattern subscription (for compatibility with tests)
    */
-  public addPattern(pattern: string, handler: Function): void {
-    // Simplified pattern matching - just store the pattern and handler
-    this.on(pattern, handler);
-  }
+  
 
   /**
    * Remove pattern subscription (for compatibility with tests)
    */
-  public removePattern(pattern: string, handler: Function): void {
-    this.off(pattern, handler);
-  }
+  
 
   /**
    * Add middleware (for compatibility with tests)

@@ -178,13 +178,13 @@ export class OscInputModule extends InputModuleBase {
     }
 
     try {
-      this.udpPort = new osc.UDPPort({
+      this.udpPort = new (osc as any).UDPPort({
         localAddress: this.host,
         localPort: this.port,
         metadata: true
       });
 
-      this.udpPort.on('ready', () => {
+      (this.udpPort as any).on('ready', () => {
         this.logger?.info(`OSC listener ready on ${this.host}:${this.port}`);
         this.emit('status', {
           moduleId: this.id,
@@ -194,11 +194,11 @@ export class OscInputModule extends InputModuleBase {
         });
       });
 
-      this.udpPort.on('message', (oscMsg: osc.OscMessage) => {
+      (this.udpPort as any).on('message', (oscMsg: any) => {
         this.handleOscMessage(oscMsg);
       });
 
-      this.udpPort.on('error', (error: Error) => {
+      (this.udpPort as any).on('error', (error: Error) => {
         this.logger?.error(`OSC listener error:`, error);
         this.emit('error', {
           moduleId: this.id,
@@ -208,7 +208,7 @@ export class OscInputModule extends InputModuleBase {
         });
       });
 
-      this.udpPort.open();
+      (this.udpPort as any).open();
     } catch (error) {
       this.logger?.error(`Failed to initialize OSC listener:`, error);
       throw error;
@@ -220,7 +220,7 @@ export class OscInputModule extends InputModuleBase {
    */
   private stopOscListener(): void {
     if (this.udpPort) {
-      this.udpPort.close();
+      (this.udpPort as any).close();
       this.udpPort = undefined;
       this.logger?.info(`OSC listener stopped`);
       this.emit('status', {

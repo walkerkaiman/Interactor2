@@ -24,6 +24,17 @@ These rules keep your codebase simple and predictable for AI agents. Follow thes
 
 ---
 
+## 🧱 Layers and Boundaries
+
+- Edge (`backend/src/appapi/`): HTTP/WS handlers. Translate requests into commands/queries.
+- Application (`backend/src/app/`): Composition, registries, orchestrators. No transport logic.
+- Core (`backend/src/core/`): Cross-cutting services (logging, state, router, errors).
+- Modules (`backend/src/modules/<feature>/`):
+  - `api/` (public API, factory registration)
+  - `domain/` (pure logic; no IO)
+  - `infra/` (IO/adapters)
+- Only import a module via its `api/` entry. `domain/` and `infra/` are internal.
+
 ## 🚫 **Forbidden Patterns** (These Confuse AI)
 
 ### **1. Singleton Services**
@@ -161,6 +172,7 @@ protected async onStop(): Promise<void> {
 ### **Router & Instance Registry**
 - The server maintains a live instance registry (map of `moduleId` → instance). Use it for wiring.
 - Router matches by `{ source, event }`. The server forwards to outputs by `moduleId` using `onTriggerEvent`/`onStreamingEvent`.
+- The router must implement the shared `EventBus` interface, providing `publish`, `subscribe`, `unsubscribe`, and `once`.
 - Do not fetch instances from `ModuleLoader` (it handles manifests only).
 
 ### **Validation at Register**
@@ -173,11 +185,13 @@ protected async onStop(): Promise<void> {
 
 ### **Module Structure** (Never Change This)
 ```
-backend/src/modules/input/my_module/
-├── index.ts          # Implementation (required)
-├── manifest.json     # Configuration (required)
-├── wiki.md           # Documentation (optional)
-└── assets/           # Static files (optional)
+backend/src/modules/<type>/<my_module>/
+├── api/        # public API entry (register factory)
+├── domain/     # pure logic (no IO)
+├── infra/      # IO/adapters
+├── index.ts    # thin glue or re-export (during transition)
+├── manifest.json
+└── wiki.md
 ```
 
 ### **No Deep Nesting**

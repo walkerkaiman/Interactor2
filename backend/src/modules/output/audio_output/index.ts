@@ -320,13 +320,5 @@ export class AudioOutputModule extends OutputModuleBase {
   }
 
   // ───────── Error helper ─────────
-  private emitError(error: Error, context: string): void {
-    this.emit('error', {
-      moduleId: this.id,
-      moduleName: this.name,
-      error: error.message,
-      context,
-      timestamp: Date.now()
-    });
-  }
+  // use protected emitError from base
 }

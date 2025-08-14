@@ -65,22 +65,43 @@ Every module follows this lifecycle:
 4. **Stopping** (`onStop`): Clean shutdown
 5. **Destruction** (`onDestroy`): Release all resources
 
-### Directory Structure
+### Directory Structure (canonical)
 
 ```
-backend/src/modules/
-├── input/
-│   ├── http_input/
-│   │   ├── index.ts          # Module implementation
-│   │   ├── manifest.json     # Module metadata
-│   │   └── wiki.md          # Documentation
-│   ├── osc_input/
-│   └── serial_input/
-└── output/
-    ├── http_output/
-    ├── osc_output/
-    └── audio_output/
+backend/src/
+├── app/         # application services & composition (e.g., ModuleRegistry, InteractorApp)
+├── appapi/      # HTTP/WS edge controllers (no business logic)
+├── core/        # cross-cutting (Logger, StateManager, MessageRouter, ErrorHandler)
+└── modules/
+    ├── input/
+    │   └── <my_input>/
+    │       ├── api/      # public API (moduleRegistry.register factory)
+    │       ├── domain/   # pure logic (no IO)
+    │       ├── infra/    # IO/adapters
+    │       ├── index.ts  # thin glue or re-export (during transition)
+    │       └── manifest.json
+    └── output/
+        └── <my_output>/
+            ├── api/
+            ├── domain/
+            ├── infra/
+            ├── index.ts
+            └── manifest.json
 ```
+
+### Public API & Registry (must follow)
+
+- Each module exposes a tiny `api/index.ts` that registers a factory:
+
+```ts
+import { moduleRegistry } from '../../../../app/ModuleRegistry';
+import { MyInputModule } from '../index';
+
+moduleRegistry.register('My Input', (config) => new MyInputModule(config as any));
+```
+
+- Other code must import a module only via its `api/` entry. Do not import `domain/` or `infra/` from outside the module.
+- The app layer uses the registry to instantiate modules. Do not hardcode module classes in the server.
 
 ---
 

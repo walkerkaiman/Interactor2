@@ -1,65 +1,65 @@
 {
   "interactions": [
     {
-      "id": "interaction-1754170499899",
-      "name": "New Interaction 1",
-      "description": "Automatically created interaction",
-      "enabled": true,
+      "id": "interaction-1755195219009",
+      "name": "New Interaction",
       "modules": [
         {
-          "id": "node-1754170499899",
+          "id": "Time Input-1755195219009",
           "moduleName": "Time Input",
-          "config": {
-            "mode": "metronome",
-            "targetTime": "12:00 PM",
-            "millisecondDelay": 10000,
-            "enabled": true,
-            "apiEnabled": false,
-            "apiEndpoint": ""
-          },
-          "status": "running",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1754235799565,
           "position": {
-            "x": 193.14626865671647,
-            "y": 413.97033582089557
+            "x": 331,
+            "y": 334.765625
           },
-          "mode": "metronome",
-          "currentTime": "10:43:19 AM",
-          "countdown": "1s to next",
-          "targetTime": "12:00 PM",
-          "targetTime12Hour": "",
-          "millisecondDelay": 10000,
+          "config": {
+            "enabled": true,
+            "mode": "metronome",
+            "millisecondDelay": 3000,
+            "apiEnabled": false
+          },
           "enabled": true,
-          "apiEnabled": false,
-          "apiEndpoint": ""
+          "lastUpdate": 1755195219009
         },
         {
-          "id": "node-1754170514058",
+          "id": "Audio Output-1755195223191",
           "moduleName": "Audio Output",
+          "position": {
+            "x": 847.8566765438763,
+            "y": 319.53143195553076
+          },
           "config": {
+            "enabled": true,
+            "deviceId": "default",
+            "sampleRate": 44100,
+            "channels": 2,
+            "format": "wav",
+            "volume": 1,
+            "bufferSize": 4096,
+            "loop": false,
+            "fadeInDuration": 0,
+            "fadeOutDuration": 0,
+            "enableFileUpload": true,
+            "uploadPort": 4000,
+            "uploadHost": "0.0.0.0",
+            "maxFileSize": 52428800,
+            "allowedExtensions": [
+              ".wav",
+              ".mp3",
+              ".ogg",
+              ".m4a",
+              ".flac"
+            ],
             "selectedFile": "1754185642038_Arcade.wav"
           },
-          "status": "stopped",
-          "messageCount": 0,
-          "frameCount": 0,
-          "lastUpdate": 1754365713447,
-          "position": {
-            "x": 708.0051345909241,
-            "y": 224.78351428685966
-          },
-          "deviceId": "default",
-          "isPlaying": true,
-          "playCount": 2,
-          "errorCount": 0
+          "enabled": true,
+          "lastUpdate": 1755195223191
         }
       ],
       "routes": [
         {
-          "id": "route-1754170518317",
-          "source": "node-1754170499899",
-          "target": "node-1754170514058",
+          "id": "r_1755195226768",
+          "source": "Time Input-1755195219009",
+          "target": "Audio Output-1755195223191",
           "event": "trigger"
         }
       ]
@@ -67,25 +67,52 @@
   ],
   "modules": [
     {
-      "id": "b97f4ec7-e18e-4695-99b8-346ae9caaf37",
-      "moduleName": "time_input",
-      "status": "stopped",
+      "id": "Time Input-1755195219009",
+      "moduleName": "Time Input",
+      "config": {
+        "enabled": true,
+        "mode": "metronome",
+        "millisecondDelay": 3000,
+        "apiEnabled": false
+      },
+      "status": "running",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754977821439,
-      "currentTime": "5:50:21 AM",
-      "countdown": "6h 9m 38s"
+      "lastUpdate": 1755195531777,
+      "currentTime": "1:18:51 PM",
+      "countdown": "3s to next"
     },
     {
-      "id": "node-1754170514058",
+      "id": "Audio Output-1755195223191",
       "moduleName": "Audio Output",
       "config": {
+        "enabled": true,
+        "deviceId": "default",
+        "sampleRate": 44100,
+        "channels": 2,
+        "format": "wav",
+        "volume": 1,
+        "bufferSize": 4096,
+        "loop": false,
+        "fadeInDuration": 0,
+        "fadeOutDuration": 0,
+        "enableFileUpload": true,
+        "uploadPort": 4000,
+        "uploadHost": "0.0.0.0",
+        "maxFileSize": 52428800,
+        "allowedExtensions": [
+          ".wav",
+          ".mp3",
+          ".ogg",
+          ".m4a",
+          ".flac"
+        ],
         "selectedFile": "1754185642038_Arcade.wav"
       },
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1754365734362
+      "lastUpdate": 1755195241014
     }
   ],
   "routes": [],

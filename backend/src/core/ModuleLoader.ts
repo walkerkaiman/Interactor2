@@ -104,6 +104,16 @@ export class ModuleLoader {
       this.modules.set(manifest.name, manifest);
       this.logger.debug(`Module loaded: ${manifest.name}`, 'ModuleLoader');
 
+      // Attempt to import module API to register its factory with ModuleRegistry
+      try {
+        const apiIndex = path.join(modulePath, 'api', 'index');
+        // Dynamic import without extension resolves to compiled JS in dist
+        await import(apiIndex);
+        this.logger.debug(`Registered API for module: ${manifest.name}`, 'ModuleLoader');
+      } catch (apiErr) {
+        this.logger.warn(`No API registration found for module: ${manifest.name}`, 'ModuleLoader');
+      }
+
     } catch (error) {
       this.logger.error(`Error loading module: ${moduleName}`, 'ModuleLoader', { error: String(error) });
     }

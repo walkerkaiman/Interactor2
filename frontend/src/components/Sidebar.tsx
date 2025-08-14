@@ -19,8 +19,8 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
       offsetY: event.clientY - event.currentTarget.getBoundingClientRect().top,
     };
     
-    event.dataTransfer.setData('application/json', JSON.stringify(dragData));
     event.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
+    event.dataTransfer.setData('application/json', JSON.stringify(dragData));
     event.dataTransfer.effectAllowed = 'copy';
   };
 
@@ -55,6 +55,10 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
     onPageChange(pages[nextIndex]);
   };
 
+  if (currentPage !== 'modules') {
+    return null;
+  }
+
   return (
     <div className={styles.sidebar} data-testid="sidebar">
       <div className={styles.header}>
@@ -79,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
               >
                 <div className={styles.moduleHeader}>
                   <span className={styles.moduleName}>{module.name}</span>
-                  <span className={styles.moduleType}>Input</span>
+                  <span className={`${styles.moduleType} ${styles.moduleTypeInput}`}>Input</span>
                 </div>
                 <p className={styles.moduleDescription}>{module.description}</p>
                 <div className={styles.moduleMeta}>
@@ -105,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ modules, currentPage, onPageChange })
               >
                 <div className={styles.moduleHeader}>
                   <span className={styles.moduleName}>{module.name}</span>
-                  <span className={styles.moduleType}>Output</span>
+                  <span className={`${styles.moduleType} ${styles.moduleTypeOutput}`}>Output</span>
                 </div>
                 <p className={styles.moduleDescription}>{module.description}</p>
                 <div className={styles.moduleMeta}>

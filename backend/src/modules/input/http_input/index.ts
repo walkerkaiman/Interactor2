@@ -424,7 +424,7 @@ export class HttpInputModule extends InputModuleBase {
        timestamp,
        rateLimitRemaining: requestData.rateLimitRemaining
      };
-     this.emitStream<HttpStreamPayload>(streamPayload);
+     this.emitStream<number>(streamPayload.value);
     }
 
     // Emit state update

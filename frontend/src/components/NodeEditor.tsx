@@ -18,8 +18,10 @@ import AudioOutputNode from './AudioOutputNode';
 import CustomEdge from './CustomEdge';
 import { useFlowBuilder } from '../graph/useFlowBuilder';
 import { useUnregisteredChanges } from '../state/useUnregisteredChanges';
+import seedConfigFromManifest from '../graph/utils/seedConfigFromManifest';
 
 import styles from './NodeEditor.module.css';
+import { useModuleRuntime } from '../hooks/useModuleRuntime';
 
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
@@ -46,26 +48,33 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   onNodeSelect,
   onInteractionsUpdate,
 }) => {
-  // Get unregistered changes
-  const { applyChangesToInteractions } = useUnregisteredChanges();
-  
-  // Apply unregistered changes to interactions for display
-  const interactionsWithChanges = applyChangesToInteractions(interactions);
+  // Unregistered-changes signals only; display uses the draft passed via props
+  const { markStructuralChange } = useUnregisteredChanges();
+  const interactionsWithChanges = interactions;
   
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect: flowBuilderConnect, onEdgesDelete: flowBuilderEdgesDelete } = useFlowBuilder(
     modules,
     interactionsWithChanges,
     (updatedInteractions: InteractionConfig[]) => {
-      // Store the updated interactions in unregistered changes
-      // This will be applied when the user registers the interactions
-      console.log('NodeEditor: Interactions updated from flow builder:', updatedInteractions);
-      // TODO: Implement proper interaction update handling
+      if (onInteractionsUpdate) {
+        onInteractionsUpdate(updatedInteractions);
+      }
+    },
+    {
+      onConfigChange: (moduleId: string, config: any) => {
+        const updated = interactions.map((interaction) => ({
+          ...interaction,
+          modules: (interaction.modules || []).map((m: any) => m.id === moduleId ? { ...m, config: { ...m.config, ...config } } : m)
+        }));
+        if (onInteractionsUpdate) {
+          onInteractionsUpdate(updated);
+        }
+      },
+      onStructuralChange: () => markStructuralChange()
     }
   );
   
-  // Debug logging for edges
-  console.log('NodeEditor edges:', edges);
-  console.log('NodeEditor nodes:', nodes);
+  // Minimized logs to reduce noise and improve perf
   
   const [draggedHandle, setDraggedHandle] = useState<{ nodeId: string; handleId: string } | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
@@ -93,22 +102,27 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       event.stopPropagation();
 
       try {
-        const dragData = JSON.parse(event.dataTransfer.getData('application/json'));
-        console.log('Drop event:', dragData);
+        const raw = event.dataTransfer.getData('application/reactflow') || event.dataTransfer.getData('application/json');
+        if (!raw) {
+          console.warn('Drop event: no data received (application/reactflow or application/json)');
+          return;
+        }
+        const dragData = JSON.parse(raw);
 
-        if (reactFlowInstance && dragData.moduleName) {
-          const position = reactFlowInstance.screenToFlowPosition({
-            x: event.clientX,
-            y: event.clientY,
-          });
+        if (dragData.moduleName) {
+          const position = (reactFlowInstance && typeof (reactFlowInstance as any).screenToFlowPosition === 'function')
+            ? (reactFlowInstance as any).screenToFlowPosition({ x: event.clientX, y: event.clientY })
+            : { x: 0, y: 0 };
+          const safePosition = position || { x: 0, y: 0 };
 
           // Create a new module instance
           const moduleId = `${dragData.moduleName}-${Date.now()}`;
+          const seededConfig = seedConfigFromManifest(dragData.manifest);
           const newModuleInstance = {
             id: moduleId,
             moduleName: dragData.moduleName,
-            position,
-            config: dragData.manifest.configSchema?.properties ? {} : {},
+            position: safePosition,
+            config: seededConfig,
             enabled: true,
             lastUpdate: Date.now()
           };
@@ -131,19 +145,17 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             ];
           }
 
-          console.log('Adding new module instance:', newModuleInstance);
-          console.log('Updated interactions:', updatedInteractions);
-          
           // Call the interaction update handler if provided
           if (onInteractionsUpdate) {
             onInteractionsUpdate(updatedInteractions);
           }
+          markStructuralChange();
         }
       } catch (error) {
         console.error('Error handling drop:', error);
       }
     },
-    [reactFlowInstance, modules, interactions, onNodeSelect, handleDeleteNode]
+    [reactFlowInstance, modules, interactions, onNodeSelect, handleDeleteNode, markStructuralChange]
   );
 
   // Handle drag over
@@ -176,27 +188,45 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle node position changes
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    // TODO: implement position updates through useFlowBuilder
-    console.log('Node drag stop:', node.id, node.position);
-  }, []);
+    console.log('Node drag stop (update position):', node.id, node.position);
+    const updated = interactions.map((interaction) => ({
+      ...interaction,
+      modules: (interaction.modules || []).map((m: any) => m.id === node.id ? { ...m, position: node.position } : m)
+    }));
+    if (onInteractionsUpdate) {
+      onInteractionsUpdate(updated);
+    }
+    markStructuralChange();
+  }, [interactions, onInteractionsUpdate, markStructuralChange]);
 
     // Handle pane click to disconnect
   const onPaneClick = useCallback((_event: React.MouseEvent) => {
     if (draggedHandle) {
-      // TODO: implement disconnect through useFlowBuilder
-      console.log('Pane click with dragged handle:', draggedHandle);
+      // Remove any route from the draft whose source and event match the dragged handle
+      const updated = interactions.map((interaction) => ({
+        ...interaction,
+        routes: (interaction.routes || []).filter((route: any) => {
+          return !(route.source === draggedHandle.nodeId && String(route.event) === String(draggedHandle.handleId));
+        })
+      }));
+      if (onInteractionsUpdate) {
+        onInteractionsUpdate(updated);
+      }
+      console.log('Pane drop disconnect (removed routes for handle):', draggedHandle);
+      markStructuralChange();
       setDraggedHandle(null);
     }
     onNodeSelect(null);
-  }, [draggedHandle, onNodeSelect]);
+  }, [draggedHandle, interactions, onNodeSelect, onInteractionsUpdate, markStructuralChange]);
 
   const onConnect = useCallback(
     (params: Connection) => {
       // TODO: implement connect through useFlowBuilder
-      console.log('Connect:', params);
+      console.log('Connect (adding route):', params);
       flowBuilderConnect(params);
+      markStructuralChange();
     },
-    [flowBuilderConnect]
+    [flowBuilderConnect, markStructuralChange]
   );
 
   // Handle edge deletion
@@ -204,13 +234,24 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     (edgesToDelete: any[]) => {
       console.log('Deleting edges:', edgesToDelete);
       flowBuilderEdgesDelete(edgesToDelete);
+      markStructuralChange();
     },
-    [flowBuilderEdgesDelete]
+    [flowBuilderEdgesDelete, markStructuralChange]
   );
+
+  // Current Time from first Time Input (runtimeBus), fallback to local clock
+  const firstTimeNode = nodes.find(n => n.type === 'timeInput');
+  const timeRuntime = useModuleRuntime(firstTimeNode?.id || '', ['currentTime']);
+  const headerCurrentTime = timeRuntime.currentTime || new Date().toLocaleTimeString();
 
   return (
     <div className={styles.nodeEditor}>
-      <ReactFlow
+      <div className={styles.headerBar}>
+        <div className={styles.headerTitle}>Node Editor</div>
+        <div className={styles.headerTime} title="Current Time">{headerCurrentTime}</div>
+      </div>
+      <div className={styles.flowContainer}>
+        <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -224,6 +265,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           onInit={setReactFlowInstance}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          // Ensure React Flow allows drops on canvas
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -238,9 +280,10 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           panOnScroll={false}
           preventScrolling={true}
         >
-        <Controls />
-        <Background />
-      </ReactFlow>
+          <Controls />
+          <Background />
+        </ReactFlow>
+      </div>
     </div>
   );
 };

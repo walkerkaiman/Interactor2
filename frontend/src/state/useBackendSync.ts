@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { ModuleManifest, InteractionConfig } from '@interactor/shared';
 import { apiService } from '../api';
 import { useUnregisteredChanges } from './useUnregisteredChanges';
+import { runtimeBus } from './runtimeBus';
 
 interface BackendSync {
   modules: any[];                  // list that already includes runtime fields
@@ -9,6 +10,7 @@ interface BackendSync {
   settings: Record<string, any>;
   loading: boolean;
   error: string | null;
+  refresh: () => Promise<{ modules: any[]; interactions: InteractionConfig[]; settings: Record<string, any> }>;
 }
 
 /**
@@ -29,24 +31,30 @@ export function useBackendSync(): BackendSync {
 
   // immutable map of manifests by name
   const manifestMapRef = useRef<Map<string, ModuleManifest>>(new Map());
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientIdRef = useRef<string | null>(null);
 
-  /* -------------------------------- initial REST load -------------------------------- */
+  /* -------------------------------- REST load + refresh -------------------------------- */
+  const refresh = useCallback(async () => {
+    const [manifests, latestInteractions, latestSettings] = await Promise.all([
+      apiService.getModules(),
+      apiService.getInteractions(),
+      apiService.getSettings()
+    ]);
+    manifestMapRef.current = new Map(manifests.map(m => [m.name, m]));
+    setModules(manifests);
+    setInteractions(latestInteractions);
+    setSettings(latestSettings);
+    return { modules: manifests, interactions: latestInteractions, settings: latestSettings };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [manifests, initialInteractions, initialSettings] = await Promise.all([
-          apiService.getModules(),
-          apiService.getInteractions(),
-          apiService.getSettings()
-        ]);
-        if (cancelled) return;
-
-        manifestMapRef.current = new Map(manifests.map(m => [m.name, m]));
-        setModules(manifests);
-        setInteractions(initialInteractions);
-        setSettings(initialSettings);
-        setLoading(false);
+        await refresh();
+        if (!cancelled) setLoading(false);
       } catch (err: any) {
         if (!cancelled) {
           setError(err?.message ?? 'Load failed');
@@ -54,25 +62,68 @@ export function useBackendSync(): BackendSync {
         }
       }
     })();
+    // Load persistent client id once
+    try {
+      const key = 'interactorClientId';
+      let id = localStorage.getItem(key);
+      if (!id && (window as any).crypto?.randomUUID) {
+        id = (window as any).crypto.randomUUID();
+        localStorage.setItem(key, id);
+      }
+      clientIdRef.current = id;
+    } catch {
+      clientIdRef.current = null;
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh]);
 
   /* -------------------------------- WebSocket -------------------------------- */
   const handleWebSocketMessage = useCallback((msg: any) => {
     console.log('WebSocket message received:', msg);
     
     if (msg.type === 'state_update') {
-      const { moduleInstances, interactions: incomingInteractions } = msg.data;
+      const { moduleInstances, interactions: wsInteractions, originClientId } = msg.data || {};
 
-      console.log('WebSocket received moduleInstances:', moduleInstances);
+      // Ignore own-origin structural frames
+      if (originClientId && clientIdRef.current && originClientId === clientIdRef.current) {
+        console.log('Ignoring state_update from our own origin client id');
+        return;
+      }
+
+      // Accept non-empty interactions snapshot to populate structure on first load
+      if (Array.isArray(wsInteractions) && wsInteractions.length > 0) {
+        console.log('Applying interactions snapshot from WebSocket:', wsInteractions.length);
+        setInteractions(wsInteractions);
+      }
+
+      // If backend sends no instances, avoid nuking our current modules (continue to allow interactions update above)
+      if (!Array.isArray(moduleInstances) || moduleInstances.length === 0) {
+        console.log('WebSocket state_update has empty moduleInstances; preserving current modules');
+        return;
+      }
 
       // merge manifests + runtime
       const manifests = manifestMapRef.current;
+      const internalToDisplay: Record<string, string> = {
+        time_input: 'Time Input',
+        audio_output: 'Audio Output',
+        dmx_output: 'DMX Output',
+        osc_input: 'OSC Input',
+        osc_output: 'OSC Output',
+        http_input: 'HTTP Input',
+        http_output: 'HTTP Output',
+        serial_input: 'Serial Input',
+        frames_input: 'Frames Input'
+      };
+
       const enriched = moduleInstances.map((inst: any) => {
-        const manifest = manifests.get(inst.moduleName);
-        const merged = manifest ? { ...manifest, ...inst } : inst;
+        const displayName = internalToDisplay[(inst.moduleName || '').toLowerCase()] || inst.moduleName || inst.name;
+        const manifest = manifests.get(inst.moduleName) || manifests.get(inst.name) || manifests.get(displayName);
+        const inferredType = (manifest as any)?.type || (/(^|_)output$/.test((inst.moduleName || '').toLowerCase()) || /output$/i.test(displayName) ? 'output' : 'input');
+        const mergedName = (manifest as any)?.name ?? displayName;
+        const merged = { name: mergedName, type: inferredType, ...(manifest || {}), ...inst };
         console.log(`Merged module ${inst.moduleName}:`, merged);
         return merged;
       });
@@ -81,13 +132,14 @@ export function useBackendSync(): BackendSync {
       setModules(prevModules => {
         console.log('Previous modules:', prevModules);
         
-        // Create a map of existing modules by name for easy lookup
-        const existingModulesMap = new Map(prevModules.map(m => [m.name, m]));
+        // Create a map of existing modules by name/moduleName for easy lookup
+        const existingModulesMap = new Map(prevModules.map(m => [m.name ?? m.moduleName, m]));
         
         // Update existing modules with runtime state from WebSocket
         enriched.forEach((enrichedModule: any) => {
-          if (enrichedModule.name) {
-            const existingModule = existingModulesMap.get(enrichedModule.name);
+          const key = enrichedModule.name ?? enrichedModule.moduleName;
+          if (key) {
+            const existingModule = existingModulesMap.get(key);
             if (existingModule) {
               // For runtime fields (like currentTime, countdown), always use the server value
               // For config fields, preserve local unregistered changes
@@ -109,12 +161,12 @@ export function useBackendSync(): BackendSync {
                 updatedModule.config = preservedConfig;
               }
               
-              existingModulesMap.set(enrichedModule.name, updatedModule);
-              console.log(`Updated module ${enrichedModule.name} with runtime fields and preserved config:`, updatedModule);
+              existingModulesMap.set(key, updatedModule);
+              console.log(`Updated module ${key} with runtime fields and preserved config:`, updatedModule);
             } else {
               // This is a new runtime instance, add it
-              existingModulesMap.set(enrichedModule.name, enrichedModule);
-              console.log(`Added new module ${enrichedModule.name}:`, enrichedModule);
+              existingModulesMap.set(key, enrichedModule);
+              console.log(`Added new module ${key}:`, enrichedModule);
             }
           }
         });
@@ -124,60 +176,77 @@ export function useBackendSync(): BackendSync {
         return finalModules;
       });
       
-      if (incomingInteractions) setInteractions(incomingInteractions);
+      // Intentionally ignore structural updates (interactions) from WS.
     } else if (msg.type === 'module_runtime_update') {
-      // Handle targeted runtime updates for specific modules
-      const { moduleId, runtimeData } = msg.data;
-      console.log(`Received runtime update for module ${moduleId}:`, runtimeData);
-      
-      setModules(prevModules => {
-        return prevModules.map(module => {
-          if (module.id === moduleId) {
-            // Update only the runtime fields, preserving user configuration
-            const updatedModule = { ...module };
-            
-            // Update runtime fields from server
-            Object.keys(runtimeData).forEach(field => {
-              if (runtimeData[field] !== undefined) {
-                updatedModule[field] = runtimeData[field];
-              }
-            });
-            
-            console.log(`Updated runtime fields for module ${moduleId}:`, updatedModule);
-            return updatedModule;
-          }
-          return module;
-        });
-      });
+      // Emit targeted runtime updates through the runtime bus only
+      const { moduleId, runtimeData, timestamp } = msg.data;
+      console.log('Emitting runtimeBus update:', { moduleId, runtimeData, timestamp });
+      runtimeBus.emit({ moduleId, runtimeData, timestamp });
     }
   }, [getMergedConfig]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3001');
-    
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
-    
-    ws.onmessage = evt => {
+    const wsUrl = (import.meta as any).env?.VITE_WS_URL ?? 'ws://localhost:3001';
+
+    const connect = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
       try {
-        const msg = JSON.parse(evt.data);
-        handleWebSocketMessage(msg);
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+          }
+        };
+
+        ws.onmessage = evt => {
+          try {
+            const msg = JSON.parse(evt.data);
+            handleWebSocketMessage(msg);
+          } catch (err) {
+            console.warn('WebSocket parse error', err);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.warn('WebSocket error (will retry):', error);
+        };
+
+        ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          // Attempt reconnect after 1s
+          if (!reconnectTimeoutRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectTimeoutRef.current = null;
+              connect();
+            }, 1000);
+          }
+        };
       } catch (err) {
-        console.error('WebSocket parse error', err);
+        console.warn('WebSocket connect failed, retrying soon', err);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = null;
+          connect();
+        }, 1000);
       }
     };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+
+    connect();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch {}
+        wsRef.current = null;
+      }
     };
-    
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-    
-    return () => ws.close();
   }, [handleWebSocketMessage]);
 
-  return { modules, interactions, settings, loading, error };
+  return { modules, interactions, settings, loading, error, refresh };
 }

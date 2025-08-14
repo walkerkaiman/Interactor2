@@ -252,14 +252,8 @@ export class SerialInputModule extends InputModuleBase {
             dataCount: this.dataCount
           });
         } else {
-          // Streaming mode: emit stream with value
-          this.emitStream({
-            value,
-            rawData,
-            threshold: this.threshold,
-            operator: this.logicOperator,
-            timestamp: serialData.timestamp
-          });
+          // Streaming mode: emit stream with numeric value only
+          this.emitStream(value);
         }
       } else if (!shouldTrigger) {
         this.lastTriggered = false;

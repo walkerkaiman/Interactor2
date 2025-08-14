@@ -2,9 +2,9 @@ import { InputModuleBase } from '../../InputModuleBase';
 import { ModuleConfig, TimeInputConfig, TimeTriggerPayload, TimeState } from '@interactor/shared';
 import { InteractorError } from '../../../core/ErrorHandler';
 import WebSocket from 'ws';
-import { TimeEngine } from './TimeEngine';
-import { WsClient } from './WsClient';
-import { convertTo12Hour, convertTo24Hour } from './DisplayFormatter';
+import { TimeEngine } from './domain/TimeEngine';
+import { WsClient } from './infra/WsClient';
+import { convertTo12Hour, convertTo24Hour } from './domain/DisplayFormatter';
 
 export class TimeInputModule extends InputModuleBase {
   private engine: TimeEngine;

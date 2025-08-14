@@ -1,6 +1,6 @@
 import path from 'path';
 import * as fs from 'fs-extra';
-import ffmpegPath from 'ffmpeg-static';
+// ffmpeg-static removed; storage no longer depends on CLI transcoding
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { IAudioStorage, SavedFilePayload, AudioFileMeta } from './IAudioStorage';
@@ -41,18 +41,9 @@ export class LocalFileSystemStorage implements IAudioStorage {
 
     await fs.writeFile(filePath, buffer);
 
-    // If MP3 uploaded, transcode to WAV for quick playback like legacy behaviour
-    let finalFilename = filename;
-    let finalFilePath = filePath;
-    if (ext === '.mp3') {
-      const wavName = filename.replace(/\.mp3$/i, '.wav');
-      const wavPath = path.join(this.assetsDir, wavName);
-
-      await execFileAsync(ffmpegPath, ['-y', '-i', filePath, '-ar', String(this.sampleRate), '-ac', String(this.channels), wavPath]);
-      await fs.remove(filePath);
-      finalFilename = wavName;
-      finalFilePath = wavPath;
-    }
+    // Keep original format; decode at playback time (no CLI transcoding here)
+    const finalFilename = filename;
+    const finalFilePath = filePath;
 
     this.uploadCount++;
 

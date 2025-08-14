@@ -9,6 +9,7 @@ interface UnregisteredConfigChange {
 interface UnregisteredChangesState {
   configChanges: Map<string, UnregisteredConfigChange>;
   hasChanges: boolean;
+  structuralChange: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export function useUnregisteredChanges() {
   const stateRef = useRef<UnregisteredChangesState>({
     configChanges: new Map(),
     hasChanges: false,
+    structuralChange: false,
   });
 
   // Local state for triggering re-renders
@@ -39,7 +41,7 @@ export function useUnregisteredChanges() {
     };
     
     stateRef.current.configChanges.set(moduleId, change);
-    stateRef.current.hasChanges = stateRef.current.configChanges.size > 0;
+    stateRef.current.hasChanges = stateRef.current.structuralChange || stateRef.current.configChanges.size > 0;
     triggerUpdate();
     
     console.log(`Unregistered config change for module ${moduleId}:`, config);
@@ -48,7 +50,7 @@ export function useUnregisteredChanges() {
   // Remove config change
   const removeConfigChange = useCallback((moduleId: string) => {
     stateRef.current.configChanges.delete(moduleId);
-    stateRef.current.hasChanges = stateRef.current.configChanges.size > 0;
+    stateRef.current.hasChanges = stateRef.current.structuralChange || stateRef.current.configChanges.size > 0;
     triggerUpdate();
     
     console.log(`Removed unregistered config change for module ${moduleId}`);
@@ -57,6 +59,7 @@ export function useUnregisteredChanges() {
   // Clear all changes
   const clearAllChanges = useCallback(() => {
     stateRef.current.configChanges.clear();
+    stateRef.current.structuralChange = false;
     stateRef.current.hasChanges = false;
     triggerUpdate();
     
@@ -110,6 +113,13 @@ export function useUnregisteredChanges() {
     }));
   }, []);
 
+  // Mark structural change (e.g., node add/remove, edge changes, position changes)
+  const markStructuralChange = useCallback(() => {
+    stateRef.current.structuralChange = true;
+    stateRef.current.hasChanges = true;
+    triggerUpdate();
+  }, [triggerUpdate]);
+
   return {
     // State
     hasChanges: stateRef.current.hasChanges,
@@ -124,5 +134,6 @@ export function useUnregisteredChanges() {
     hasConfigChange,
     getMergedConfig,
     applyChangesToInteractions,
+    markStructuralChange,
   };
 } 

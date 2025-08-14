@@ -239,13 +239,8 @@ export class FramesInputModule extends InputModuleBase {
             frameCount: this.frameCount
           });
         } else {
-          // Streaming mode: emit stream with frame number
-          this.emitStream({
-            frameNumber,
-            msb,
-            lsb,
-            timestamp: frameData.timestamp
-          });
+          // Streaming mode: emit stream with frame number (numeric value)
+          this.emitStream(frameNumber);
         }
       }
 

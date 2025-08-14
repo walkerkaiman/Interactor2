@@ -1,4 +1,4 @@
-import { convertTo12Hour, convertTo24Hour, getCountdownToTarget, getMetronomeCountdown } from '../DisplayFormatter';
+import { convertTo12Hour, convertTo24Hour, getCountdownToTarget, getMetronomeCountdown } from '../domain/DisplayFormatter';
 
 describe('DisplayFormatter', () => {
   describe('convertTo12Hour', () => {

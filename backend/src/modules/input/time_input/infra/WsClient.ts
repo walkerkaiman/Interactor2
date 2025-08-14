@@ -2,8 +2,8 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 
 export interface WsClientOptions {
-  baseDelay?: number;      // ms – delay before first reconnect attempt
-  maxAttempts?: number;    // how many times to retry (0 = infinite)
+  baseDelay?: number;
+  maxAttempts?: number;
 }
 
 export class WsClient extends EventEmitter {
@@ -18,21 +18,17 @@ export class WsClient extends EventEmitter {
   connect() {
     this.clearTimer();
     this.ws = new WebSocket(this.url);
-
     this.ws.onopen = () => {
       this.attempts = 0;
       this.emit('open');
     };
-
     this.ws.onmessage = evt => {
       this.emit('message', evt.data);
     };
-
     this.ws.onclose = evt => {
       this.emit('close', evt);
       this.scheduleReconnect();
     };
-
     this.ws.onerror = err => {
       this.emit('error', err);
     };
@@ -46,7 +42,6 @@ export class WsClient extends EventEmitter {
     }
   }
 
-  /* ---------------- private ---------------- */
   private scheduleReconnect() {
     const { baseDelay = 5000, maxAttempts = 5 } = this.opts;
     if (maxAttempts !== 0 && this.attempts >= maxAttempts) {
@@ -65,3 +60,5 @@ export class WsClient extends EventEmitter {
     }
   }
 }
+
+

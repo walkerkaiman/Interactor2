@@ -133,6 +133,20 @@
   text-transform: uppercase;
 }
 
+/* Color overrides per AI TODO: Inputs green, Outputs red */
+.moduleCard .moduleHeader .moduleType {
+  color: #ffffff;
+}
+
+/* Input badge */
+.moduleCard .moduleHeader .moduleType:has(+ .moduleName),
+.moduleCard .moduleHeader .moduleType {
+}
+
+/* Target explicit text cases since CSS lacks :has(text()) reliably; adjust via classes in markup if needed */
+.moduleCard .moduleHeader .moduleTypeInput { background: #10B981; }
+.moduleCard .moduleHeader .moduleTypeOutput { background: #EF4444; }
+
 .moduleDescription {
   margin: 0 0 0.75rem 0;
   color: #d1d5db;

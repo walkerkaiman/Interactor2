@@ -62,7 +62,7 @@ app.get('/api/modules', (req, res) => {
 // Documentation endpoint
 app.get('/api/documentation/*', (req, res) => {
   try {
-    const docPath = req.params[0];
+    const docPath = (req.params as any)[0] as string;
     let filePath: string;
     
     if (docPath.startsWith('documentation/')) {
@@ -79,11 +79,11 @@ app.get('/api/documentation/*', (req, res) => {
     
     const content = fs.readFileSync(filePath, 'utf-8');
     res.set('Content-Type', 'text/plain');
-    res.send(content);
+    return res.send(content);
     
   } catch (error) {
     console.error('Error serving documentation:', error);
-    res.status(500).json({ success: false, error: 'Failed to load documentation' });
+    return res.status(500).json({ success: false, error: 'Failed to load documentation' });
   }
 });
 

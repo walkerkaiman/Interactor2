@@ -95,7 +95,7 @@ export class OscOutputModule extends OutputModuleBase {
     this.host = configWithDefaults.host;
     this.port = configWithDefaults.port;
     this.addressPattern = configWithDefaults.addressPattern;
-    this.enabled = configWithDefaults.enabled;
+    this.enabled = !!configWithDefaults.enabled;
   }
 
   protected async onInit(): Promise<void> {
@@ -195,7 +195,7 @@ export class OscOutputModule extends OutputModuleBase {
     }
     
     if (newConfig.enabled !== this.enabled) {
-      this.enabled = newConfig.enabled;
+      this.enabled = !!newConfig.enabled;
       if (this.enabled && !this.isConnected) {
         await this.start();
       } else if (!this.enabled && this.isConnected) {
@@ -216,11 +216,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async onSend<T = unknown>(data: T): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot send OSC data when module is disabled',
-        { enabled: this.enabled, attempted: 'send' },
-        ['Enable the OSC module in configuration', 'Check module status before sending data', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot send OSC data when module is disabled', { enabled: this.enabled, attempted: 'send' });
     }
     await this.sendOscMessage(this.addressPattern, data);
   }
@@ -230,11 +226,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async handleTriggerEvent(event: TriggerEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle trigger event when OSC module is disabled',
-        { enabled: this.enabled, attempted: 'trigger_event' },
-        ['Enable the OSC module in configuration', 'Check module status before triggering', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot handle trigger event when OSC module is disabled', { enabled: this.enabled, attempted: 'trigger_event' });
     }
     
     // Extract address from event payload if available, otherwise use default
@@ -249,11 +241,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   protected async handleStreamingEvent(event: StreamEvent): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot handle streaming event when OSC module is disabled',
-        { enabled: this.enabled, attempted: 'streaming_event' },
-        ['Enable the OSC module in configuration', 'Check module status before streaming', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot handle streaming event when OSC module is disabled', { enabled: this.enabled, attempted: 'streaming_event' });
     }
     
     // For streaming events, send the value to the default address pattern
@@ -263,13 +251,9 @@ export class OscOutputModule extends OutputModuleBase {
   /**
    * Handle manual trigger with proper typing
    */
-  protected async onManualTrigger(): Promise<void> {
+  protected async handleManualTrigger(): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot perform manual trigger when OSC module is disabled',
-        { enabled: this.enabled, attempted: 'manual_trigger' },
-        ['Enable the OSC module in configuration', 'Check module status before manual trigger', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot perform manual trigger when OSC module is disabled', { enabled: this.enabled, attempted: 'manual_trigger' });
     }
     
     const testData = {
@@ -290,13 +274,13 @@ export class OscOutputModule extends OutputModuleBase {
     }
 
     try {
-      this.udpPort = new osc.UDPPort({
+      this.udpPort = new (osc as any).UDPPort({
         remoteAddress: this.host,
         remotePort: this.port,
         metadata: true
       });
 
-      this.udpPort.on('ready', () => {
+      (this.udpPort as any).on('ready', () => {
         this.logger?.info(`OSC sender ready to ${this.host}:${this.port}`);
         this.setConnectionStatus(true);
         this.emit('status', {
@@ -307,7 +291,7 @@ export class OscOutputModule extends OutputModuleBase {
         });
       });
 
-      this.udpPort.on('error', (error: Error) => {
+      (this.udpPort as any).on('error', (error: Error) => {
         this.logger?.error(`OSC sender error:`, error);
         this.setConnectionStatus(false);
         this.emit('error', {
@@ -318,7 +302,7 @@ export class OscOutputModule extends OutputModuleBase {
         });
       });
 
-      this.udpPort.open();
+      (this.udpPort as any).open();
     } catch (error) {
       this.logger?.error(`Failed to initialize OSC sender:`, error);
       this.setConnectionStatus(false);
@@ -331,7 +315,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   private stopOscSender(): void {
     if (this.udpPort) {
-      this.udpPort.close();
+      (this.udpPort as any).close();
       this.udpPort = undefined;
       this.setConnectionStatus(false);
       this.logger?.info(`OSC sender stopped`);
@@ -348,11 +332,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   private async sendOscMessage<T = unknown>(address: string, data: T): Promise<void> {
     if (!this.udpPort || !this.isConnected) {
-      throw InteractorError.moduleError(
-        'OSC sender is not ready - cannot send message',
-        new Error('UDP port not initialized or connection lost'),
-        ['Check OSC configuration (host and port)', 'Verify network connectivity', 'Ensure module is started and initialized', 'Check if target OSC application is running']
-      );
+      throw InteractorError.internal('OSC sender is not ready - cannot send message', new Error('UDP port not initialized or connection lost'));
     }
 
     const timestamp = Date.now();
@@ -370,7 +350,7 @@ export class OscOutputModule extends OutputModuleBase {
       };
 
       // Send the message
-      this.udpPort.send(oscMessage);
+      (this.udpPort as any).send(oscMessage);
       
       // Create message data object
       const messageData: OscOutputMessage = {
@@ -574,11 +554,7 @@ export class OscOutputModule extends OutputModuleBase {
    */
   public async sendToAddress(address: string, data: unknown): Promise<void> {
     if (!this.enabled) {
-      throw InteractorError.conflict(
-        'Cannot send to OSC address when module is disabled',
-        { enabled: this.enabled, attempted: 'send_to_address', address },
-        ['Enable the OSC module in configuration', 'Check module status before sending', 'Verify module initialization completed successfully']
-      );
+      throw InteractorError.conflict('Cannot send to OSC address when module is disabled', { enabled: this.enabled, attempted: 'send_to_address', address });
     }
     await this.sendOscMessage(address, data);
   }

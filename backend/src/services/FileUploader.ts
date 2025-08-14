@@ -57,9 +57,9 @@ export class FileUploader extends EventEmitter {
     this.upload = multer({
       storage: multer.diskStorage({
         destination: (req, file, cb) => {
-          const moduleType = req.params.moduleType;
+          const moduleType = req.params.moduleType as string;
           const moduleConfig = this.config.moduleConfigs.get(moduleType);
-          const subdir = moduleConfig?.subdirectory || moduleType;
+          const subdir = (moduleConfig?.subdirectory || moduleType) as string;
           const uploadPath = path.join(this.uploadDir, subdir);
           fs.ensureDirSync(uploadPath);
           cb(null, uploadPath);
@@ -75,8 +75,8 @@ export class FileUploader extends EventEmitter {
         fileSize: config.maxFileSize
       },
       fileFilter: (req, file, cb) => {
-        const moduleType = req.params.moduleType;
-        const moduleConfig = this.config.moduleConfigs.get(moduleType);
+          const moduleType = req.params.moduleType as string;
+          const moduleConfig = this.config.moduleConfigs.get(moduleType);
         
         if (!moduleConfig) {
           return cb(new Error(`Module type '${moduleType}' not configured`));
@@ -124,28 +124,28 @@ export class FileUploader extends EventEmitter {
     });
 
     // Get file list for all modules or specific module
-    this.app.get('/files/:moduleType?', async (req, res) => {
-      const moduleType = req.params.moduleType;
+      this.app.get('/files/:moduleType?', async (req, res) => {
+      const moduleType = req.params.moduleType as string | undefined;
       
       try {
         if (moduleType) {
           // Get files for specific module
           const files = await this.getFileList(moduleType);
-          res.json({ success: true, data: files });
+          return res.json({ success: true, data: files });
         } else {
           // Get files for all modules
           const allFiles = await this.getAllFileList();
-          res.json({ success: true, data: allFiles });
+          return res.json({ success: true, data: allFiles });
         }
       } catch (error) {
-        this.logger.error('Failed to get file list:', error);
-        res.status(500).json({ success: false, error: 'Failed to get file list' });
+        this.logger.error('Failed to get file list:', String(error));
+        return res.status(500).json({ success: false, error: 'Failed to get file list' });
       }
     });
 
     // Upload file for specific module
-    this.app.post('/upload/:moduleType', this.upload.single('file'), async (req, res) => {
-      const moduleType = req.params.moduleType;
+      this.app.post('/upload/:moduleType', this.upload.single('file'), async (req, res) => {
+      const moduleType = req.params.moduleType as string;
       const file = req.file;
       
       if (!file) {
@@ -154,14 +154,14 @@ export class FileUploader extends EventEmitter {
 
       try {
         // Validate module configuration
-        const moduleConfig = this.config.moduleConfigs.get(moduleType);
+        const moduleConfig = this.config.moduleConfigs.get(moduleType as string);
         if (!moduleConfig) {
           return res.status(400).json({ success: false, error: `Module type '${moduleType}' not configured` });
         }
 
         // Create a lock for this file to prevent concurrent modifications
         const lockKey = `upload_${moduleType}_${file.filename}`;
-        const uploadPromise = this.handleFileUpload(file, moduleType, moduleConfig);
+        const uploadPromise = this.handleFileUpload(file, moduleType as string, moduleConfig);
         this.fileLocks.set(lockKey, uploadPromise);
         
         await uploadPromise;
@@ -172,24 +172,24 @@ export class FileUploader extends EventEmitter {
           originalName: file.originalname,
           size: file.size,
           timestamp: Date.now(),
-          moduleType,
+          moduleType: moduleType as string,
           subdirectory: moduleConfig.subdirectory
         };
 
         this.emit('fileUploaded', uploadedFile);
         this.logger.info(`File uploaded: ${file.filename} by ${moduleType}`);
         
-        res.json({ success: true, data: uploadedFile });
-      } catch (error) {
-        this.logger.error('Upload failed:', error);
-        res.status(500).json({ success: false, error: error.message });
+        return res.json({ success: true, data: uploadedFile });
+      } catch (error: any) {
+        this.logger.error('Upload failed:', String(error));
+        return res.status(500).json({ success: false, error: error?.message || 'Upload failed' });
       }
     });
 
     // Delete file from specific module
-    this.app.delete('/files/:moduleType/:filename', async (req, res) => {
-      const moduleType = req.params.moduleType;
-      const filename = req.params.filename;
+      this.app.delete('/files/:moduleType/:filename', async (req, res) => {
+      const moduleType = req.params.moduleType as string;
+      const filename = req.params.filename as string;
       
       try {
         const lockKey = `delete_${moduleType}_${filename}`;
@@ -202,24 +202,24 @@ export class FileUploader extends EventEmitter {
         this.emit('fileDeleted', { filename, moduleType, timestamp: Date.now() });
         this.logger.info(`File deleted: ${filename} from ${moduleType}`);
         
-        res.json({ success: true, data: { filename, deleted: true } });
-      } catch (error) {
-        this.logger.error('Delete failed:', error);
-        res.status(500).json({ success: false, error: error.message });
+        return res.json({ success: true, data: { filename, deleted: true } });
+      } catch (error: any) {
+        this.logger.error('Delete failed:', String(error));
+        return res.status(500).json({ success: false, error: error?.message || 'Delete failed' });
       }
     });
 
     // Get file metadata
-    this.app.get('/files/:moduleType/:filename/metadata', async (req, res) => {
-      const moduleType = req.params.moduleType;
-      const filename = req.params.filename;
+      this.app.get('/files/:moduleType/:filename/metadata', async (req, res) => {
+      const moduleType = req.params.moduleType as string;
+      const filename = req.params.filename as string;
       
       try {
         const metadata = await this.getFileMetadata(filename, moduleType);
-        res.json({ success: true, data: metadata });
-      } catch (error) {
-        this.logger.error('Failed to get metadata:', error);
-        res.status(500).json({ success: false, error: error.message });
+        return res.json({ success: true, data: metadata });
+      } catch (error: any) {
+        this.logger.error('Failed to get metadata:', String(error));
+        return res.status(500).json({ success: false, error: error?.message || 'Failed to get metadata' });
       }
     });
 
@@ -346,7 +346,7 @@ export class FileUploader extends EventEmitter {
         allFiles = allFiles.concat(moduleFiles.files);
         totalSize += moduleFiles.totalSize;
       } catch (error) {
-        this.logger.warn(`Failed to get files for module ${moduleType}:`, error);
+        this.logger.warn(`Failed to get files for module ${moduleType}:`, String(error));
       }
     }
     

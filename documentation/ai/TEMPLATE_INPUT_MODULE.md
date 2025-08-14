@@ -4,6 +4,34 @@ This template provides a standardized structure for input modules that properly 
 
 > Routing note: Routes match the event emitted by the input (e.g., `timeTrigger`). Do not rely on remapping to target input events; the server wires outputs by `moduleId` and forwards based on `{ source, event }`.
 
+## Structure
+
+```
+modules/input/<your_module>
+  api/
+    index.ts           # public factory + exports only
+  domain/
+    <domain files>     # pure logic
+  infra/
+    <adapters>         # IO, device, network
+  index.ts             # re-export during transition only
+  manifest.json
+  wiki.md
+```
+
+## Public API
+
+- Expose only via `api/index.ts`.
+- Register your factory with `ModuleRegistry`:
+
+```ts
+import { moduleRegistry } from '../../../app/ModuleRegistry';
+import { MyInputModule } from '../index';
+
+// Factory should be side-effect imported by ModuleLoader or server composition
+moduleRegistry.register('My Input', (config) => new MyInputModule(config as any));
+```
+
 ## Comprehensive State Management
 
 ### 1. All Settings Preserved Regardless of Mode

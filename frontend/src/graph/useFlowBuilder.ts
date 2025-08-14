@@ -1,6 +1,7 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { Node, Edge, Connection, useNodesState, useEdgesState } from 'reactflow';
 import { InteractionConfig, ModuleManifest } from '@interactor/shared';
+import { resolveNodeType } from './utils/nodeTypeRegistry';
 
 interface FlowBuilderReturn {
   nodes: Node[];
@@ -14,22 +15,32 @@ interface FlowBuilderReturn {
 export function useFlowBuilder(
   modules: any[],
   interactions: InteractionConfig[],
-  onInteractionsChange: (intx: InteractionConfig[]) => void
+  onInteractionsChange: (intx: InteractionConfig[]) => void,
+  options?: {
+    onConfigChange?: (moduleId: string, config: any) => void;
+    onStructuralChange?: () => void;
+  }
 ): FlowBuilderReturn {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  const toSlug = useCallback((s: string | undefined) => (s || '').toLowerCase().replace(/\s+/g, '_'), []);
+
   // rebuild graph when inputs change
-  useMemo(() => {
+  useEffect(() => {
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
-    // Create maps for efficient lookup
+    // Create maps for efficient lookup (support display names and slugs)
     const moduleMap = new Map<string, ModuleManifest | any>();
     const runtimeModuleMap = new Map<string, any>();
     
-    // Map modules by name for manifest lookup
-    modules.forEach(m => moduleMap.set(m.name ?? m.moduleName ?? m.id, m));
+    // Map modules by name and slug for manifest lookup
+    modules.forEach(m => {
+      const key = (m as any).name ?? (m as any).moduleName ?? (m as any).id;
+      moduleMap.set(key, m);
+      moduleMap.set(toSlug(key), m);
+    });
     
     // Map runtime modules by ID for instance data
     modules.forEach(m => {
@@ -40,25 +51,34 @@ export function useFlowBuilder(
 
     interactions.forEach(interaction => {
       interaction.modules?.forEach(modInst => {
-        const manifest = moduleMap.get(modInst.moduleName);
+        const manifest = moduleMap.get(modInst.moduleName) || moduleMap.get(toSlug(modInst.moduleName)) || modules.find((m:any)=> (m.name||'').toLowerCase()===toSlug(modInst.moduleName));
         if (!manifest) return;
         
         // Use runtime module data if available, otherwise fall back to interaction data
         const runtimeInstance = runtimeModuleMap.get(modInst.id);
         const instanceData = runtimeInstance || modInst;
         
-        console.log(`Creating node for ${modInst.moduleName} (${modInst.id}):`, {
-          manifest,
-          modInst,
-          runtimeInstance,
-          instanceData
-        });
+        // Build node
         
         newNodes.push({
           id: modInst.id,
-          type: manifest.name === 'Time Input' ? 'timeInput' : manifest.type === 'output' ? 'audioOutput' : 'custom',
+          type: resolveNodeType(modInst.moduleName, (manifest as any).type),
           position: modInst.position || { x: 0, y: 0 },
-          data: { module: manifest, instance: instanceData, edges: [] }
+          data: {
+            module: manifest,
+            instance: instanceData,
+            edges: [],
+            onDelete: (nodeId: string) => {
+              const updatedInteractions = interactions.map((intx) => ({
+                ...intx,
+                modules: (intx.modules || []).filter(m => m.id !== nodeId),
+                routes: (intx.routes || []).filter(r => r.source !== nodeId && r.target !== nodeId)
+              }));
+              onInteractionsChange(updatedInteractions);
+              if (options?.onStructuralChange) options.onStructuralChange();
+            },
+            onConfigChange: options?.onConfigChange
+          }
         });
       });
       interaction.routes?.forEach(route => {
@@ -77,20 +97,39 @@ export function useFlowBuilder(
             interaction: interaction
           }
         };
-        
-        console.log(`Creating edge:`, edge);
         newEdges.push(edge);
       });
     });
+
+    // Guard against transient empties (WS initial/refresh): never clear to empty
+    if (newNodes.length === 0 && newEdges.length === 0) {
+      return;
+    }
 
     setNodes(newNodes);
     setEdges(newEdges);
   }, [modules, interactions, setNodes, setEdges]);
 
-  // Just re-emit connect to external handler for now
-  const onConnect = useCallback((_conn: Connection) => {
-    // TODO: implement update logic -> interactions
-  }, []);
+  // Add a new route on connect, preserving sourceHandle as event
+  const onConnect = useCallback((conn: Connection) => {
+    if (!conn.source || !conn.target || !conn.sourceHandle) return;
+    const newRoute = {
+      id: `r_${Date.now()}`,
+      source: conn.source,
+      target: conn.target,
+      event: String(conn.sourceHandle)
+    } as any;
+
+    const updated = interactions.length > 0
+      ? interactions.map(intx => ({
+          ...intx,
+          routes: [...(intx.routes || []), newRoute]
+        }))
+      : [{ id: `interaction-${Date.now()}`, name: 'New Interaction', modules: [], routes: [newRoute] } as any];
+
+    console.log('useFlowBuilder: onConnect → newRoute', newRoute);
+    onInteractionsChange(updated);
+  }, [interactions, onInteractionsChange]);
 
   // Handle edge deletion
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {

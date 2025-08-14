@@ -4,6 +4,33 @@ This template provides a standardized structure for output modules that properly
 
 > Routing note: Outputs receive messages via server wiring by `moduleId`. The router matches `{ source, event }` from the input; no event remapping occurs during registration. Implement `onTriggerEvent`/`onStreamingEvent` accordingly.
 
+## Structure
+
+```
+modules/output/<your_module>
+  api/
+    index.ts           # public factory + exports only
+  domain/
+    <domain files>     # pure logic
+  infra/
+    <adapters>         # IO, device drivers
+  index.ts             # re-export during transition only
+  manifest.json
+  wiki.md
+```
+
+## Public API
+
+- Expose only via `api/index.ts`.
+- Register your factory with `ModuleRegistry`.
+
+```ts
+import { moduleRegistry } from '../../../app/ModuleRegistry';
+import { MyOutputModule } from '../index';
+
+moduleRegistry.register('My Output', (config) => new MyOutputModule(config as any));
+```
+
 ## State Management Best Practices
 
 ### 1. Use Standardized State Update Methods

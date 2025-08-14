@@ -6,6 +6,7 @@ import compression from 'compression';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { WebSocketServer } from 'ws';
+import { setupWebSocket } from './appapi/websocket';
 
 // Core services (singletons)
 import { Logger } from './core/Logger';
@@ -16,6 +17,18 @@ import { SystemStats } from './core/SystemStats';
 import { ErrorHandler, InteractorError } from './core/ErrorHandler';
 import { FileUploader } from './services/FileUploader';
 import { fileUploader } from './services/fileUploaderInstance';
+import { moduleRegistry } from './app/ModuleRegistry';
+// Transitional explicit API registrations to ensure factories are available in dev
+import './modules/input/time_input/api/index';
+import './modules/output/audio_output/api/index';
+import './modules/input/frames_input/api/index';
+import './modules/input/http_input/api/index';
+import './modules/input/osc_input/api/index';
+import './modules/input/serial_input/api/index';
+import './modules/output/dmx_output/api/index';
+import './modules/output/http_output/api/index';
+import './modules/output/osc_output/api/index';
+import { buildHttpRoutes } from './appapi/httpRoutes';
 
 // Types
 import {
@@ -29,7 +42,7 @@ import {
 export class InteractorServer {
   private app: express.Application;
   private server: any;
-  private wss: WebSocketServer;
+  private wss!: WebSocketServer;
   private logger: Logger;
   private messageRouter: MessageRouter;
   private moduleLoader: ModuleLoader;
@@ -44,7 +57,6 @@ export class InteractorServer {
   constructor() {
     this.app = express();
     this.server = createServer(this.app);
-    this.wss = new WebSocketServer({ server: this.server });
     
     // Initialize singleton services
     this.logger = Logger.getInstance();
@@ -74,7 +86,7 @@ export class InteractorServer {
       await this.initializeServices();
       await this.setupMiddleware();
       await this.setupRoutes();
-      await this.setupWebSocket();
+      this.wss = setupWebSocket(this.server);
       await this.setupModuleStateListeners();
     } catch (error) {
       this.logger.error('Failed to initialize Interactor Server', 'InteractorServer', { error: String(error) });
@@ -163,30 +175,24 @@ export class InteractorServer {
       
       this.logger.info(`Restoring ${moduleInstances.length} module instances from data store`);
       
-      // Create live instances for all modules in the data store
+      // Create live instances for supported modules in the data store (inputs and outputs)
       for (const moduleInstance of moduleInstances) {
-        const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
-        const internalName = this.getInternalModuleName(displayName);
-        
-        if (displayName === 'Time Input' || internalName === 'time_input') {
-          try {
-            // Create live module instance
-            const liveInstance = await this.createModuleInstance(moduleInstance);
-            if (liveInstance) {
-              // Set up state listeners for this module
-              this.setupModuleStateListener(moduleInstance);
-              
-              // Start the live module instance if it was previously running
-              if (moduleInstance.status === 'running') {
-                await liveInstance.start();
-                this.logger.info(`Restored and started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
-              } else {
-                this.logger.info(`Restored live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}) - not starting (status: ${moduleInstance.status})`);
-              }
+        try {
+          const liveInstance = await this.createModuleInstance(moduleInstance);
+          if (liveInstance) {
+            // Set up state listeners for this module
+            this.setupModuleStateListener(moduleInstance);
+
+            // Start the live module instance if it was previously running
+            if (moduleInstance.status === 'running') {
+              await liveInstance.start();
+              this.logger.info(`Restored and started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+            } else {
+              this.logger.info(`Restored live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}) - not starting (status: ${moduleInstance.status})`);
             }
-          } catch (error) {
-            this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
           }
+        } catch (error) {
+          this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
         }
       }
       
@@ -303,7 +309,7 @@ export class InteractorServer {
         this.logger.debug(`Updated module ID in state manager: ${oldId} -> ${newId}`);
       }
     } catch (error) {
-      this.logger.error(`Failed to update module ID in state manager:`, error);
+      this.logger.error(`Failed to update module ID in state manager:`, String(error));
     }
   }
 
@@ -312,108 +318,80 @@ export class InteractorServer {
    */
   private async createModuleInstance(moduleData: any): Promise<any> {
     const { id, moduleName, config } = moduleData;
-    
-    // Normalize the module name to use the display name from manifest
     const displayName = this.getModuleNameFromManifest(moduleName);
-    const internalName = this.getInternalModuleName(displayName);
-    
-    // Handle Time Input module
-    if (displayName === 'Time Input' || internalName === 'time_input') {
-      try {
-        const { TimeInputModule } = await import('./modules/input/time_input/index');
-        const moduleInstance = new TimeInputModule(config, id);
-        moduleInstance.setLogger(this.logger);
-        moduleInstance.on('stateUpdate', (stateData: any) => {
-          this.handleModuleStateUpdate(id, stateData);
-        });
-        moduleInstance.on('configUpdated', (configData: any) => {
-          this.handleModuleConfigUpdate(id, configData);
-        });
-        moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
-          this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
-          const moduleInstances = this.stateManager.getModuleInstances();
-          const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
-          if (stateModuleInstance) {
-            const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
-            runtimeFields.forEach(field => {
-              if (runtimeData[field] !== undefined) {
-                stateModuleInstance[field] = runtimeData[field];
-              }
-            });
-            stateModuleInstance.lastUpdate = Date.now();
-            this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
-              this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
-            }).catch(error => {
-              this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
-            });
-          } else {
-            this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
-          }
-        });
-        moduleInstance.on('trigger', (triggerEvent: any) => {
-          this.logger.debug(`Received trigger event from ${moduleName}:`, triggerEvent);
-          const message = {
-            id: `msg_${Date.now()}_${Math.random()}`,
-            source: moduleInstance.id,
-            target: '',
-            event: triggerEvent.event,
-            payload: triggerEvent.payload,
-            timestamp: Date.now()
-          };
-          this.messageRouter.routeMessage(message);
-        });
-        await moduleInstance.init();
-        this.moduleInstances.set(moduleInstance.id, moduleInstance);
-        this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
-        return moduleInstance;
-      } catch (error) {
-        this.logger.error(`Failed to create ${moduleName} instance:`, error);
-        throw error;
+    try {
+      // Prefer registry
+      if (!moduleRegistry.has(displayName)) {
+        this.logger.warn(`Module registry has no factory for ${displayName}; using transitional fallback`);
       }
+      const moduleInstance = moduleRegistry.has(displayName)
+        ? await moduleRegistry.create(displayName, config, id)
+        : await this.createModuleInstanceFallback(displayName, config, id);
+      moduleInstance.setLogger(this.logger);
+      moduleInstance.on('stateUpdate', (stateData: any) => {
+        this.handleModuleStateUpdate(moduleInstance.id, stateData);
+      });
+      moduleInstance.on('configUpdated', (configData: any) => {
+        this.handleModuleConfigUpdate(moduleInstance.id, configData);
+      });
+      moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
+        this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
+        const moduleInstances = this.stateManager.getModuleInstances();
+        const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
+        if (stateModuleInstance) {
+          const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'] as const;
+          runtimeFields.forEach(field => {
+            if ((runtimeData as any)[field] !== undefined) {
+              (stateModuleInstance as any)[field] = (runtimeData as any)[field];
+            }
+          });
+          stateModuleInstance.lastUpdate = Date.now();
+          this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+            this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
+          }).catch(error => {
+            this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
+          });
+        } else {
+          this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
+        }
+      });
+      moduleInstance.on('trigger', (triggerEvent: any) => {
+        this.logger.debug(`Received trigger event from ${moduleName}:`, triggerEvent);
+        const message = {
+          id: `msg_${Date.now()}_${Math.random()}`,
+          source: moduleInstance.id,
+          target: '',
+          event: triggerEvent.event,
+          payload: triggerEvent.payload,
+          timestamp: Date.now()
+        };
+        this.messageRouter.routeMessage(message);
+      });
+      await moduleInstance.init();
+      this.moduleInstances.set(moduleInstance.id, moduleInstance);
+      this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
+      return moduleInstance;
+    } catch (error) {
+      this.logger.error(`Failed to create ${moduleName} instance:`, String(error));
+      throw error;
     }
-    // Handle Audio Output module
-    if (displayName === 'Audio Output' || internalName === 'audio_output') {
-      try {
-        const { AudioOutputModule } = await import('./modules/output/audio_output/index');
-        const moduleInstance = new AudioOutputModule(config, id);
-        moduleInstance.setLogger(this.logger);
-        moduleInstance.on('stateUpdate', (stateData: any) => {
-          this.handleModuleStateUpdate(id, stateData);
-        });
-        moduleInstance.on('configUpdated', (configData: any) => {
-          this.handleModuleConfigUpdate(id, configData);
-        });
-        moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
-          this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
-          const moduleInstances = this.stateManager.getModuleInstances();
-          const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
-          if (stateModuleInstance) {
-            const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
-            runtimeFields.forEach(field => {
-              if (runtimeData[field] !== undefined) {
-                stateModuleInstance[field] = runtimeData[field];
-              }
-            });
-            stateModuleInstance.lastUpdate = Date.now();
-            this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
-              this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
-            }).catch(error => {
-              this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
-            });
-          } else {
-            this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
-          }
-        });
-        await moduleInstance.init();
-        this.moduleInstances.set(moduleInstance.id, moduleInstance);
-        this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
-        return moduleInstance;
-      } catch (error) {
-        this.logger.error(`Failed to create ${moduleName} instance:`, error);
-        throw error;
-      }
+  }
+
+  /**
+   * Transitional fallback factory for well-known modules until all modules self-register
+   */
+  private async createModuleInstanceFallback(displayName: string, config: any, id?: string): Promise<any> {
+    if (displayName === 'Time Input') {
+      const { TimeInputModule } = await import('./modules/input/time_input/index');
+      const moduleInstance = new TimeInputModule(config, id);
+      return moduleInstance;
     }
-    return null; // Module type not supported yet
+    if (displayName === 'Audio Output') {
+      const { AudioOutputModule } = await import('./modules/output/audio_output/index');
+      const moduleInstance = new AudioOutputModule(config, id);
+      return moduleInstance;
+    }
+    throw new Error(`No factory available for module: ${displayName}`);
   }
   
   /**
@@ -431,8 +409,8 @@ export class InteractorServer {
         
         // Update only runtime fields
         runtimeFields.forEach(field => {
-          if (stateData[field] !== undefined) {
-            moduleInstance[field] = stateData[field];
+          if ((stateData as any)[field] !== undefined) {
+            (moduleInstance as any)[field] = (stateData as any)[field];
           }
         });
         
@@ -447,7 +425,7 @@ export class InteractorServer {
         this.logger.debug(`Updated runtime state for module ${moduleId}`, stateData);
       }
     } catch (error) {
-      this.logger.error(`Failed to handle state update for module ${moduleId}:`, error);
+      this.logger.error(`Failed to handle state update for module ${moduleId}:`, String(error));
     }
   }
   
@@ -473,7 +451,7 @@ export class InteractorServer {
         this.logger.debug(`Updated config for module ${moduleId}`, configData);
       }
     } catch (error) {
-      this.logger.error(`Failed to handle config update for module ${moduleId}:`, error);
+      this.logger.error(`Failed to handle config update for module ${moduleId}:`, String(error));
     }
   }
 
@@ -481,25 +459,18 @@ export class InteractorServer {
    * Setup minimal REST API routes
    */
   private setupRoutes(): void {
-    // Health check
+    // Mount thin controllers router (in-progress extraction)
+    this.app.use(buildHttpRoutes());
+    // Health check (will be removed once fully extracted into appapi)
     this.app.get('/health', ErrorHandler.asyncHandler(async (req, res) => {
       const health = this.systemStats.getHealthStatus();
       const uptime = this.systemStats.getUptimeFormatted();
-      
-      res.json({
-        status: health.status,
-        uptime: uptime,
-        timestamp: Date.now(),
-        message: health.message
-      });
+      res.json({ status: health.status, uptime, timestamp: Date.now(), message: health.message });
     }));
 
-    // System stats
+    // System stats (duplicate during transition)
     this.app.get('/api/stats', (req, res) => {
-      res.json({
-        success: true,
-        data: this.systemStats.getStats()
-      });
+      res.json({ success: true, data: this.systemStats.getStats() });
     });
 
     // Module management - list available modules
@@ -552,21 +523,22 @@ export class InteractorServer {
       moduleInstance.config = newConfig;
       moduleInstance.lastUpdate = Date.now();
       
-      this.logger.info(`Updating module config for ${moduleInstance.moduleName} (${req.params.id}):`, {
+      this.logger.info(`Updating module config for ${moduleInstance.moduleName} (${req.params.id}):`);
+      this.logger.debug('Module config update details', 'InteractorServer', {
         oldConfig: moduleInstance.config,
         newConfig: newConfig,
         changes: req.body.config
       });
       
       // CRITICAL: Also update the live module instance if it exists
-      const liveInstance = this.moduleInstances.get(req.params.id);
+      const liveInstance = this.moduleInstances.get(req.params.id as string);
       if (liveInstance) {
         try {
           await liveInstance.updateConfig(newConfig);
           this.logger.info(`Updated live module instance config for ${moduleInstance.moduleName} (${req.params.id})`);
         } catch (error) {
-          this.logger.error(`Failed to update live module config:`, error);
-          throw InteractorError.moduleError('Failed to update module configuration', error as Error);
+          this.logger.error(`Failed to update live module config:`, String(error));
+          throw InteractorError.internal('Failed to update module configuration', error as Error);
         }
       } else {
         this.logger.warn(`No live instance found for module ${req.params.id}, only updated data store`);
@@ -614,22 +586,22 @@ export class InteractorServer {
         // Broadcast state update
         this.broadcastStateUpdate();
         
-        res.json({ 
+        return res.json({ 
           success: true, 
           message: 'Module configuration updated successfully',
           data: moduleInstance
         });
       } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
+        return res.status(500).json({ success: false, error: String(error) });
       }
     });
 
     this.app.get('/api/modules/:name', (req, res) => {
       const manifest = this.moduleLoader.getManifest(req.params.name as string);
       if (manifest) {
-        res.json({ success: true, data: manifest });
+        return res.json({ success: true, data: manifest });
       } else {
-        res.status(404).json({ success: false, error: 'Module not found' });
+        return res.status(404).json({ success: false, error: 'Module not found' });
       }
     });
 
@@ -659,50 +631,29 @@ export class InteractorServer {
       
       const response: InteractionListResponse = { interactions: enrichedInteractions };
       this.logger.debug(`API: Sending response with ${enrichedInteractions.length} interactions`, 'InteractorServer');
-      res.json({ success: true, data: response });
+      return res.json({ success: true, data: response });
     });
 
     // Register entire interaction map (atomic update)
     this.app.post('/api/interactions/register', async (req, res) => {
       try {
         const interactionMap: InteractionConfig[] = req.body.interactions || [];
+        const originClientId: string | undefined = (req.get('X-Client-Id') as string) || req.body.clientId;
         
         // Replace entire interaction state
         await this.stateManager.replaceState({ interactions: interactionMap });
         
-        // Process routes from interactions and add to MessageRouter
+        // Process routes from interactions and add to MessageRouter (no event remapping)
         const messageRouter = MessageRouter.getInstance();
-        messageRouter.clearRoutes(); // Clear existing routes
-        
+        messageRouter.clearRoutes();
         interactionMap.forEach(interaction => {
-          if (interaction.routes) {
-            interaction.routes.forEach(route => {
-              // For output modules, we need to map the simplified "input" handle to actual module events
-              // Since MessageRoute doesn't contain handle info, we'll use the event name to determine mapping
-              const targetModule = interaction.modules.find(m => m.id === route.target);
-              if (targetModule) {
-                const manifest = this.moduleLoader.getManifest(targetModule.moduleName);
-                if (manifest?.type === 'output' && manifest.events) {
-                  const inputEvents = manifest.events.filter(e => e.type === 'input');
-                  if (inputEvents.length > 0 && inputEvents[0]?.name) {
-                    // For output modules, map to the first available input event
-                    const mappedRoute = {
-                      ...route,
-                      event: inputEvents[0].name
-                    };
-                    messageRouter.addRoute(mappedRoute);
-                    this.logger.debug(`Mapped route for output module: ${route.id} -> ${inputEvents[0].name}`, 'InteractorServer');
-                  }
-                } else {
-                  // For regular routes, add as-is
-                  messageRouter.addRoute(route);
-                }
-              } else {
-                // Fallback: add route as-is
-                messageRouter.addRoute(route);
-              }
-            });
-          }
+          interaction.routes?.forEach(route => {
+            const ensuredRoute = { ...route } as any;
+            if (!ensuredRoute.id) {
+              ensuredRoute.id = `route_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            }
+            messageRouter.addRoute(ensuredRoute);
+          });
         });
         
         // Create module instances for all modules in interactions
@@ -730,28 +681,30 @@ export class InteractorServer {
           modules: moduleInstances 
         });
         
-        // Create and start live module instances for input modules
+        // Create live module instances for inputs and outputs; start inputs if appropriate
         for (const moduleInstance of moduleInstances) {
-          if (moduleInstance.moduleName === 'Time Input') {
-            try {
-              // Create live module instance
-              const liveInstance = await this.createModuleInstance(moduleInstance);
-              if (liveInstance) {
-                // Start the live module instance
+          try {
+            const liveInstance = await this.createModuleInstance(moduleInstance);
+            if (liveInstance) {
+              const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
+              const internalName = this.getInternalModuleName(displayName);
+              // Start inputs automatically (e.g., time_input)
+              if (displayName === 'Time Input' || internalName === 'time_input') {
                 await liveInstance.start();
                 this.logger.info(`Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
               }
-            } catch (error) {
-              this.logger.error(`Failed to start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, error);
             }
+          } catch (error) {
+            this.logger.error(`Failed to create/start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
           }
         }
         
-        // Set up trigger event listeners for output modules
+        // Re-wire router after (re)creating instances
         this.setupTriggerEventListeners();
         
-        // Broadcast state update to all connected clients
-        this.broadcastStateUpdate();
+        // Broadcast state update to all clients with originClientId (echo suppression friendly)
+        this.logger.info('Register completed, broadcasting state_update', 'InteractorServer', { originClientId: originClientId || 'none' });
+        this.broadcastStateUpdate(originClientId);
         
         res.json({ 
           success: true, 
@@ -811,13 +764,13 @@ export class InteractorServer {
         // Broadcast state update to all connected clients
         this.broadcastStateUpdate();
         
-        res.json({ 
+        return res.json({ 
           success: true, 
           data: instance,
           message: 'Module instance created successfully'
         });
       } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
+        return res.status(500).json({ success: false, error: String(error) });
       }
     });
 
@@ -906,8 +859,8 @@ export class InteractorServer {
           await liveInstance.start();
           this.logger.info(`Module ${moduleInstance.moduleName} (${req.params.id}) started successfully`);
         } catch (error) {
-          this.logger.error(`Failed to start module ${moduleInstance.moduleName}:`, error);
-          throw error;
+          this.logger.error(`Failed to start module ${moduleInstance.moduleName}:`, String(error));
+          return res.status(500).json({ success: false, error: String(error) });
         }
         
         // Update module status to running
@@ -920,14 +873,14 @@ export class InteractorServer {
         // Broadcast state update
         this.broadcastStateUpdate();
         
-        res.json({ 
+        return res.json({ 
           success: true, 
           message: 'Module started successfully',
           data: moduleInstance
         });
       } catch (error) {
-        this.logger.error(`Failed to start module: ${error}`);
-        res.status(500).json({ success: false, error: String(error) });
+        this.logger.error(`Failed to start module: ${String(error)}`);
+        return res.status(500).json({ success: false, error: String(error) });
       }
     });
 
@@ -948,8 +901,8 @@ export class InteractorServer {
             await liveInstance.stop();
             this.logger.info(`Live module ${moduleInstance.moduleName} (${req.params.id}) stopped successfully`);
           } catch (error) {
-            this.logger.error(`Failed to stop live module ${moduleInstance.moduleName}:`, error);
-            throw error;
+            this.logger.error(`Failed to stop live module ${moduleInstance.moduleName}:`, String(error));
+            return res.status(500).json({ success: false, error: String(error) });
           }
         } else {
           this.logger.warn(`No live instance found for module ${req.params.id}`);
@@ -965,14 +918,14 @@ export class InteractorServer {
         // Broadcast state update
         this.broadcastStateUpdate();
         
-        res.json({ 
+        return res.json({ 
           success: true, 
           message: 'Module stopped successfully',
           data: moduleInstance
         });
       } catch (error) {
-        this.logger.error(`Failed to stop module: ${error}`);
-        res.status(500).json({ success: false, error: String(error) });
+        this.logger.error(`Failed to stop module: ${String(error)}`);
+        return res.status(500).json({ success: false, error: String(error) });
       }
     });
 
@@ -1166,7 +1119,7 @@ export class InteractorServer {
   /**
    * Broadcast state update to all connected WebSocket clients
    */
-  public broadcastStateUpdate(): void {
+  public broadcastStateUpdate(originClientId?: string): void {
     if (this.wss.clients.size === 0) return;
     
     try {
@@ -1174,7 +1127,8 @@ export class InteractorServer {
         type: 'state_update',
         data: {
           interactions: this.stateManager.getInteractions(),
-          moduleInstances: this.stateManager.getModuleInstances()
+          moduleInstances: this.stateManager.getModuleInstances(),
+          ...(originClientId ? { originClientId } : {})
         }
       };
       
@@ -1251,47 +1205,53 @@ export class InteractorServer {
    * Setup trigger event listeners for output modules
    */
   private setupTriggerEventListeners(): void {
-    // Get all module instances and set up trigger event listeners for output modules
+    // Clear previous listeners to avoid duplicates when re-wiring
+    this.messageRouter.removeAllListeners();
+
+    // Wire output modules by live instance id
     const moduleInstances = this.stateManager.getModuleInstances();
-    
     moduleInstances.forEach(moduleInstance => {
       const manifest = this.moduleLoader.getManifest(moduleInstance.moduleName);
-      if (manifest?.type === 'output') {
-        // Get the actual module instance from the module loader
-        const actualModule = this.moduleLoader.getInstance(moduleInstance.id);
-        if (actualModule) {
-          // Set up trigger event listener for this output module
-          actualModule.on('triggerEvent', (event: any) => {
-            this.logger.debug(`Received trigger event from module: ${event.moduleId}`, event);
-            this.broadcastTriggerEvent(event.moduleId, event.type);
-          });
-          
-          // Set up message router listener for this output module
-          this.messageRouter.on(moduleInstance.id, (message: any) => {
-            this.logger.debug(`Message router sending message to ${moduleInstance.moduleName}:`, message);
-            
-            // Create the appropriate event type for the output module
-            if (message.event === 'trigger' || message.event === 'timeTrigger' || message.event === 'manualTrigger') {
-              const triggerEvent = {
-                moduleId: message.source,
-                moduleName: 'Input Module',
-                event: message.event,
-                payload: message.payload,
-                timestamp: message.timestamp
-              };
-              actualModule.onTriggerEvent(triggerEvent);
-            } else if (message.event === 'stream') {
-              const streamEvent = {
-                moduleId: message.source,
-                moduleName: 'Input Module',
-                value: message.payload,
-                timestamp: message.timestamp
-              };
-              actualModule.onStreamingEvent(streamEvent);
-            }
-          });
-        }
+      if (manifest?.type !== 'output') return;
+
+      const liveInstance = this.moduleInstances.get(moduleInstance.id);
+      if (!liveInstance) {
+        this.logger.warn(`No live instance found for output module ${moduleInstance.moduleName} (${moduleInstance.id})`);
+        return;
       }
+
+      // Pulse → WS
+      liveInstance.on('triggerEvent', (event: any) => {
+        this.logger.debug(`Received trigger event from module: ${event.moduleId}`, event);
+        this.broadcastTriggerEvent(event.moduleId, event.type);
+      });
+
+      // Router → output instance
+      this.messageRouter.on(moduleInstance.id, (message: any) => {
+        this.logger.debug(`Router → ${moduleInstance.moduleName} (${moduleInstance.id}):`, message);
+        if (message.event === 'trigger' || message.event === 'timeTrigger' || message.event === 'manualTrigger') {
+          const triggerEvent = {
+            moduleId: message.source,
+            moduleName: 'Input Module',
+            event: message.event,
+            payload: message.payload,
+            timestamp: message.timestamp
+          };
+          if (typeof liveInstance.onTriggerEvent === 'function') {
+            liveInstance.onTriggerEvent(triggerEvent);
+          }
+        } else if (message.event === 'stream') {
+          const streamEvent = {
+            moduleId: message.source,
+            moduleName: 'Input Module',
+            value: message.payload,
+            timestamp: message.timestamp
+          };
+          if (typeof liveInstance.onStreamingEvent === 'function') {
+            liveInstance.onStreamingEvent(streamEvent);
+          }
+        }
+      });
     });
   }
 

@@ -24,6 +24,16 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
     super(name, config, manifest, id);
   }
 
+  // Interface: onOutput(handler)
+  public onOutput(handler: (data: any) => void): void {
+    this.addOutputHandler(handler as unknown as EventHandler);
+  }
+
+  // Interface: send(data)
+  public async send(data: any): Promise<void> {
+    await this.onSend(data);
+  }
+
   /**
    * Add output handler
    */
@@ -141,12 +151,37 @@ export abstract class OutputModuleBase extends ModuleBase implements OutputModul
     }
   }
 
+  /** Helper to emit status updates in a consistent shape */
+  protected emitStatus(status: string, details?: Record<string, unknown>): void {
+    this.emit('status', {
+      moduleId: this.id,
+      moduleName: this.name,
+      status,
+      ...(details || {})
+    });
+  }
+
+  /** Helper to emit standardized errors */
+  protected emitError(error: Error, context: string): void {
+    this.emit('error', {
+      moduleId: this.id,
+      moduleName: this.name,
+      error: error.message,
+      context
+    });
+  }
+
   /**
    * Set connection status
    */
   protected setConnected(connected: boolean): void {
     this.isConnected = connected;
     this.logger?.debug(`Connection status for ${this.name}: ${connected}`);
+  }
+
+  // Back-compat alias used by some modules
+  protected setConnectionStatus(connected: boolean): void {
+    this.setConnected(connected);
   }
 
   /**
