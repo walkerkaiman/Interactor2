@@ -3,8 +3,11 @@ import { Logger } from '../../../../core/Logger';
 export class TimeEngine {
   private timer: NodeJS.Timeout | null = null;
   private lastTickTime = 0;
-  private tickInterval = 1000; // Default 1 second
+  private displayInterval = 1000; // Always update display every 1 second
+  private triggerInterval = 1000; // Trigger interval (can be different from display)
   private logger?: Logger;
+  private mode: 'clock' | 'metronome' = 'clock';
+  private targetTime?: string;
   
   constructor(
     private readonly onTick: () => void,
@@ -16,14 +19,15 @@ export class TimeEngine {
     this.mode = mode || 'clock';
     this.targetTime = targetTime;
     this.logger = logger;
-    this.logger?.debug('TimeEngine initialized', { mode: this.mode });
+    this.logger?.debug('TimeEngine initialized with mode: ' + this.mode);
   }
 
   start(intervalMs: number): void {
     this.stop();
-    this.tickInterval = intervalMs;
-    this.timer = setInterval(() => this.handleTick(), intervalMs);
-    this.logger?.debug(`TimeEngine started with ${intervalMs}ms interval`);
+    this.triggerInterval = intervalMs;
+    // Always update display every second, regardless of trigger interval
+    this.timer = setInterval(() => this.handleTick(), this.displayInterval);
+    this.logger?.debug(`TimeEngine started with ${intervalMs}ms trigger interval, ${this.displayInterval}ms display interval`);
   }
 
   stop(): void {
@@ -37,58 +41,40 @@ export class TimeEngine {
   updateConfig(mode: 'clock' | 'metronome', targetTime?: string, intervalMs?: number): void {
     this.mode = mode;
     this.targetTime = targetTime;
-    if (intervalMs) this.tickInterval = intervalMs;
-    this.logger?.debug('TimeEngine config updated', { mode, targetTime, intervalMs });
+    if (intervalMs) this.triggerInterval = intervalMs;
+    this.logger?.debug(`TimeEngine config updated - mode: ${mode}, targetTime: ${targetTime}, intervalMs: ${intervalMs}`);
   }
 
   private handleTick(): void {
     const now = Date.now();
-    this.logger?.debug('TimeEngine tick', {
-      lastTickTime: this.lastTickTime,
-      currentTime: now,
-      interval: this.tickInterval,
-      mode: this.mode,
-      targetTime: this.targetTime
-    });
-
-    // Prevent duplicate ticks if the interval fires early
-    if (now - this.lastTickTime < this.tickInterval * 0.9) {
-      this.logger?.debug('Skipping duplicate tick');
-      return;
-    }
-    this.lastTickTime = now;
-
+    
+    // Always update the display
     this.onTick();
     
-    const shouldTrigger = this.shouldTrigger();
-    this.logger?.debug('TimeEngine post-tick', {
-      shouldTrigger,
-      nextTickIn: this.tickInterval - (now - this.lastTickTime)
-    });
-
+    // Check if we should trigger based on the trigger interval
+    const shouldTrigger = this.shouldTrigger(now);
+    
     if (shouldTrigger) {
       this.logger?.debug('Triggering time event');
       this.onTrigger();
     }
   }
 
-  private shouldTrigger(): boolean {
+  private shouldTrigger(now: number): boolean {
     if (this.mode === 'metronome') {
-      this.logger?.debug('Metronome mode trigger');
-      return true;
+      // For metronome, trigger every triggerInterval milliseconds
+      return (now % this.triggerInterval) < this.displayInterval;
     }
     
     if (this.mode === 'clock' && this.targetTime) {
       const current = new Date();
       const target = this.parseTargetTime(this.targetTime);
-      const shouldTrigger = current.getHours() === target.getHours() && 
-             current.getMinutes() === target.getMinutes();
       
-      this.logger?.debug('Clock mode trigger check', { 
-        current: `${current.getHours()}:${current.getMinutes()}`,
-        target: `${target.getHours()}:${target.getMinutes()}`,
-        shouldTrigger
-      });
+      const shouldTrigger = current.getHours() === target.getHours() && 
+             current.getMinutes() === target.getMinutes() &&
+             current.getSeconds() === 0; // Only trigger at the start of the minute
+      
+      this.logger?.debug(`Clock mode trigger check - current: ${current.getHours()}:${current.getMinutes()}:${current.getSeconds()}, target: ${target.getHours()}:${target.getMinutes()}, shouldTrigger: ${shouldTrigger}`);
       
       return shouldTrigger;
     }

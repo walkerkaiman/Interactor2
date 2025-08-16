@@ -368,11 +368,13 @@ export class InteractorServer {
       
       return instance;
     } catch (error) {
-      this.logger.error(`Failed to create module instance for ${moduleData.moduleName} (${moduleData.id}):`, { 
-        message: error.message || 'Unknown error', 
-        stack: error.stack || 'No stack trace available',
-        errorObject: error
-      });
+      this.logger.error(`Failed to create module instance for ${moduleData.moduleName} (${moduleData.id}):`);
+      this.logger.error(`Error message: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
+      if (error instanceof Error) {
+        this.logger.error(`Error name: ${error.name}`);
+        this.logger.error(`Error constructor: ${error.constructor.name}`);
+      }
       return null;
     }
   }
@@ -1330,14 +1332,24 @@ export class InteractorServer {
       Object.assign(moduleInstance, stateData);
       moduleInstance.lastUpdate = Date.now();
       
-      // Save to StateManager
-      const moduleInstances = this.stateManager.getModuleInstances();
-      this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
-        // Broadcast to frontend
+      // Only save state if this is a configuration change, not a runtime update
+      // Runtime fields that should NOT trigger state saves
+      const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
+      const hasConfigChanges = Object.keys(stateData).some(key => !runtimeFields.includes(key));
+      
+      if (hasConfigChanges) {
+        // Save to StateManager only for configuration changes
+        const moduleInstances = this.stateManager.getModuleInstances();
+        this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
+          // Broadcast to frontend
+          this.broadcastStateUpdate();
+        }).catch(error => {
+          this.logger.error(`Failed to save state update for module ${moduleInstance.id}:`, error);
+        });
+      } else {
+        // Just broadcast runtime updates without saving state
         this.broadcastStateUpdate();
-      }).catch(error => {
-        this.logger.error(`Failed to save state update for module ${moduleInstance.id}:`, error);
-      });
+      }
     });
     
     // Listen for runtime state updates specifically
@@ -1354,14 +1366,8 @@ export class InteractorServer {
       
       moduleInstance.lastUpdate = Date.now();
       
-      // Save to StateManager
-      const moduleInstances = this.stateManager.getModuleInstances();
-      this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
-        // Broadcast targeted runtime update to frontend
-        this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
-      }).catch(error => {
-        this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
-      });
+      // Broadcast targeted runtime update to frontend (NO state saving for runtime data)
+      this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
     });
   }
 

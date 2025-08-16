@@ -1,37 +1,31 @@
 {
   "interactions": [
     {
-      "id": "interaction-1755195219009",
+      "id": "interaction-1755358320962",
       "name": "New Interaction",
       "modules": [
         {
-          "id": "Time Input-1755223482486",
+          "id": "Time Input-1755358506879",
           "moduleName": "Time Input",
           "position": {
-            "x": 319.52700175898264,
-            "y": 394.2098597278988
+            "x": -311.52098553063496,
+            "y": 317.00689943310687
           },
           "config": {
             "enabled": true,
-            "mode": "clock",
-            "millisecondDelay": 1000,
-            "apiEnabled": false,
-            "Time Input-1755223482486": {
-              "enabled": true,
-              "mode": "metronome",
-              "millisecondDelay": 1000,
-              "apiEnabled": false
-            }
+            "mode": "metronome",
+            "millisecondDelay": 4000,
+            "apiEnabled": false
           },
           "enabled": true,
-          "lastUpdate": 1755223482486
+          "lastUpdate": 1755358506879
         },
         {
-          "id": "Audio Output-1755223486697",
+          "id": "Audio Output-1755358509233",
           "moduleName": "Audio Output",
           "position": {
-            "x": 874.1692392996803,
-            "y": 334.4751788653309
+            "x": 333.5880842078834,
+            "y": 312.566027727014
           },
           "config": {
             "enabled": true,
@@ -57,42 +51,33 @@
             ]
           },
           "enabled": true,
-          "lastUpdate": 1755223486698
+          "lastUpdate": 1755358509233
         }
       ],
       "routes": [
         {
-          "id": "r_1755223493164",
-          "source": "Time Input-1755223482486",
-          "target": "Audio Output-1755223486697",
+          "id": "r_1755358513172",
+          "source": "Time Input-1755358506879",
+          "target": "Audio Output-1755358509233",
           "event": "trigger"
         }
-      ]
+      ],
+      "enabled": true
     }
   ],
   "modules": [
     {
-      "id": "Time Input-1755223482486",
-      "moduleName": "Time Input",
-      "config": {
-        "enabled": true,
-        "mode": "clock",
-        "millisecondDelay": 1000,
-        "apiEnabled": false,
-        "Time Input-1755223482486": {
-          "enabled": true,
-          "mode": "metronome",
-          "millisecondDelay": 1000,
-          "apiEnabled": false
-        }
-      },
+      "id": "aa1bf72d-c262-43d1-801e-58263d213abf",
+      "moduleName": "time_input",
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1755355812698
+      "lastUpdate": 1755361924834,
+      "currentTime": "",
+      "countdown": "27m 55s"
     },
     {
-      "id": "Audio Output-1755223486697",
+      "id": "Audio Output-1755358509233",
       "moduleName": "Audio Output",
       "config": {
         "enabled": true,
@@ -120,14 +105,9 @@
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1755268921490
+      "lastUpdate": 1755358989713
     }
   ],
   "routes": [],
-  "settings": {
-    "test-setting": {
-      "enabled": true,
-      "theme": "dark"
-    }
-  }
+  "settings": {}
 }

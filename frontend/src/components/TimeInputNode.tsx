@@ -1,9 +1,26 @@
 import { memo } from 'react';
 import { apiService } from '../api';
 import { createModuleNode } from './BaseModuleNode';
-import { useInstanceData, useNodeConfig } from '../hooks/useNodeConfig';
+import { useNodeConfig } from '../hooks/useNodeConfig';
+import { useModuleRuntime } from '../hooks/useModuleRuntime';
 import styles from './CustomNode.module.css';
 
+/**
+ * Time Input Module Component
+ * 
+ * IMPORTANT: This module is for COUNTDOWN TIMERS only, not current time display.
+ * 
+ * Purpose:
+ * - Clock mode: Shows countdown to target time (e.g., "2h 15m 30s")
+ * - Metronome mode: Shows countdown to next trigger (e.g., "3s to next")
+ * 
+ * DO NOT ADD:
+ * - Current time display
+ * - Clock faces
+ * - Time indicators
+ * 
+ * This module triggers events based on time, it does not display current time.
+ */
 // Countdown display component
 function CountdownDisplay({ countdown }: { countdown: string }) {
   return (
@@ -19,8 +36,9 @@ function TimeConfig({ instance, updateConfig }: { instance: any; updateConfig: (
   const [targetTime, setTargetTime] = useNodeConfig<string>(instance, 'targetTime', '12:00 PM', undefined, updateConfig);
   const [millisecondDelay, setMillisecondDelay] = useNodeConfig<number>(instance, 'millisecondDelay', 1000, undefined, updateConfig);
   
-  // Use useInstanceData for runtime values that come from WebSocket updates
-  const countdown = useInstanceData<string>(instance, 'countdown', '');
+  // Use useModuleRuntime for real-time runtime values that come from WebSocket updates
+  const runtimeData = useModuleRuntime(instance.id, ['countdown']);
+  const countdown = runtimeData.countdown || '';
 
   const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMode = e.target.value as 'clock' | 'metronome';

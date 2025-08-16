@@ -300,10 +300,7 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
     // Emit runtime state update event for targeted updates
     this.emit('runtimeStateUpdate', runtimeData);
     
-    // Also emit stateUpdate for backward compatibility
-    this.emit('stateUpdate', stateUpdate);
-    
-    // Also emit moduleStateChanged for real-time updates
+    // Emit moduleStateChanged for real-time updates
     this.emit('moduleStateChanged', stateUpdate);
   }
 

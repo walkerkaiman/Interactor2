@@ -80,9 +80,8 @@ export class InteractorApp extends EventEmitter {
           if ((runtimeData as any)[field] !== undefined) (stateModuleInstance as any)[field] = (runtimeData as any)[field];
         });
         stateModuleInstance.lastUpdate = Date.now();
-        this.stateManager.replaceState({ modules }).then(() => {
-          this.emit('module_runtime_update', { moduleId: moduleInstance.id, runtimeData });
-        }).catch(error => this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error));
+        // Emit runtime update to frontend (NO state saving for runtime data)
+        this.emit('module_runtime_update', { moduleId: moduleInstance.id, runtimeData });
       }
     });
     moduleInstance.on('trigger', (triggerEvent: any) => {
@@ -122,7 +121,14 @@ export class InteractorApp extends EventEmitter {
     const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
     runtimeFields.forEach(field => { if (stateData[field] !== undefined) (moduleInstance as any)[field] = stateData[field]; });
     (moduleInstance as any).lastUpdate = Date.now();
-    await this.stateManager.replaceState({ modules });
+    
+    // Only save state if this is a configuration change, not a runtime update
+    const hasConfigChanges = Object.keys(stateData).some(key => !runtimeFields.includes(key));
+    
+    if (hasConfigChanges) {
+      await this.stateManager.replaceState({ modules });
+    }
+    
     this.emitStateUpdate();
   }
 

@@ -6,158 +6,127 @@ import { TimeEngine } from './domain/TimeEngine';
 import { WsClient } from './infra/WsClient';
 import { convertTo12Hour, convertTo24Hour } from './domain/DisplayFormatter';
 
+/**
+ * Time Input Module
+ * 
+ * IMPORTANT: This module is for COUNTDOWN TIMERS and TRIGGERS only.
+ * 
+ * Purpose:
+ * - Clock mode: Triggers at specific time, shows countdown to target
+ * - Metronome mode: Triggers at intervals, shows countdown to next trigger
+ * 
+ * DO NOT ADD:
+ * - Current time calculation or display
+ * - Clock functionality
+ * - Time indicators
+ * 
+ * This module provides time-based automation, not time display.
+ */
 export class TimeInputModule extends InputModuleBase {
   private engine: TimeEngine;
-  private wsClient?: WsClient;
-  private targetTime?: string;
-  private enabled: boolean;
-  private currentTime: string = '';
-  private countdown: string = '';
   private timeMode: 'clock' | 'metronome' = 'clock';
+  private targetTime?: string;
   private millisecondDelay: number = 1000;
+  private enabled: boolean = true;
+  private apiEnabled: boolean = false;
+  private apiEndpoint?: string;
+  private countdown: string = '--';
+  private wsClient?: WsClient;
+  private reconnectDelay: number = 1000;
+  private maxReconnectAttempts: number = 5;
+  private wsReconnectAttempts: number = 0;
+  private engineRunning: boolean = false; // Flag to track if engine is running
   // StateManager removed - modules should not directly access core services
   
   // WebSocket properties
   private ws: WebSocket | null = null;
   private wsUrl?: string;
   private wsReconnectInterval: NodeJS.Timeout | null = null;
-  private wsReconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 5000; // 5 seconds
-  private apiEnabled = false;
-  private apiEndpoint?: string;
   private externalId?: string; // Store external ID for state updates
 
-  constructor(config: TimeInputConfig, id?: string) {
-    super('time_input', config, {
-      name: 'Time Input',
-      type: 'input',
-      version: '1.0.0',
-      description: 'Clock mode triggers at specific time, Metronome mode pulses at intervals.',
-      author: 'Interactor Team',
-      configSchema: {
-        type: 'object',
-        properties: {
-          mode: {
-            type: 'string',
-            description: 'Operating mode',
-            enum: ['clock', 'metronome'],
-            default: 'clock'
-          },
-          targetTime: {
-            type: 'string',
-            description: 'Target time in 12-hour format (e.g., 2:30 PM) - Clock mode only',
-            pattern: '^(1[0-2]|0?[1-9]):[0-5][0-9]\\s*(AM|PM)$'
-          },
-          millisecondDelay: {
-            type: 'number',
-            description: 'Delay between pulses in milliseconds - Metronome mode only',
-            minimum: 100,
-            maximum: 60000,
-            default: 1000
-          },
-          enabled: {
-            type: 'boolean',
-            description: 'Enable/disable the time trigger',
-            default: true
-          },
-          apiEnabled: {
-            type: 'boolean',
-            description: 'Enable WebSocket API for external time sources',
-            default: false
-          },
-          apiEndpoint: {
-            type: 'string',
-            description: 'WebSocket endpoint for external time API (e.g., wss://api.example.com/time)',
-            pattern: '^wss?://.+'
-          }
-        },
-        required: ['mode']
-      },
-      events: [
-        {
-          name: 'timeTrigger',
-          type: 'output',
-          description: 'Emitted when target time is reached (Clock mode) or on pulse (Metronome mode)'
-        },
-        {
-          name: 'stateUpdate',
-          type: 'output',
-          description: 'Emitted when module state changes'
-        },
-        {
-          name: 'apiConnected',
-          type: 'output',
-          description: 'Emitted when WebSocket API connection is established'
-        },
-        {
-          name: 'apiDisconnected',
-          type: 'output',
-          description: 'Emitted when WebSocket API connection is lost'
-        }
-      ]
-    }, id);
-    
-    this.logger?.debug('Initializing TimeInputModule with config:', {
-      config: JSON.stringify(config),
-      id
-    });
+  constructor(config: any = {}) {
+    super('time_input', config);
 
-    // Validate config
-    if (!config) {
-      this.logger?.error('Config is required');
-      throw new InteractorError('Config is required');
-    }
-    
-    if (config.mode === 'clock' && !config.targetTime) {
-      this.logger?.error('Clock mode requires targetTime');
-      throw new InteractorError('Target time is required for clock mode');
-    }
-
-    // Ensure default values if config is incomplete
+    // Create safe config with defaults
     const safeConfig = {
       mode: config.mode || 'clock',
       targetTime: config.targetTime || '12:00 PM',
-      millisecondDelay: config.millisecondDelay || 1000
+      millisecondDelay: config.millisecondDelay || 1000,
+      enabled: config.enabled !== undefined ? config.enabled : true,
+      apiEnabled: config.apiEnabled || false,
+      apiEndpoint: config.apiEndpoint
     };
 
+    // Initialize module properties from config
+    this.timeMode = safeConfig.mode;
+    this.targetTime = safeConfig.targetTime;
+    this.millisecondDelay = safeConfig.millisecondDelay;
+    this.enabled = safeConfig.enabled;
+    this.apiEnabled = safeConfig.apiEnabled;
+    this.apiEndpoint = safeConfig.apiEndpoint;
+
+    // Only log if there are issues with initialization
+    if (!this.targetTime || this.targetTime === 'undefined') {
+      this.logger?.error('TimeInputModule: Missing or invalid targetTime in config:', {
+        config: config,
+        safeConfig: safeConfig
+      });
+    }
+
+    // Initialize time engine
     this.engine = new TimeEngine(
       () => this.updateTimeDisplay(),
       () => this.emitTimeTrigger(),
-      safeConfig.mode,
-      safeConfig.targetTime,
+      this.timeMode,
+      this.targetTime,
       this.logger
     );
-
-    this.startEngine();
   }
 
+  /**
+   * Restore module state from saved data
+   */
   protected async onStateRestore(state: any): Promise<void> {
-    this.logger?.debug('Restoring TimeInputModule state:', {
-      state: JSON.stringify(state),
-      currentMode: this.timeMode,
-      currentTarget: this.targetTime
-    });
+    // Only log if there are issues with state restoration
+    if (!state || typeof state !== 'object') {
+      this.logger?.error('TimeInputModule: Invalid state provided for restoration:', state);
+      return;
+    }
 
     await super.onStateRestore(state);
     
-    // Reinitialize engine with restored state
-    this.engine = new TimeEngine(
-      () => this.updateTimeDisplay(),
-      () => this.emitTimeTrigger(),
-      state?.mode || this.timeMode,
-      state?.targetTime || this.targetTime,
-      this.logger
-    );
+    // Restore module properties from state
+    if (state) {
+      this.timeMode = state.mode || this.timeMode;
+      this.targetTime = state.targetTime || this.targetTime;
+      this.millisecondDelay = state.millisecondDelay || this.millisecondDelay;
+      this.enabled = state.enabled !== undefined ? state.enabled : this.enabled;
+      this.apiEnabled = state.apiEnabled || this.apiEnabled;
+      this.apiEndpoint = state.apiEndpoint || this.apiEndpoint;
+    }
     
-    this.startEngine();
+    // Only log if critical properties are missing
+    if (!this.targetTime || this.targetTime === 'undefined') {
+      this.logger?.error('TimeInputModule: Missing targetTime after state restoration:', {
+        state: state,
+        restoredTargetTime: this.targetTime
+      });
+    }
+    
+    // Update the existing engine with restored configuration instead of creating a new one
+    if (this.engine) {
+      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
+      if (this.enabled && !this.engineRunning) {
+        this.startEngine();
+      }
+    }
   }
 
   protected async onInit(): Promise<void> {
     // Validate configuration first
     if (this.timeMode === 'clock') {
       // Validate time format for clock mode
-      if (!this.isValidTimeFormat(this.targetTime || '')) {
+      if (this.targetTime && !this.isValidTimeFormat(this.targetTime)) {
         throw InteractorError.validation(
           `Invalid time format: ${this.targetTime}`,
           { provided: this.targetTime, expected: '12-hour format' },
@@ -206,7 +175,7 @@ export class TimeInputModule extends InputModuleBase {
     this.logger?.info(`Time Input module ${this.id} starting...`);
     
     if (this.enabled) {
-      this.engine.start();
+      this.startEngine();
     } else {
       this.logger?.warn(`Time Input module ${this.id} is disabled`);
     }
@@ -219,11 +188,13 @@ export class TimeInputModule extends InputModuleBase {
 
   protected async onStop(): Promise<void> {
     this.engine.stop();
+    this.engineRunning = false;
     this.disconnectWebSocket();
   }
 
   protected async onDestroy(): Promise<void> {
     this.engine.stop();
+    this.engineRunning = false;
     this.disconnectWebSocket();
   }
 
@@ -232,7 +203,7 @@ export class TimeInputModule extends InputModuleBase {
     
     if (newTimeConfig.mode !== this.timeMode) {
       this.timeMode = newTimeConfig.mode || 'clock';
-      this.engine.update({ mode: this.timeMode });
+      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
     }
     
     if (newTimeConfig.targetTime !== this.targetTime) {
@@ -244,6 +215,7 @@ export class TimeInputModule extends InputModuleBase {
           ['Use format like "2:30 PM" or "10:15 AM"', 'Include AM/PM designation', 'Use 12-hour format (1-12), not 24-hour']
         );
       }
+      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
     }
     
     if (newTimeConfig.millisecondDelay !== this.millisecondDelay) {
@@ -255,14 +227,16 @@ export class TimeInputModule extends InputModuleBase {
           ['Try 1000ms for 1-second intervals', 'Use 500ms for faster pulses', 'Maximum is 60000ms (1 minute)']
         );
       }
-      this.engine.update({ delayMs: this.millisecondDelay });
+      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
     }
     
     if (newTimeConfig.enabled !== this.enabled) {
       this.enabled = newTimeConfig.enabled ?? this.enabled;
-      this.engine.update({ enabled: this.enabled });
       if (!this.enabled) {
         this.engine.stop();
+        this.engineRunning = false;
+      } else if (this.enabled && !this.engineRunning) {
+        this.startEngine();
       }
     }
 
@@ -290,11 +264,8 @@ export class TimeInputModule extends InputModuleBase {
     // Use the standardized runtime state update method
     // This prevents overwriting user's unregistered configuration changes
     this.emitRuntimeStateUpdate({
-      currentTime: this.currentTime,
       countdown: this.countdown,
     });
-
-    this.logger?.info(`Time Input ${this.id}: Emitting runtime state update - currentTime = ${this.currentTime}, countdown = ${this.countdown}`);
   }
 
   protected handleInput(data: any): void {
@@ -312,7 +283,7 @@ export class TimeInputModule extends InputModuleBase {
   protected async onStartListening(): Promise<void> {
     this.logger?.info(`Time Input module ${this.id} starting to listen...`);
     if (this.enabled) {
-      this.engine.start();
+      this.startEngine();
     }
     if (this.apiEnabled && this.apiEndpoint) {
       this.connectWebSocket();
@@ -321,6 +292,7 @@ export class TimeInputModule extends InputModuleBase {
 
   protected async onStopListening(): Promise<void> {
     this.engine.stop();
+    this.engineRunning = false;
     this.disconnectWebSocket();
   }
 
@@ -354,24 +326,24 @@ export class TimeInputModule extends InputModuleBase {
   /**
    * Get trigger parameters for UI display
    */
-  public getTriggerParameters(): { 
-    mode: 'clock' | 'metronome';
-    targetTime: string; 
-    millisecondDelay: number;
-    enabled: boolean; 
-    currentTime: string; 
-    countdown: string;
-    targetTime12Hour: string;
-  } {
-    return {
+  public getTriggerParameters(): any {
+    // Only log if there are issues with parameters
+    const params = {
       mode: this.timeMode,
-      targetTime: this.targetTime || '',
+      targetTime: this.targetTime,
       millisecondDelay: this.millisecondDelay,
       enabled: this.enabled,
-      currentTime: this.currentTime,
-      countdown: this.countdown,
-      targetTime12Hour: this.convertTo12Hour(this.targetTime || '')
+      apiEnabled: this.apiEnabled,
+      apiEndpoint: this.apiEndpoint,
+      countdown: this.countdown
     };
+
+    // Only log if critical parameters are missing
+    if (!this.targetTime || this.targetTime === 'undefined') {
+      this.logger?.error('TimeInputModule: Missing targetTime in getTriggerParameters:', params);
+    }
+
+    return params;
   }
 
   /**
@@ -389,26 +361,12 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   /**
-   * Update current time and countdown display
+   * Update time display and countdown - called by TimeEngine every second
    */
   private updateTimeDisplay(): void {
-    this.logger?.debug('Calculating time display', {
-      mode: this.timeMode,
-      targetTime: this.targetTime,
-      millisecondDelay: this.millisecondDelay
-    });
-
-    const now = new Date();
+    // Countdown calculation only - no current time display
+    let newCountdown = '--';
     
-    // Current time display
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-    this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${period}`;
-
-    // Countdown calculation
     if (this.timeMode === 'clock' && this.targetTime) {
       try {
         const target24 = this.convertTo24Hour(this.targetTime);
@@ -416,6 +374,7 @@ export class TimeInputModule extends InputModuleBase {
         const targetDate = new Date();
         targetDate.setHours(targetHours, targetMinutes, 0, 0);
         
+        const now = new Date();
         if (targetDate <= now) targetDate.setDate(targetDate.getDate() + 1);
         
         const diffMs = targetDate.getTime() - now.getTime();
@@ -423,33 +382,29 @@ export class TimeInputModule extends InputModuleBase {
         const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
         const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
         
-        this.countdown = diffHours > 0 ? `${diffHours}h ${diffMinutes}m ${diffSeconds}s` :
-                        diffMinutes > 0 ? `${diffMinutes}m ${diffSeconds}s` :
-                        `${diffSeconds}s`;
+        newCountdown = diffHours > 0 ? `${diffHours}h ${diffMinutes}m ${diffSeconds}s` :
+                      diffMinutes > 0 ? `${diffMinutes}m ${diffSeconds}s` :
+                      `${diffSeconds}s`;
       } catch (error) {
         this.logger?.error('Failed to calculate clock countdown:', error);
-        this.countdown = 'Invalid time';
+        newCountdown = 'Invalid time';
       }
     } 
     else if (this.timeMode === 'metronome') {
       try {
         const timeToNext = this.millisecondDelay - (Date.now() % this.millisecondDelay);
-        this.countdown = `${Math.ceil(timeToNext / 1000)}s to next`;
+        newCountdown = `${Math.ceil(timeToNext / 1000)}s to next`;
       } catch (error) {
         this.logger?.error('Failed to calculate metronome countdown:', error);
-        this.countdown = '--';
+        newCountdown = '--';
       }
     }
-    else {
-      this.countdown = '--';
+
+    // Only emit state update if countdown actually changed
+    if (newCountdown !== this.countdown) {
+      this.countdown = newCountdown;
+      this.emitStateUpdate();
     }
-
-    this.logger?.debug('Time display updated', {
-      currentTime: this.currentTime,
-      countdown: this.countdown
-    });
-
-    this.emitStateUpdate();
   }
 
   /**
@@ -524,17 +479,10 @@ export class TimeInputModule extends InputModuleBase {
     try {
       // Extract time information from API data
       // Expected format: { time: "2:30 PM", timestamp: 1234567890, ... }
-      if (data.time) {
-        // Update target time if provided by API
-        if (this.isValidTimeFormat(data.time)) {
-          this.targetTime = data.time;
-          this.logger?.info(`Updated target time from API: ${this.targetTime}`);
-        }
-      }
-      
-      if (data.currentTime) {
-        // Update current time display
-        this.currentTime = data.currentTime;
+      if (data.targetTime) {
+        // Update target time if provided
+        this.targetTime = data.targetTime;
+        this.logger?.info(`Updated target time from API: ${this.targetTime}`);
       }
       
       if (data.countdown) {
@@ -545,7 +493,6 @@ export class TimeInputModule extends InputModuleBase {
       // Emit state update with API data
       this.emit('stateUpdate', {
         mode: this.timeMode,
-        currentTime: this.currentTime,
         countdown: this.countdown,
         targetTime12Hour: this.timeMode === 'clock' ? this.convertTo12Hour(this.targetTime || '') : '',
         millisecondDelay: this.millisecondDelay,
@@ -566,7 +513,6 @@ export class TimeInputModule extends InputModuleBase {
     return {
       isRunning: this.isRunning,
       isInitialized: this.isInitialized,
-      currentTime: this.currentTime,
       countdown: this.countdown,
       isListening: this.isListening,
     };
@@ -708,9 +654,18 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   private startEngine(): void {
+    // Prevent multiple engine starts
+    if (this.engineRunning) {
+      this.logger?.debug('Engine already running, skipping start');
+      return;
+    }
+    
     const interval = this.timeMode === 'metronome' 
-      ? this.millisecondDelay 
+      ? (this.millisecondDelay || 1000)
       : 1000; // Check every second for clock mode
+    
     this.engine.start(interval);
+    this.engineRunning = true;
+    this.logger?.debug(`Engine started with ${interval}ms interval`);
   }
 } 
