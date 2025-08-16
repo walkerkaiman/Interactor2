@@ -205,6 +205,22 @@ This is the definitive behavior AI agents must preserve when modifying sync logi
 - Don’t: Clear the canvas/graph on transient WS frames; never derive structure from empty WS payloads.
 - Don’t: Remap route events at registration; event equality must be preserved end-to-end.
 
+## Config vs Runtime: Strict Separation (Very Important)
+
+When implementing UI or backend logic, treat configuration and runtime data as different channels.
+
+- Configuration (persistent): lives on `interaction.modules[*].config` and is edited only in the local draft until Register. The backend persists it and includes it in non-empty `state_update` snapshots and REST responses. It should not be included in `module_runtime_update` frames.
+- Runtime (ephemeral): values such as `countdown`, `currentTime`, `isPlaying`, etc., may stream at high frequency. These are delivered via `module_runtime_update` and merged into the module instance in memory. They must never overwrite the local draft configuration or cause a re-render that resets form inputs.
+
+Frontend rules to uphold:
+- Per-field config inputs use a hook that: (1) prefers the local draft value if present, (2) falls back to backend config when no local edits exist, (3) ignores runtime updates entirely.
+- When a user edits a single config field, store only the delta for that field in the unregistered-changes memory and notify the parent with the full merged draft for rendering.
+- Do not mutate `instance.config` objects passed into components; treat them as snapshots coming from the draft/authoritative state.
+
+Backend rules to uphold:
+- Do not emit runtime messages that contain persistent configuration. Use dedicated config endpoints (REST) and structural broadcasts (`state_update`) for persisted changes.
+- After registration, broadcast a structural snapshot and optionally include `originClientId` so the registering client can ignore the echo and refresh via REST.
+
 ## Backend layout and module structure (must follow)
 
 - Layered layout:
@@ -394,6 +410,26 @@ const [originalRegisteredInteractions, setOriginalRegisteredInteractions] = useS
 3. Test API endpoints directly
 4. Check network connectivity for WebSocket
 5. Validate configuration files
+
+## Configuration Change Flow (Updated)
+
+For individual configuration changes (not structural registration):
+
+1) User makes change in UI
+- Frontend immediately updates local memory for responsive UI
+- Frontend sends change to backend via API (`updateModuleConfig`)
+
+2) Backend processes change
+- Backend updates its state and persists the change
+- Backend broadcasts `state_update` to all clients via WebSocket
+
+3) All clients update memory
+- All clients (including the one that made the change) receive WebSocket message
+- All clients update their memory with backend's authoritative state
+- Local change tracking is cleared when backend value matches local value
+
+4) UI re-renders
+- Components re-render based on updated memory state
 
 ## Contributing
 

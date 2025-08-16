@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Node, Edge, Connection, useNodesState, useEdgesState } from 'reactflow';
 import { InteractionConfig, ModuleManifest } from '@interactor/shared';
 import { resolveNodeType } from './utils/nodeTypeRegistry';
@@ -101,8 +101,8 @@ export function useFlowBuilder(
       });
     });
 
-    // Guard against transient empties (WS initial/refresh): never clear to empty
-    if (newNodes.length === 0 && newEdges.length === 0) {
+    // Guard against transient empties only if interactions are non-empty
+    if (newNodes.length === 0 && newEdges.length === 0 && interactions.length > 0) {
       return;
     }
 
@@ -125,7 +125,7 @@ export function useFlowBuilder(
           ...intx,
           routes: [...(intx.routes || []), newRoute]
         }))
-      : [{ id: `interaction-${Date.now()}`, name: 'New Interaction', modules: [], routes: [newRoute] } as any];
+      : [{ id: `interaction-${Date.now()}`, name: 'New Interaction', modules: [], routes: [newRoute], enabled: true } as any];
 
     console.log('useFlowBuilder: onConnect → newRoute', newRoute);
     onInteractionsChange(updated);

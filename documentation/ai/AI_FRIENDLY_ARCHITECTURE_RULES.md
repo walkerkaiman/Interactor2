@@ -99,6 +99,33 @@ route.event = outputManifest.events[0].name;
 route.event remains the event emitted by the source (e.g., 'timeTrigger')
 ```
 
+### **7. Clearing UI on transient WebSocket frames**
+```typescript
+// ❌ BAD - Treat empty WS payload as authoritative
+if (msg.type === 'state_update') {
+  setNodes([]); setEdges([]); // nukes canvas on startup
+}
+
+// ✅ GOOD - REST is authoritative for structure; ignore empty WS frames
+if (msg.type === 'state_update') {
+  if (Array.isArray(msg.data?.interactions) && msg.data.interactions.length > 0) {
+    // adopt structural snapshot
+  }
+  // never clear graph because moduleInstances is empty
+}
+```
+
+### **8. Rendering from multiple structural sources**
+```typescript
+// ❌ BAD - Graph renders from mixed local + WS + REST simultaneously
+const graph = merge(localDraft, wsDraft, restDraft);
+
+// ✅ GOOD - Single source of truth for the editor
+// 1) On startup: REST → editor
+// 2) While editing: local draft → editor (until Register)
+// 3) After Register: REST refresh or non-empty WS snapshot → editor
+```
+
 ---
 
 ## ✅ **Encouraged Patterns** (AI-Friendly)

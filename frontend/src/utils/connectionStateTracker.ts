@@ -82,7 +82,7 @@ class ConnectionStateTracker {
    * Get connection type for a specific handle
    */
   public getConnectionType(sourceNodeId: string, sourceHandleId: string): string | null {
-    for (const [key, connection] of this.connections) {
+    for (const [, connection] of this.connections) {
       if (connection.sourceNodeId === sourceNodeId && connection.sourceHandleId === sourceHandleId) {
         return connection.connectionType;
       }

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import { InteractionConfig } from '@interactor/shared';
-import { apiService } from '../api';
+
 
 interface UseFlowStateProps {
   interactions: InteractionConfig[];

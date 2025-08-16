@@ -59,7 +59,7 @@ export interface OscMessage {
 export interface OscTriggerPayload {
   /** OSC address that triggered the event */
   address: string;
-  /** OSC message arguments */
+  /** OSC message arguments - kept for debugging/logging purposes */
   args: any[];
   /** Timestamp when message was received */
   timestamp: number;
@@ -74,9 +74,9 @@ export interface OscTriggerPayload {
 export interface OscStreamPayload {
   /** OSC address that triggered the event */
   address: string;
-  /** Numeric value extracted from first argument */
+  /** Numeric value extracted from first argument - always a number for streaming */
   value: number;
-  /** OSC message arguments */
+  /** OSC message arguments - kept for debugging/logging purposes */
   args: any[];
   /** Timestamp when message was received */
   timestamp: number;
@@ -133,8 +133,6 @@ export interface HttpRequestData {
  * @interface HttpTriggerPayload
  */
 export interface HttpTriggerPayload {
-  /** Numeric value extracted from request */
-  value: number;
   /** HTTP method */
   method: string;
   /** Request URL */
@@ -160,7 +158,7 @@ export interface HttpTriggerPayload {
  * @interface HttpStreamPayload
  */
 export interface HttpStreamPayload {
-  /** Numeric value extracted from request */
+  /** Numeric value extracted from request - always a number for streaming */
   value: number;
   /** HTTP method */
   method: string;
@@ -211,8 +209,6 @@ export interface SerialData {
  * @interface SerialTriggerPayload
  */
 export interface SerialTriggerPayload {
-  /** Numeric value extracted from serial data */
-  value: number;
   /** Raw serial data string */
   rawData: string;
   /** Threshold value for comparison */
@@ -230,7 +226,7 @@ export interface SerialTriggerPayload {
  * @interface SerialStreamPayload
  */
 export interface SerialStreamPayload {
-  /** Numeric value extracted from serial data */
+  /** Numeric value extracted from serial data - always a number for streaming */
   value: number;
   /** Raw serial data string */
   rawData: string;
@@ -676,7 +672,7 @@ export interface ModuleStateUpdate {
 export interface TriggerEvent {
   /** Event type */
   type: 'trigger';
-  /** Event payload */
+  /** Event payload - generic since trigger events just call functions */
   payload: any;
   /** Timestamp when event occurred */
   timestamp: number;
@@ -691,7 +687,7 @@ export interface TriggerEvent {
 export interface StreamEvent {
   /** Event type */
   type: 'stream';
-  /** Streamed value */
+  /** Streamed value - always a number for streaming events */
   value: number;
   /** Timestamp when event occurred */
   timestamp: number;

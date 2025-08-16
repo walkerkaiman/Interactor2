@@ -60,6 +60,7 @@ export class InteractorServer {
     
     // Initialize singleton services
     this.logger = Logger.getInstance();
+    this.logger.setLevel('debug'); // Ensure debug level logging
     this.messageRouter = MessageRouter.getInstance();
     this.moduleLoader = ModuleLoader.getInstance();
     this.stateManager = StateManager.getInstance();
@@ -172,6 +173,7 @@ export class InteractorServer {
     try {
       const moduleInstances = this.stateManager.getModuleInstances();
       const interactions = this.stateManager.getInteractions();
+      const failedInstances = [];
       
       this.logger.info(`Restoring ${moduleInstances.length} module instances from data store`);
       
@@ -192,8 +194,17 @@ export class InteractorServer {
             }
           }
         } catch (error) {
-          this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
+          this.logger.error(`Failed to restore live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: error.message, stack: error.stack });
+          this.logger.info(`Skipping failed restoration of ${moduleInstance.moduleName} (${moduleInstance.id}) to allow server startup.`);
+          failedInstances.push(moduleInstance.id);
         }
+      }
+      
+      // Remove failed instances from state to prevent future errors
+      if (failedInstances.length > 0) {
+        const updatedModuleInstances = moduleInstances.filter(instance => !failedInstances.includes(instance.id));
+        await this.stateManager.replaceState({ modules: updatedModuleInstances });
+        this.logger.info(`Removed ${failedInstances.length} failed module instances from state manager.`);
       }
       
       // Set up trigger event listeners for output modules
@@ -201,8 +212,8 @@ export class InteractorServer {
       
       this.logger.info(`Successfully restored ${this.moduleInstances.size} live module instances`);
     } catch (error) {
-      this.logger.error('Failed to restore module instances:', String(error));
-      throw error;
+      this.logger.error('Failed to restore module instances:', { message: error.message, stack: error.stack });
+      this.logger.info('Continuing server startup despite restoration failure.');
     }
   }
 
@@ -316,64 +327,53 @@ export class InteractorServer {
   /**
    * Create a live module instance
    */
-  private async createModuleInstance(moduleData: any): Promise<any> {
-    const { id, moduleName, config } = moduleData;
-    const displayName = this.getModuleNameFromManifest(moduleName);
+  private async createModuleInstance(moduleData: ModuleInstance): Promise<any> {
     try {
-      // Prefer registry
-      if (!moduleRegistry.has(displayName)) {
-        this.logger.warn(`Module registry has no factory for ${displayName}; using transitional fallback`);
+      const moduleName = this.getInternalModuleName(moduleData.moduleName);
+      this.logger.debug(`Attempting to create instance for module: ${moduleData.moduleName} (${moduleData.id})`, { moduleName });
+      
+      if (!moduleName) {
+        this.logger.error(`Failed to resolve internal module name for ${moduleData.moduleName} (${moduleData.id})`);
+        return null;
       }
-      const moduleInstance = moduleRegistry.has(displayName)
-        ? await moduleRegistry.create(displayName, config, id)
-        : await this.createModuleInstanceFallback(displayName, config, id);
-      moduleInstance.setLogger(this.logger);
-      moduleInstance.on('stateUpdate', (stateData: any) => {
-        this.handleModuleStateUpdate(moduleInstance.id, stateData);
-      });
-      moduleInstance.on('configUpdated', (configData: any) => {
-        this.handleModuleConfigUpdate(moduleInstance.id, configData);
-      });
-      moduleInstance.on('runtimeStateUpdate', (runtimeData: any) => {
-        this.logger.debug(`Received runtime state update from module ${moduleName} (${moduleInstance.id}):`, runtimeData);
-        const moduleInstances = this.stateManager.getModuleInstances();
-        const stateModuleInstance = moduleInstances.find(m => m.id === moduleInstance.id);
-        if (stateModuleInstance) {
-          const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'] as const;
-          runtimeFields.forEach(field => {
-            if ((runtimeData as any)[field] !== undefined) {
-              (stateModuleInstance as any)[field] = (runtimeData as any)[field];
-            }
-          });
-          stateModuleInstance.lastUpdate = Date.now();
-          this.stateManager.replaceState({ modules: moduleInstances }).then(() => {
-            this.broadcastModuleRuntimeUpdate(moduleInstance.id, runtimeData);
-          }).catch(error => {
-            this.logger.error(`Failed to save runtime state update for module ${moduleInstance.id}:`, error);
-          });
-        } else {
-          this.logger.warn(`Module instance not found in state manager for ID: ${moduleInstance.id}`);
-        }
-      });
-      moduleInstance.on('trigger', (triggerEvent: any) => {
-        this.logger.debug(`Received trigger event from ${moduleName}:`, triggerEvent);
-        const message = {
-          id: `msg_${Date.now()}_${Math.random()}`,
-          source: moduleInstance.id,
-          target: '',
-          event: triggerEvent.event,
-          payload: triggerEvent.payload,
-          timestamp: Date.now()
-        };
-        this.messageRouter.routeMessage(message);
-      });
-      await moduleInstance.init();
-      this.moduleInstances.set(moduleInstance.id, moduleInstance);
-      this.logger.info(`Created live instance for ${moduleName} (${moduleInstance.id})`);
-      return moduleInstance;
+      
+      this.logger.debug(`Resolved internal module name: ${moduleName} for ${moduleData.moduleName} (${moduleData.id})`);
+      
+      // Check if module is registered in the registry
+      if (!moduleRegistry.has(moduleData.moduleName)) {
+        this.logger.error(`Module not registered in registry: ${moduleData.moduleName} (${moduleData.id})`);
+        return null;
+      }
+      
+      this.logger.debug(`Module found in registry: ${moduleData.moduleName} (${moduleData.id})`);
+      
+      // Create instance using the module registry
+      this.logger.debug(`Creating new instance of ${moduleData.moduleName} with ID ${moduleData.id}`, { config: moduleData.config });
+      const instance = await moduleRegistry.create(moduleData.moduleName, moduleData.config || {}, moduleData.id);
+      
+      this.logger.debug(`Created instance of ${moduleName} (${moduleData.moduleName}, ID: ${moduleData.id})`);
+      
+      // Set logger and message router
+      instance.setLogger(this.logger);
+      
+      // Initialize the module instance
+      this.logger.debug(`Initializing instance of ${moduleName} (${moduleData.moduleName}, ID: ${moduleData.id})`);
+      await instance.init();
+      
+      this.logger.debug(`Initialized instance of ${moduleName} (${moduleData.moduleName}, ID: ${moduleData.id})`);
+      
+      // Store the live instance
+      this.moduleInstances.set(moduleData.id, instance);
+      this.logger.debug(`Stored live instance for ${moduleName} (${moduleData.moduleName}, ID: ${moduleData.id}) in moduleInstances`);
+      
+      return instance;
     } catch (error) {
-      this.logger.error(`Failed to create ${moduleName} instance:`, String(error));
-      throw error;
+      this.logger.error(`Failed to create module instance for ${moduleData.moduleName} (${moduleData.id}):`, { 
+        message: error.message || 'Unknown error', 
+        stack: error.stack || 'No stack trace available',
+        errorObject: error
+      });
+      return null;
     }
   }
 
@@ -382,6 +382,7 @@ export class InteractorServer {
    */
   private async createModuleInstanceFallback(displayName: string, config: any, id?: string): Promise<any> {
     if (displayName === 'Time Input') {
+      this.logger.debug(`Creating Time Input module with config:`, config);
       const { TimeInputModule } = await import('./modules/input/time_input/index');
       const moduleInstance = new TimeInputModule(config, id);
       return moduleInstance;
@@ -515,6 +516,7 @@ export class InteractorServer {
       const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
       
       if (!moduleInstance) {
+        this.logger.error(`Module instance not found in state manager for ID: ${req.params.id}`);
         throw InteractorError.notFound('Module instance', req.params.id);
       }
       
@@ -531,13 +533,27 @@ export class InteractorServer {
       });
       
       // CRITICAL: Also update the live module instance if it exists
-      const liveInstance = this.moduleInstances.get(req.params.id as string);
+      let liveInstance = this.moduleInstances.get(req.params.id as string);
+      if (!liveInstance) {
+        this.logger.warn(`No live instance found for module ${req.params.id}, attempting to create one.`);
+        try {
+          liveInstance = await this.createModuleInstance(moduleInstance);
+          if (liveInstance) {
+            this.logger.info(`Created live instance for ${moduleInstance.moduleName} (${req.params.id}) during config update.`);
+          } else {
+            this.logger.error(`Failed to create live instance for ${moduleInstance.moduleName} (${req.params.id}) during config update.`);
+          }
+        } catch (error) {
+          this.logger.error(`Failed to create live module instance during config update:`, { message: error.message, stack: error.stack });
+        }
+      }
+      
       if (liveInstance) {
         try {
           await liveInstance.updateConfig(newConfig);
           this.logger.info(`Updated live module instance config for ${moduleInstance.moduleName} (${req.params.id})`);
         } catch (error) {
-          this.logger.error(`Failed to update live module config:`, String(error));
+          this.logger.error(`Failed to update live module config:`, { message: error.message, stack: error.stack });
           throw InteractorError.internal('Failed to update module configuration', error as Error);
         }
       } else {
@@ -684,18 +700,32 @@ export class InteractorServer {
         // Create live module instances for inputs and outputs; start inputs if appropriate
         for (const moduleInstance of moduleInstances) {
           try {
-            const liveInstance = await this.createModuleInstance(moduleInstance);
-            if (liveInstance) {
-              const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
-              const internalName = this.getInternalModuleName(displayName);
-              // Start inputs automatically (e.g., time_input)
-              if (displayName === 'Time Input' || internalName === 'time_input') {
-                await liveInstance.start();
-                this.logger.info(`Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+            let liveInstance = this.moduleInstances.get(moduleInstance.id);
+            if (!liveInstance) {
+              this.logger.info(`Creating live instance for ${moduleInstance.moduleName} (${moduleInstance.id}) during interaction registration.`);
+              liveInstance = await this.createModuleInstance(moduleInstance);
+              if (liveInstance) {
+                this.logger.info(`Successfully created live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
+                const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
+                const internalName = this.getInternalModuleName(displayName);
+                // Start inputs automatically (e.g., time_input)
+                if (displayName === 'Time Input' || internalName === 'time_input') {
+                  try {
+                    await liveInstance.start();
+                    this.logger.info(`Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+                    moduleInstance.status = 'running';
+                  } catch (startError) {
+                    this.logger.error(`Failed to start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: startError.message, stack: startError.stack });
+                  }
+                }
+              } else {
+                this.logger.error(`Failed to create live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
               }
+            } else {
+              this.logger.info(`Live instance already exists for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
             }
           } catch (error) {
-            this.logger.error(`Failed to create/start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, String(error));
+            this.logger.error(`Failed to create/start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: error.message, stack: error.stack });
           }
         }
         
@@ -713,6 +743,7 @@ export class InteractorServer {
           moduleInstances: moduleInstances.length
         });
       } catch (error) {
+        this.logger.error(`Failed to register interactions:`, { message: error.message, stack: error.stack });
         res.status(400).json({ success: false, error: String(error) });
       }
     });
@@ -842,16 +873,20 @@ export class InteractorServer {
         const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
         
         if (!moduleInstance) {
+          this.logger.error(`Module instance not found in state manager for ID: ${req.params.id}`);
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
         // Create live module instance if it doesn't exist
         let liveInstance = this.moduleInstances.get(req.params.id);
         if (!liveInstance) {
+          this.logger.warn(`No live instance found for module ${req.params.id}, attempting to create one.`);
           liveInstance = await this.createModuleInstance(moduleInstance);
           if (!liveInstance) {
+            this.logger.error(`Failed to create live instance for ${moduleInstance.moduleName} (${req.params.id})`);
             throw new Error(`Failed to create live instance for ${moduleInstance.moduleName}`);
           }
+          this.logger.info(`Created live instance for ${moduleInstance.moduleName} (${req.params.id}) during start request.`);
         }
         
         // Start the live module instance
@@ -859,7 +894,7 @@ export class InteractorServer {
           await liveInstance.start();
           this.logger.info(`Module ${moduleInstance.moduleName} (${req.params.id}) started successfully`);
         } catch (error) {
-          this.logger.error(`Failed to start module ${moduleInstance.moduleName}:`, String(error));
+          this.logger.error(`Failed to start module ${moduleInstance.moduleName}:`, { message: error.message, stack: error.stack });
           return res.status(500).json({ success: false, error: String(error) });
         }
         
@@ -879,7 +914,7 @@ export class InteractorServer {
           data: moduleInstance
         });
       } catch (error) {
-        this.logger.error(`Failed to start module: ${String(error)}`);
+        this.logger.error(`Failed to start module:`, { message: error.message, stack: error.stack });
         return res.status(500).json({ success: false, error: String(error) });
       }
     });
@@ -1346,7 +1381,7 @@ export class InteractorServer {
       if (this.wss.clients.size > 0) {
         this.broadcastStateUpdate();
       }
-    }, 5000); // Broadcast every 5 seconds as a fallback
+    }, 1000); // Broadcast every 1 second for real-time updates
     
     // Set up trigger event listeners for output modules
     this.setupTriggerEventListeners();
@@ -1388,6 +1423,24 @@ export class InteractorServer {
 
     // Start the file uploader first
     await this.fileUploader.start();
+
+    // Test instantiation of TimeInputModule with minimal config
+    try {
+      const { TimeInputModule } = await import('./modules/input/time_input/index');
+      const testConfig = {
+        mode: 'clock',
+        targetTime: '12:00 PM',
+        enabled: false
+      };
+      const testInstance = new TimeInputModule(testConfig, 'test-instance');
+      this.logger.info('Successfully created test instance of TimeInputModule', { config: testConfig });
+    } catch (error) {
+      this.logger.error('Failed to create test instance of TimeInputModule', {
+        message: error.message,
+        stack: error.stack,
+        errorObject: error
+      });
+    }
 
     return new Promise((resolve, reject) => {
       this.server.listen(port, host, () => {

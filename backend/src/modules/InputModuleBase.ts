@@ -44,8 +44,38 @@ export abstract class InputModuleBase extends ModuleBase implements InputModule 
   /**
    * Register an input handler
    */
-  public onInput(handler: EventHandler): void {
+  public onInput(handler: (data: any) => void, id?: string): void {
+    if (id && this.updateHandler(id, handler)) {
+      this.logger?.debug(`Updated existing handler with ID: ${id}`);
+      return;
+    }
+    
+    // Add ID to handler if provided
+    if (id) {
+      (handler as any).id = id;
+    }
+    
     this.inputHandlers.push(handler);
+    this.logger?.debug(`Added ${id ? 'new' : ''} input handler${id ? ` with ID: ${id}` : ''}`);
+  }
+
+  protected updateHandler(id: string, newHandler: EventHandler): boolean {
+    const index = this.inputHandlers.findIndex(h => (h as any).id === id);
+    if (index >= 0) {
+      this.inputHandlers[index] = newHandler;
+      return true;
+    }
+    return false;
+  }
+
+  public removeHandler(id: string): boolean {
+    const initialLength = this.inputHandlers.length;
+    this.inputHandlers = this.inputHandlers.filter(h => (h as any).id !== id);
+    const removed = initialLength !== this.inputHandlers.length;
+    if (removed) {
+      this.logger?.debug(`Removed handler with ID: ${id}`);
+    }
+    return removed;
   }
 
   /**

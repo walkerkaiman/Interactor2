@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -38,7 +38,7 @@ function App() {
       let id = localStorage.getItem(key);
       if (!id && (window as any).crypto?.randomUUID) {
         id = (window as any).crypto.randomUUID();
-        localStorage.setItem(key, id);
+        if (id) localStorage.setItem(key, id);
       }
     } catch {}
   }, []);

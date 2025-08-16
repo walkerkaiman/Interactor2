@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface UnregisteredConfigChange {
   moduleId: string;
@@ -34,16 +34,23 @@ export function useUnregisteredChanges() {
 
   // Update config change
   const updateConfigChange = useCallback((moduleId: string, config: Record<string, any>) => {
+    // Merge with any existing unregistered config for this module (store only deltas)
+    const existing = stateRef.current.configChanges.get(moduleId);
+    const mergedConfig = {
+      ...(existing?.config || {}),
+      ...config,
+    };
+
     const change: UnregisteredConfigChange = {
       moduleId,
-      config: { ...config },
+      config: mergedConfig,
       timestamp: Date.now(),
     };
-    
+
     stateRef.current.configChanges.set(moduleId, change);
     stateRef.current.hasChanges = stateRef.current.structuralChange || stateRef.current.configChanges.size > 0;
     triggerUpdate();
-    
+
     console.log(`Unregistered config change for module ${moduleId}:`, config);
   }, [triggerUpdate]);
 

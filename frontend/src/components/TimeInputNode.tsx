@@ -1,8 +1,7 @@
 import { memo } from 'react';
 import { apiService } from '../api';
 import { createModuleNode } from './BaseModuleNode';
-// import { useInstanceData } from '../hooks/useNodeConfig';
-import { useModuleRuntime } from '../hooks/useModuleRuntime';
+import { useInstanceData, useNodeConfig } from '../hooks/useNodeConfig';
 import styles from './CustomNode.module.css';
 
 // Countdown display component
@@ -15,25 +14,26 @@ function CountdownDisplay({ countdown }: { countdown: string }) {
 }
 
 function TimeConfig({ instance, updateConfig }: { instance: any; updateConfig: (key: string, value: any) => void }) {
-  const config = instance?.config || {};
-  const mode = config.mode || 'clock';
-  const targetTime = config.targetTime || '12:00 PM';
-  const millisecondDelay = config.millisecondDelay || 1000;
-  const runtime = useModuleRuntime(instance?.id, ['countdown']);
-  const countdown = runtime.countdown || '';
+  // Use useNodeConfig for configuration values to ensure proper sync with backend and local drafts
+  const [mode, setMode] = useNodeConfig<string>(instance, 'mode', 'clock', undefined, updateConfig);
+  const [targetTime, setTargetTime] = useNodeConfig<string>(instance, 'targetTime', '12:00 PM', undefined, updateConfig);
+  const [millisecondDelay, setMillisecondDelay] = useNodeConfig<number>(instance, 'millisecondDelay', 1000, undefined, updateConfig);
+  
+  // Use useInstanceData for runtime values that come from WebSocket updates
+  const countdown = useInstanceData<string>(instance, 'countdown', '');
 
   const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMode = e.target.value as 'clock' | 'metronome';
-    updateConfig('mode', newMode);
+    setMode(newMode);
   };
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateConfig('targetTime', e.target.value);
+    setTargetTime(e.target.value);
   };
 
   const handleDelayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDelay = parseInt(e.target.value) || 1000;
-    updateConfig('millisecondDelay', newDelay);
+    setMillisecondDelay(newDelay);
   };
 
   return (
@@ -116,7 +116,7 @@ const TimeInputNodeConfig = {
   validators: {
     millisecondDelay: (value: any) => Math.max(100, Math.min(60000, Number(value) || 1000))
   },
-  instanceDataKeys: [],
+  instanceDataKeys: ['countdown'],
   onManualTrigger: async (nodeId: string) => {
     await apiService.triggerModule(nodeId, { type: 'manualTrigger' });
   },

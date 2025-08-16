@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createModuleNode, BaseModuleNodeProps } from './BaseModuleNode';
+import { createModuleNode } from './BaseModuleNode';
 import { apiService } from '../api';
 import styles from './CustomNode.module.css';
 import { useModuleRuntime } from '../hooks/useModuleRuntime';
@@ -93,10 +93,7 @@ function AudioConfig({ instance, updateConfig }: { instance: any; updateConfig: 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+
 
   return (
     <div className={styles.audioConfig}>
@@ -146,16 +143,8 @@ function AudioConfig({ instance, updateConfig }: { instance: any; updateConfig: 
 }
 
 function AudioActions({ instance }: { instance: any }) {
-  const runtime = useModuleRuntime(instance?.id, ['isPlaying', 'currentTime', 'duration']);
+  const runtime = useModuleRuntime(instance?.id, ['isPlaying']);
   const isPlaying = !!runtime.isPlaying;
-  const currentTime = Number(runtime.currentTime || 0);
-  const duration = Number(runtime.duration || 0);
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className={styles.audioActions}>
@@ -183,7 +172,7 @@ const AudioOutputNodeConfig: AudioOutputNodeConfig = {
     selectedFile: '',
     enabled: true,
   },
-  instanceDataKeys: [],
+  instanceDataKeys: ['isPlaying', 'currentTime', 'duration', 'playCount', 'errorCount'],
   ConfigComponent: AudioConfig,
   ActionsComponent: AudioActions,
 };

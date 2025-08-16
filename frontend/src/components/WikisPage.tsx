@@ -12,8 +12,7 @@ interface WikisPageProps {
 
 const WikisPage: React.FC<WikisPageProps> = ({ 
   modules, 
-  state, 
-  onStateUpdate, 
+   
   onModuleSelect 
 }) => {
   const handleModuleClick = (moduleName: string) => {

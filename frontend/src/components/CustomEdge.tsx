@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo } from 'react';
 import { EdgeLabelRenderer, getBezierPath } from 'reactflow';
 import { FrontendEdgeData } from '../types';
 

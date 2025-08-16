@@ -8,7 +8,7 @@ interface EdgeStateMap {
   };
 }
 
-export function useEdgeState(edges: Edge[], registeredInteractionIds: Set<string>) {
+export function useEdgeState(edges: Edge[]) {
   const [edgeStates, setEdgeStates] = useState<EdgeStateMap>({});
 
   // Initialize edge states based on current edges

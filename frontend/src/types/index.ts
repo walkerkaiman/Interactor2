@@ -2,7 +2,7 @@ import {
   ModuleManifest,
   InteractionConfig,
   MessageRoute,
-  ModuleInstance,
+
 } from '@interactor/shared';
 
 // Frontend-specific node data

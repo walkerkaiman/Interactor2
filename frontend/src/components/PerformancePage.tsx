@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React from 'react';
 import { PerformancePageState } from '../types';
 import styles from './PerformancePage.module.css';
 
@@ -7,7 +7,7 @@ interface PerformancePageProps {
   onStateUpdate: (updates: Partial<PerformancePageState>) => void;
 }
 
-const PerformancePage: React.FC<PerformancePageProps> = ({ state }) => {
+const PerformancePage: React.FC<PerformancePageProps> = () => {
   return (
     <div className={styles.performancePage} data-testid="performance-page">
       <h2>Performance</h2>

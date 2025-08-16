@@ -97,58 +97,60 @@ export class TimeInputModule extends InputModuleBase {
         }
       ]
     }, id);
-
-    // Ensure config is not undefined
-    const safeConfig = config || {};
     
-    this.enabled = safeConfig.enabled !== false;
-    this.timeMode = safeConfig.mode || 'clock';
-    this.millisecondDelay = safeConfig.millisecondDelay || 1000;
-    // Set targetTime only for clock mode, undefined for metronome
-    if (this.timeMode === 'clock') {
-      this.targetTime = safeConfig.targetTime || '12:00 PM';
-    } else {
-      this.targetTime = undefined;
+    this.logger?.debug('Initializing TimeInputModule with config:', {
+      config: JSON.stringify(config),
+      id
+    });
+
+    // Validate config
+    if (!config) {
+      this.logger?.error('Config is required');
+      throw new InteractorError('Config is required');
     }
-    // StateManager access removed - using proper event emission instead
     
-    // WebSocket configuration
-    this.apiEnabled = safeConfig.apiEnabled || false;
-    this.apiEndpoint = safeConfig.apiEndpoint;
+    if (config.mode === 'clock' && !config.targetTime) {
+      this.logger?.error('Clock mode requires targetTime');
+      throw new InteractorError('Target time is required for clock mode');
+    }
+
+    // Ensure default values if config is incomplete
+    const safeConfig = {
+      mode: config.mode || 'clock',
+      targetTime: config.targetTime || '12:00 PM',
+      millisecondDelay: config.millisecondDelay || 1000
+    };
+
+    this.engine = new TimeEngine(
+      () => this.updateTimeDisplay(),
+      () => this.emitTimeTrigger(),
+      safeConfig.mode,
+      safeConfig.targetTime,
+      this.logger
+    );
+
+    this.startEngine();
+  }
+
+  protected async onStateRestore(state: any): Promise<void> {
+    this.logger?.debug('Restoring TimeInputModule state:', {
+      state: JSON.stringify(state),
+      currentMode: this.timeMode,
+      currentTarget: this.targetTime
+    });
+
+    await super.onStateRestore(state);
     
-    // Store external ID if provided
-    this.externalId = id;
-
-    // Create engine instance
-    this.engine = new TimeEngine({
-      mode: this.timeMode,
-      targetTime: this.targetTime,
-      delayMs: this.millisecondDelay,
-      enabled: this.enabled,
-    });
-
-    // Wire engine events
-    this.engine.on('tick', ({ currentTime, countdown }) => {
-      this.currentTime = currentTime;
-      this.countdown = countdown;
-      this.emitStateUpdate();
-    });
-    this.engine.on('pulse', () => {
-      this.emitTrigger('timeTrigger', {
-        mode: 'metronome',
-        millisecondDelay: this.millisecondDelay,
-        currentTime: new Date().toISOString(),
-        timestamp: Date.now(),
-      });
-    });
-    this.engine.on('clockHit', () => {
-      this.emitTrigger('timeTrigger', {
-        mode: 'clock',
-        targetTime: this.targetTime,
-        currentTime: new Date().toISOString(),
-        timestamp: Date.now(),
-      });
-    });
+    // Reinitialize engine with restored state
+    this.engine = new TimeEngine(
+      () => this.updateTimeDisplay(),
+      () => this.emitTimeTrigger(),
+      state?.mode || this.timeMode,
+      state?.targetTime || this.targetTime,
+      this.logger
+    );
+    
+    this.startEngine();
   }
 
   protected async onInit(): Promise<void> {
@@ -390,63 +392,63 @@ export class TimeInputModule extends InputModuleBase {
    * Update current time and countdown display
    */
   private updateTimeDisplay(): void {
+    this.logger?.debug('Calculating time display', {
+      mode: this.timeMode,
+      targetTime: this.targetTime,
+      millisecondDelay: this.millisecondDelay
+    });
+
     const now = new Date();
     
-    // Update current time in 12-hour format with seconds
+    // Current time display
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const seconds = now.getSeconds();
     const period = hours >= 12 ? 'PM' : 'AM';
     const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
     this.currentTime = `${hours12}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${period}`;
-    
-    // Calculate countdown based on mode
-    if (this.timeMode === 'clock') {
-      // Calculate countdown to target time
-      const targetTime24 = this.convertTo24Hour(this.targetTime || '');
-      const parts = targetTime24.split(':').map(Number);
-      const targetHours = parts[0];
-      const targetMinutes = parts[1];
-      
-      if (targetHours === undefined || targetMinutes === undefined) {
+
+    // Countdown calculation
+    if (this.timeMode === 'clock' && this.targetTime) {
+      try {
+        const target24 = this.convertTo24Hour(this.targetTime);
+        const [targetHours, targetMinutes] = target24.split(':').map(Number);
+        const targetDate = new Date();
+        targetDate.setHours(targetHours, targetMinutes, 0, 0);
+        
+        if (targetDate <= now) targetDate.setDate(targetDate.getDate() + 1);
+        
+        const diffMs = targetDate.getTime() - now.getTime();
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+        
+        this.countdown = diffHours > 0 ? `${diffHours}h ${diffMinutes}m ${diffSeconds}s` :
+                        diffMinutes > 0 ? `${diffMinutes}m ${diffSeconds}s` :
+                        `${diffSeconds}s`;
+      } catch (error) {
+        this.logger?.error('Failed to calculate clock countdown:', error);
         this.countdown = 'Invalid time';
-        return;
       }
-      
-      const targetDate = new Date();
-      targetDate.setHours(targetHours, targetMinutes, 0, 0);
-      
-      // If target time has passed today, set it for tomorrow
-      if (targetDate <= now) {
-        targetDate.setDate(targetDate.getDate() + 1);
-      }
-      
-      const diffMs = targetDate.getTime() - now.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-      
-      if (diffHours > 0) {
-        this.countdown = `${diffHours}h ${diffMinutes}m ${diffSeconds}s`;
-      } else if (diffMinutes > 0) {
-        this.countdown = `${diffMinutes}m ${diffSeconds}s`;
-      } else {
-        this.countdown = `${diffSeconds}s`;
-      }
-    } else if (this.timeMode === 'metronome') {
-      // For metronome mode, show countdown to next pulse
-      const timeSinceLastPulse = Date.now() % this.millisecondDelay;
-      const timeToNextPulse = this.millisecondDelay - timeSinceLastPulse;
-      const secondsToNext = Math.ceil(timeToNextPulse / 1000);
-      
-      if (secondsToNext > 0) {
-        this.countdown = `${secondsToNext}s to next`;
-      } else {
-        this.countdown = 'Now!';
+    } 
+    else if (this.timeMode === 'metronome') {
+      try {
+        const timeToNext = this.millisecondDelay - (Date.now() % this.millisecondDelay);
+        this.countdown = `${Math.ceil(timeToNext / 1000)}s to next`;
+      } catch (error) {
+        this.logger?.error('Failed to calculate metronome countdown:', error);
+        this.countdown = '--';
       }
     }
-    
-    // Emit updated state to core system
+    else {
+      this.countdown = '--';
+    }
+
+    this.logger?.debug('Time display updated', {
+      currentTime: this.currentTime,
+      countdown: this.countdown
+    });
+
     this.emitStateUpdate();
   }
 
@@ -695,5 +697,20 @@ export class TimeInputModule extends InputModuleBase {
       default:
         return baseSchema;
     }
+  }
+
+  private emitTimeTrigger(): void {
+    this.emitTrigger('timeTrigger', {
+      mode: this.timeMode,
+      targetTime: this.targetTime,
+      timestamp: Date.now()
+    });
+  }
+
+  private startEngine(): void {
+    const interval = this.timeMode === 'metronome' 
+      ? this.millisecondDelay 
+      : 1000; // Check every second for clock mode
+    this.engine.start(interval);
   }
 } 

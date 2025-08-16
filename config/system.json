@@ -15,12 +15,10 @@
   },
   "modules": {
     "autoLoad": true,
-    "scanInterval": 5000,
     "hotReload": true
   },
   "interactions": {
     "autoSave": true,
-    "saveInterval": 30000,
     "backupCount": 5
   },
   "security": {

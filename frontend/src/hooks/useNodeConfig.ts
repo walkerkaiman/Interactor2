@@ -23,77 +23,67 @@ export function useNodeConfig<T>(
   const { 
     getMergedConfig, 
     updateConfigChange, 
-    removeConfigChange, 
+ 
     hasConfigChange 
   } = useUnregisteredChanges();
 
-  // Get the effective config (original + unregistered changes)
-  const effectiveConfig = instance?.id ? getMergedConfig(instance.id, config) : config;
-  const effectiveValue = effectiveConfig[key] !== undefined ? effectiveConfig[key] : defaultValue;
 
-  // Check if this is a mode-specific setting that should be preserved
-  const isModeSpecificSetting = (key: string): boolean => {
-    // These settings should always be preserved regardless of current mode
-    const modeSpecificKeys = [
-      'mode', 'targetTime', 'millisecondDelay', 'enabled', 'apiEnabled', 'apiEndpoint',
-      'port', 'host', 'endpoint', 'methods', 'addressPattern',
-      'deviceId', 'volume', 'sampleRate', 'channels', 'format',
-      // Add more mode-specific keys as needed
-    ];
-    return modeSpecificKeys.includes(key);
-  };
 
-  // Update from instance config changes (only if not locally modified)
+
+
+  // Update local UI state when backend config changes
   useEffect(() => {
-    if (instance?.config) {
-      const newValue = effectiveValue;
-      
-      // Only update from backend if this key hasn't been locally modified
-      // AND if the value is actually different from what we have
-      if (!localChanges.has(key)) {
-        const finalValue = validator ? validator(newValue) : newValue;
-        
-        // Only update if the value is actually different
-        if (finalValue !== state) {
-          setState(finalValue);
-          lastBackendValue.current = finalValue;
-        }
-      } else {
-        // If this key has local changes, check if the backend value is different from our last known backend value
-        // This helps detect when the backend has been updated externally
-        if (newValue !== lastBackendValue.current) {
-          console.log(`Backend value changed for ${key}: ${lastBackendValue.current} -> ${newValue}, but keeping local change`);
-          lastBackendValue.current = newValue;
-        }
+    if (!instance?.config) return;
+    const backendValue = instance.config[key] !== undefined ? instance.config[key] : defaultValue;
+
+    if (!localChanges.has(key)) {
+      // No local changes, update from backend
+      const finalValue = validator ? validator(backendValue) : backendValue;
+      if (finalValue !== state) {
+        setState(finalValue);
+      }
+    } else {
+      // Local change exists - check if backend now matches our local value (change was processed)
+      if (backendValue === state) {
+        // Backend now matches our local value, clear the local change
+        setLocalChanges(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(key);
+          return newSet;
+        });
+        console.log(`Local change for ${key} has been confirmed by backend, clearing local change`);
+      } else if (backendValue !== lastBackendValue.current) {
+        // Backend value changed but doesn't match our local value - log for debugging
+        console.log(`Backend value for ${key} changed from ${String(lastBackendValue.current)} to ${String(backendValue)}, but local value is ${String(state)}`);
       }
     }
-  }, [instance, key, defaultValue, validator, localChanges, effectiveValue, state]);
+    
+    // Track last raw backend value
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    lastBackendValue.current = backendValue as T;
+  }, [instance?.config, key, defaultValue, validator, localChanges, state]);
 
   const updateState = useCallback((value: T) => {
     setState(value);
-    
+
     // Mark this key as locally modified
     setLocalChanges(prev => new Set([...prev, key]));
-    
-    // Update local config
-    if (instance) {
-      const updatedConfig = {
-        ...instance.config,
-        [key]: value
-      };
-      instance.config = updatedConfig;
-      
-      // Store in unregistered changes
-      if (instance.id) {
-        updateConfigChange(instance.id, updatedConfig);
-      }
-      
-      // Notify parent component of config change
-      if (onConfigChange && instance.id) {
-        onConfigChange(instance.id, updatedConfig);
+
+    if (instance?.id) {
+      // Store only the delta in the unregistered changes memory
+      updateConfigChange(instance.id, { [key]: value } as any);
+
+      // Compute the full merged config for the parent/upstream (draft = backend + all local deltas + this change)
+      const currentLocalDraftConfig = getMergedConfig(instance.id, instance.config || {});
+      const fullUpdatedConfig = { ...currentLocalDraftConfig, [key]: value };
+
+      // Notify parent component of config change with the full merged config
+      if (onConfigChange) {
+        onConfigChange(instance.id, fullUpdatedConfig);
       }
     }
-  }, [instance, onConfigChange, key, updateConfigChange]);
+  }, [instance, onConfigChange, key, updateConfigChange, getMergedConfig]);
 
   // Reset local changes when instance changes (new module loaded)
   useEffect(() => {
@@ -110,23 +100,7 @@ export function useNodeConfig<T>(
     }
   }, [instance?.id, hasConfigChange]);
 
-  // Clear local changes when backend value matches our local value
-  useEffect(() => {
-    if (instance?.config && localChanges.has(key)) {
-      const backendValue = instance.config[key] !== undefined ? instance.config[key] : defaultValue;
-      const localValue = state;
-      
-      // If backend value now matches our local value, the change has been registered
-      if (backendValue === localValue) {
-        setLocalChanges(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(key);
-          return newSet;
-        });
-        console.log(`Local change for ${key} has been registered, clearing local change`);
-      }
-    }
-  }, [instance?.config, key, state, localChanges, defaultValue]);
+
 
   return [state, updateState];
 }

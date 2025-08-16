@@ -45,7 +45,7 @@ export function useBaseModuleNode(
   const manifest = props.data.module;
   const instance = props.data.instance;
   const edges = props.data.edges || [];
-  const [isPulsing, setIsPulsing] = useState(false);
+  const [isPulsing] = useState(false);
   const [connectionStateVersion, setConnectionStateVersion] = useState(0);
 
   // Get unregistered changes
@@ -56,19 +56,7 @@ export function useBaseModuleNode(
   useEffect(() => {
     if (!config.enablePulseAnimation) return;
 
-    const handleTriggerEvent = (event: any) => {
-      if (event.moduleId === nodeId) {
-        setIsPulsing(true);
-        const duration = config.pulseAnimationDuration || 600;
-        setTimeout(() => setIsPulsing(false), duration);
-      }
-    };
 
-    const handlePulseEnded = (moduleId: string) => {
-      if (moduleId === nodeId) {
-        setIsPulsing(false);
-      }
-    };
 
     // Trigger events now handled through direct props/callbacks
     return () => {
@@ -353,7 +341,7 @@ export function useBaseModuleNode(
 // HOC to create a module node component with shared functionality
 export function createModuleNode(config: ModuleNodeConfig) {
   return function ModuleNodeComponent(props: BaseModuleNodeProps) {
-    const [configVersion, setConfigVersion] = useState(0);
+
     
     const {
       instance,
@@ -392,18 +380,13 @@ export function createModuleNode(config: ModuleNodeConfig) {
 
     // Config and actions components rendering (safe for hooks inside)
     const updateConfigCb = useCallback((key: string, value: any) => {
-      if (instance) {
-        const updatedConfig = {
-          ...instance.config,
-          [key]: value
-        };
-        instance.config = updatedConfig;
-        if (props.data.onConfigChange && instance.id) {
-          props.data.onConfigChange(instance.id, updatedConfig);
-        }
-        setConfigVersion(prev => prev + 1);
+      if (!instance?.id) return;
+      // Notify parent with the delta; parent will merge with draft and update the graph state
+      if (props.data.onConfigChange) {
+        props.data.onConfigChange(instance.id, { [key]: value });
       }
-    }, [instance, props.data.onConfigChange]);
+      
+    }, [instance?.id, props.data.onConfigChange]);
 
     // @ts-ignore - Variables are used in the hook but TypeScript doesn't recognize it
     return (

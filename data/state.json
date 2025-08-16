@@ -5,27 +5,33 @@
       "name": "New Interaction",
       "modules": [
         {
-          "id": "Time Input-1755195219009",
+          "id": "Time Input-1755223482486",
           "moduleName": "Time Input",
           "position": {
-            "x": 331,
-            "y": 334.765625
+            "x": 319.52700175898264,
+            "y": 394.2098597278988
           },
           "config": {
             "enabled": true,
-            "mode": "metronome",
-            "millisecondDelay": 3000,
-            "apiEnabled": false
+            "mode": "clock",
+            "millisecondDelay": 1000,
+            "apiEnabled": false,
+            "Time Input-1755223482486": {
+              "enabled": true,
+              "mode": "metronome",
+              "millisecondDelay": 1000,
+              "apiEnabled": false
+            }
           },
           "enabled": true,
-          "lastUpdate": 1755195219009
+          "lastUpdate": 1755223482486
         },
         {
-          "id": "Audio Output-1755195223191",
+          "id": "Audio Output-1755223486697",
           "moduleName": "Audio Output",
           "position": {
-            "x": 847.8566765438763,
-            "y": 319.53143195553076
+            "x": 874.1692392996803,
+            "y": 334.4751788653309
           },
           "config": {
             "enabled": true,
@@ -48,18 +54,17 @@
               ".ogg",
               ".m4a",
               ".flac"
-            ],
-            "selectedFile": "1754185642038_Arcade.wav"
+            ]
           },
           "enabled": true,
-          "lastUpdate": 1755195223191
+          "lastUpdate": 1755223486698
         }
       ],
       "routes": [
         {
-          "id": "r_1755195226768",
-          "source": "Time Input-1755195219009",
-          "target": "Audio Output-1755195223191",
+          "id": "r_1755223493164",
+          "source": "Time Input-1755223482486",
+          "target": "Audio Output-1755223486697",
           "event": "trigger"
         }
       ]
@@ -67,23 +72,27 @@
   ],
   "modules": [
     {
-      "id": "Time Input-1755195219009",
+      "id": "Time Input-1755223482486",
       "moduleName": "Time Input",
       "config": {
         "enabled": true,
-        "mode": "metronome",
-        "millisecondDelay": 3000,
-        "apiEnabled": false
+        "mode": "clock",
+        "millisecondDelay": 1000,
+        "apiEnabled": false,
+        "Time Input-1755223482486": {
+          "enabled": true,
+          "mode": "metronome",
+          "millisecondDelay": 1000,
+          "apiEnabled": false
+        }
       },
-      "status": "running",
+      "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1755195531777,
-      "currentTime": "1:18:51 PM",
-      "countdown": "3s to next"
+      "lastUpdate": 1755355812698
     },
     {
-      "id": "Audio Output-1755195223191",
+      "id": "Audio Output-1755223486697",
       "moduleName": "Audio Output",
       "config": {
         "enabled": true,
@@ -106,13 +115,12 @@
           ".ogg",
           ".m4a",
           ".flac"
-        ],
-        "selectedFile": "1754185642038_Arcade.wav"
+        ]
       },
       "status": "stopped",
       "messageCount": 0,
       "frameCount": 0,
-      "lastUpdate": 1755195241014
+      "lastUpdate": 1755268921490
     }
   ],
   "routes": [],

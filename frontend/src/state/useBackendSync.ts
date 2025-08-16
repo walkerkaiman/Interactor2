@@ -68,7 +68,7 @@ export function useBackendSync(): BackendSync {
       let id = localStorage.getItem(key);
       if (!id && (window as any).crypto?.randomUUID) {
         id = (window as any).crypto.randomUUID();
-        localStorage.setItem(key, id);
+        if (id) localStorage.setItem(key, id);
       }
       clientIdRef.current = id;
     } catch {
@@ -123,7 +123,8 @@ export function useBackendSync(): BackendSync {
         const manifest = manifests.get(inst.moduleName) || manifests.get(inst.name) || manifests.get(displayName);
         const inferredType = (manifest as any)?.type || (/(^|_)output$/.test((inst.moduleName || '').toLowerCase()) || /output$/i.test(displayName) ? 'output' : 'input');
         const mergedName = (manifest as any)?.name ?? displayName;
-        const merged = { name: mergedName, type: inferredType, ...(manifest || {}), ...inst };
+        // Ensure id and moduleName are present alongside manifest fields and runtime
+        const merged = { id: inst.id, moduleName: inst.moduleName || mergedName, name: mergedName, type: inferredType, ...(manifest || {}), ...inst };
         console.log(`Merged module ${inst.moduleName}:`, merged);
         return merged;
       });
@@ -141,28 +142,29 @@ export function useBackendSync(): BackendSync {
           if (key) {
             const existingModule = existingModulesMap.get(key);
             if (existingModule) {
-              // For runtime fields (like currentTime, countdown), always use the server value
-              // For config fields, preserve local unregistered changes
+              // Merge manifest + runtime, preserve local unregistered config deltas
               const runtimeFields = ['currentTime', 'countdown', 'status', 'isRunning', 'isInitialized', 'isListening', 'lastUpdate'];
-              
-              // Start with existing module
-              const updatedModule = { ...existingModule };
-              
-              // Update runtime fields from server (always use server value)
+
+              const updatedModule: any = { ...existingModule };
+              // Ensure id and moduleName propagate from runtime
+              updatedModule.id = enrichedModule.id;
+              updatedModule.moduleName = enrichedModule.moduleName || updatedModule.moduleName;
+              updatedModule.type = enrichedModule.type || updatedModule.type;
+
+              // Update runtime fields from server (always authoritative)
               runtimeFields.forEach(field => {
                 if (enrichedModule[field] !== undefined) {
                   updatedModule[field] = enrichedModule[field];
                 }
               });
-              
-              // For config, preserve local unregistered changes
+
+              // For config, use backend's authoritative state (WebSocket indicates backend has processed changes)
               if (enrichedModule.config) {
-                const preservedConfig = getMergedConfig(existingModule.id, enrichedModule.config);
-                updatedModule.config = preservedConfig;
+                updatedModule.config = enrichedModule.config;
               }
-              
+
               existingModulesMap.set(key, updatedModule);
-              console.log(`Updated module ${key} with runtime fields and preserved config:`, updatedModule);
+              console.log(`Updated module ${key} with id ${updatedModule.id} and preserved config`, updatedModule);
             } else {
               // This is a new runtime instance, add it
               existingModulesMap.set(key, enrichedModule);

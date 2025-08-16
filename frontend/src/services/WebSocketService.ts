@@ -16,7 +16,7 @@ interface WebSocketConnection {
   config: WebSocketConfig;
   isConnected: boolean;
   reconnectAttempts: number;
-  reconnectTimeout?: NodeJS.Timeout;
+  reconnectTimeout?: ReturnType<typeof setTimeout>;
 }
 
 class WebSocketService {

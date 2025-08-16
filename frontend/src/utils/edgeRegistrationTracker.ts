@@ -112,9 +112,7 @@ class EdgeRegistrationTrackerImpl implements EdgeRegistrationTracker {
   }
 
   // Helper methods
-  private getEdgeIdFromConnection(source: string, target: string): string {
-    return `${source}-${target}`;
-  }
+
 
   private getEdgeIdFromRoute(route: any): string {
     return route.id || `${route.source}-${route.target}`;

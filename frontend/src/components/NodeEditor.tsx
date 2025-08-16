@@ -19,6 +19,7 @@ import CustomEdge from './CustomEdge';
 import { useFlowBuilder } from '../graph/useFlowBuilder';
 import { useUnregisteredChanges } from '../state/useUnregisteredChanges';
 import seedConfigFromManifest from '../graph/utils/seedConfigFromManifest';
+import { apiService } from '../api';
 
 import styles from './NodeEditor.module.css';
 import { useModuleRuntime } from '../hooks/useModuleRuntime';
@@ -44,7 +45,6 @@ interface NodeEditorProps {
 const NodeEditor: React.FC<NodeEditorProps> = ({
   modules,
   interactions,
-  selectedNodeId,
   onNodeSelect,
   onInteractionsUpdate,
 }) => {
@@ -61,13 +61,14 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       }
     },
     {
-      onConfigChange: (moduleId: string, config: any) => {
-        const updated = interactions.map((interaction) => ({
-          ...interaction,
-          modules: (interaction.modules || []).map((m: any) => m.id === moduleId ? { ...m, config: { ...m.config, ...config } } : m)
-        }));
-        if (onInteractionsUpdate) {
-          onInteractionsUpdate(updated);
+      onConfigChange: async (moduleId: string, configDeltaOrFull: any) => {
+        try {
+          // Immediately send config change to backend
+          await apiService.updateModuleConfig(moduleId, configDeltaOrFull);
+          // Backend will notify all clients via WebSocket, so we don't need to update local state
+        } catch (error) {
+          console.error('Failed to update module config:', error);
+          // Optionally show error to user
         }
       },
       onStructuralChange: () => markStructuralChange()
@@ -89,11 +90,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     console.log('Delete node:', nodeId);
   }, []);
 
-  // Handle config changes from nodes
-  const handleNodeConfigChange = useCallback((nodeId: string, config: any) => {
-    // TODO: implement config updates through useFlowBuilder
-    console.log('Config change:', nodeId, config);
-  }, []);
+
 
   // Handle module drop
   const onDrop = useCallback(
@@ -135,7 +132,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
               id: `interaction-${Date.now()}`,
               name: 'New Interaction',
               modules: [newModuleInstance],
-              routes: []
+              routes: [],
+              enabled: true
             });
           } else {
             // Add to the first interaction

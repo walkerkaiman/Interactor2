@@ -2,12 +2,15 @@ import { ModuleConfig, ModuleManifest } from '@interactor/shared';
 import { Logger } from './Logger';
 import * as path from 'path';
 import * as fs from 'fs-extra';
+import { InteractorError } from './ErrorHandler';
+import { AudioOutputModule } from '../modules/output/audio_output/index';
 
 export class ModuleLoader {
   private static instance: ModuleLoader;
   private modules: Map<string, ModuleManifest> = new Map();
   private logger: Logger;
   private modulesPath: string;
+  private audioOutputInstance: AudioOutputModule | undefined;
 
   private constructor() {
     this.logger = Logger.getInstance();
@@ -107,15 +110,15 @@ export class ModuleLoader {
       // Attempt to import module API to register its factory with ModuleRegistry
       try {
         const apiIndex = path.join(modulePath, 'api', 'index');
+        this.logger.debug(`Attempting to import API for module: ${manifest.name} from ${apiIndex}`, 'ModuleLoader');
         // Dynamic import without extension resolves to compiled JS in dist
         await import(apiIndex);
         this.logger.debug(`Registered API for module: ${manifest.name}`, 'ModuleLoader');
       } catch (apiErr) {
-        this.logger.warn(`No API registration found for module: ${manifest.name}`, 'ModuleLoader');
+        this.logger.warn(`No API registration found for module: ${manifest.name}`, 'ModuleLoader', { error: String(apiErr) });
       }
-
     } catch (error) {
-      this.logger.error(`Error loading module: ${moduleName}`, 'ModuleLoader', { error: String(error) });
+      this.logger.error(`Error loading module: ${moduleName}`, 'ModuleLoader', { error: String(error), stack: error.stack });
     }
   }
 
@@ -189,6 +192,60 @@ export class ModuleLoader {
   public getInstance(id: string): any {
     // Simplified implementation - return undefined since we don't track instances
     return undefined;
+  }
+
+  /**
+   * Initialize a specific module by its ID
+   */
+  public initializeModule(moduleId: string): void {
+    this.logger?.debug('Initializing module:', moduleId);
+    
+    try {
+      const module = this.getModule(moduleId);
+      this.logger?.debug('Module found:', {moduleExists: !!module});
+      
+      if (!module) {
+        this.logger?.error(`Module ${moduleId} not found`);
+        throw new InteractorError(`Module ${moduleId} not found`, { statusCode: 404 });
+      }
+      
+      // Special handling for audio output
+      if (moduleId === 'audio-output') {
+        this.logger?.debug('Initializing audio output module');
+        this.ensureAudioOutputInitialized();
+      }
+      
+      this.logger?.debug('Calling module.initialize()');
+      module.initialize();
+      this.logger?.debug('Module initialized successfully:', moduleId);
+    } catch (error) {
+      this.logger?.error(`Module initialization failed for ${moduleId}:`, {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  private ensureAudioOutputInitialized(): void {
+    this.logger?.debug('Checking audio output initialization', {
+      existingInstance: !!this.audioOutputInstance
+    });
+
+    if (!this.audioOutputInstance) {
+      try {
+        const config = this.getConfig('audio-output');
+        this.logger?.debug('Creating new AudioOutput instance with config:', config);
+        this.audioOutputInstance = new AudioOutputModule(config);
+        this.logger?.debug('AudioOutput instance created successfully');
+      } catch (error) {
+        this.logger?.error('Failed to initialize audio output:', {
+          error: error.message,
+          stack: error.stack
+        });
+        throw error;
+      }
+    }
   }
 
   /**
