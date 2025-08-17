@@ -38,14 +38,39 @@ export class TimeInputModule extends InputModuleBase {
   private engineRunning: boolean = false; // Flag to track if engine is running
   // StateManager removed - modules should not directly access core services
   
+  // Throttling for runtime updates
+  private lastRuntimeUpdate: number = 0;
+  private readonly RUNTIME_UPDATE_THROTTLE = 1000; // Reduced to 1 second to match system updates
+  
   // WebSocket properties
   private ws: WebSocket | null = null;
   private wsUrl?: string;
   private wsReconnectInterval: NodeJS.Timeout | null = null;
   private externalId?: string; // Store external ID for state updates
 
-  constructor(config: any = {}) {
-    super('time_input', config);
+  constructor(config: any = {}, id?: string) {
+    const manifest = {
+      name: 'Time Input',
+      type: 'input' as const,
+      version: '1.0.0',
+      description: 'Time-based trigger module for countdown timers and metronomes',
+      author: 'Interactor Team',
+      configSchema: {
+        type: 'object' as const,
+        properties: {
+          mode: { type: 'string' as const, enum: ['clock', 'metronome'] },
+          targetTime: { type: 'string' as const },
+          millisecondDelay: { type: 'number' as const, minimum: 1, maximum: 60000 },
+          enabled: { type: 'boolean' as const },
+          apiEnabled: { type: 'boolean' as const },
+          apiEndpoint: { type: 'string' as const }
+        },
+        required: []
+      },
+      events: []
+    };
+    
+    super('time_input', config, manifest, id);
 
     // Create safe config with defaults
     const safeConfig = {
@@ -60,7 +85,7 @@ export class TimeInputModule extends InputModuleBase {
     // Initialize module properties from config
     this.timeMode = safeConfig.mode;
     this.targetTime = safeConfig.targetTime;
-    this.millisecondDelay = safeConfig.millisecondDelay;
+    this.millisecondDelay = safeConfig.millisecondDelay || 1000;
     this.enabled = safeConfig.enabled;
     this.apiEnabled = safeConfig.apiEnabled;
     this.apiEndpoint = safeConfig.apiEndpoint;
@@ -93,29 +118,28 @@ export class TimeInputModule extends InputModuleBase {
       return;
     }
 
-    await super.onStateRestore(state);
-    
     // Restore module properties from state
     if (state) {
       this.timeMode = state.mode || this.timeMode;
       this.targetTime = state.targetTime || this.targetTime;
       this.millisecondDelay = state.millisecondDelay || this.millisecondDelay;
       this.enabled = state.enabled !== undefined ? state.enabled : this.enabled;
-      this.apiEnabled = state.apiEnabled || this.apiEnabled;
+      this.apiEnabled = state.apiEnabled !== undefined ? state.apiEnabled : this.apiEnabled;
       this.apiEndpoint = state.apiEndpoint || this.apiEndpoint;
-    }
-    
-    // Only log if critical properties are missing
-    if (!this.targetTime || this.targetTime === 'undefined') {
-      this.logger?.error('TimeInputModule: Missing targetTime after state restoration:', {
-        state: state,
-        restoredTargetTime: this.targetTime
-      });
-    }
-    
-    // Update the existing engine with restored configuration instead of creating a new one
-    if (this.engine) {
-      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
+      this.countdown = state.countdown || this.countdown;
+
+      // Only log if there are issues with state restoration
+      if (!this.targetTime || this.targetTime === 'undefined') {
+        this.logger?.error('TimeInputModule: Missing or invalid targetTime after state restoration:', {
+          state: state,
+          restoredTargetTime: this.targetTime
+        });
+      }
+
+      // Update the existing engine with new configuration
+      this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay || 1000);
+
+      // Start engine if it was running before and is enabled
       if (this.enabled && !this.engineRunning) {
         this.startEngine();
       }
@@ -199,14 +223,20 @@ export class TimeInputModule extends InputModuleBase {
   }
 
   protected async onConfigUpdate(oldConfig: ModuleConfig, newConfig: ModuleConfig): Promise<void> {
+    this.logger?.info(`[TIMEMODULE] onConfigUpdate called for ${this.id}`);
+    this.logger?.debug(`[TIMEMODULE] Old config:`, oldConfig);
+    this.logger?.debug(`[TIMEMODULE] New config:`, newConfig);
+    
     const newTimeConfig = newConfig as TimeInputConfig;
     
     if (newTimeConfig.mode !== this.timeMode) {
+      this.logger?.info(`[TIMEMODULE] Mode changed from ${this.timeMode} to ${newTimeConfig.mode}`);
       this.timeMode = newTimeConfig.mode || 'clock';
       this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
     }
     
     if (newTimeConfig.targetTime !== this.targetTime) {
+      this.logger?.info(`[TIMEMODULE] Target time changed from ${this.targetTime} to ${newTimeConfig.targetTime}`);
       this.targetTime = newTimeConfig.targetTime || this.targetTime;
       if (this.timeMode === 'clock' && !this.isValidTimeFormat(this.targetTime || '')) {
         throw InteractorError.validation(
@@ -219,6 +249,7 @@ export class TimeInputModule extends InputModuleBase {
     }
     
     if (newTimeConfig.millisecondDelay !== this.millisecondDelay) {
+      this.logger?.info(`[TIMEMODULE] Millisecond delay changed from ${this.millisecondDelay} to ${newTimeConfig.millisecondDelay}`);
       this.millisecondDelay = newTimeConfig.millisecondDelay || 1000;
       if (this.timeMode === 'metronome' && (this.millisecondDelay < 100 || this.millisecondDelay > 60000)) {
         throw InteractorError.validation(
@@ -228,9 +259,11 @@ export class TimeInputModule extends InputModuleBase {
         );
       }
       this.engine.updateConfig(this.timeMode, this.targetTime, this.millisecondDelay);
+      this.logger?.info(`[TIMEMODULE] Engine updated with new delay: ${this.millisecondDelay}ms`);
     }
     
     if (newTimeConfig.enabled !== this.enabled) {
+      this.logger?.info(`[TIMEMODULE] Enabled changed from ${this.enabled} to ${newTimeConfig.enabled}`);
       this.enabled = newTimeConfig.enabled ?? this.enabled;
       if (!this.enabled) {
         this.engine.stop();
@@ -242,6 +275,7 @@ export class TimeInputModule extends InputModuleBase {
 
     // Handle WebSocket configuration changes
     if (newTimeConfig.apiEnabled !== this.apiEnabled || newTimeConfig.apiEndpoint !== this.apiEndpoint) {
+      this.logger?.info(`[TIMEMODULE] API config changed - enabled: ${newTimeConfig.apiEnabled}, endpoint: ${newTimeConfig.apiEndpoint}`);
       this.apiEnabled = newTimeConfig.apiEnabled || false;
       this.apiEndpoint = newTimeConfig.apiEndpoint;
       
@@ -253,6 +287,7 @@ export class TimeInputModule extends InputModuleBase {
       }
     }
     
+    this.logger?.info(`[TIMEMODULE] onConfigUpdate completed for ${this.id}`);
     // Emit configuration update using the standardized method
     this.emitConfigUpdate();
   }
@@ -261,10 +296,20 @@ export class TimeInputModule extends InputModuleBase {
    * Emit current module state - called after config changes and periodic updates
    */
   private emitStateUpdate(): void {
+    const now = Date.now();
+    
+    // Throttle runtime updates to reduce WebSocket traffic
+    if (now - this.lastRuntimeUpdate < this.RUNTIME_UPDATE_THROTTLE) {
+      return;
+    }
+    
+    this.lastRuntimeUpdate = now;
+    
     // Use the standardized runtime state update method
     // This prevents overwriting user's unregistered configuration changes
     this.emitRuntimeStateUpdate({
-      countdown: this.countdown,
+      countdown: this.countdown || '--',
+      currentTime: new Date().toISOString(),
     });
   }
 
@@ -321,6 +366,20 @@ export class TimeInputModule extends InputModuleBase {
   private isValidTimeFormat(time: string): boolean {
     const timeRegex = /^(1[0-2]|0?[1-9]):[0-5][0-9]\s*(AM|PM)$/i;
     return timeRegex.test(time);
+  }
+
+  /**
+   * Get runtime data for the module
+   * This is called by InteractorApp.getCurrentState() to collect runtime data from all modules
+   */
+  public getRuntimeData(): Record<string, any> {
+    return {
+      countdown: this.countdown || '--',
+      currentTime: new Date().toISOString(),
+      mode: this.timeMode,
+      enabled: this.enabled,
+      isRunning: this.engineRunning
+    };
   }
 
   /**
@@ -392,7 +451,8 @@ export class TimeInputModule extends InputModuleBase {
     } 
     else if (this.timeMode === 'metronome') {
       try {
-        const timeToNext = this.millisecondDelay - (Date.now() % this.millisecondDelay);
+        const delay = this.millisecondDelay ?? 1000;
+        const timeToNext = delay - (Date.now() % delay);
         newCountdown = `${Math.ceil(timeToNext / 1000)}s to next`;
       } catch (error) {
         this.logger?.error('Failed to calculate metronome countdown:', error);

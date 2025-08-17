@@ -256,20 +256,20 @@ export class InteractorServer {
       next();
     });
     
-    // Serve static files from frontend build
-    const frontendPath = path.join(process.cwd(), '..', 'frontend', 'dist');
-    if (await fs.pathExists(frontendPath)) {
-      this.app.use(express.static(frontendPath));
-      
-      // Serve index.html for all non-API routes (SPA routing)
-      this.app.get('*', (req, res, next) => {
-        if (!req.path.startsWith('/api') && !req.path.startsWith('/health')) {
-          res.sendFile(path.join(frontendPath, 'index.html'));
-        } else {
-          next();
-        }
-      });
-    }
+    // Serve static files from frontend build (DISABLED for development)
+    // const frontendPath = path.join(process.cwd(), '..', 'frontend', 'dist');
+    // if (await fs.pathExists(frontendPath)) {
+    //   this.app.use(express.static(frontendPath));
+    //   
+    //   // Serve index.html for all non-API routes (SPA routing)
+    //   this.app.get('*', (req, res, next) => {
+    //     if (!req.path.startsWith('/api') && !req.path.startsWith('/health')) {
+    //       res.sendFile(path.join(frontendPath, 'index.html'));
+    //     } else {
+    //       next();
+    //     }
+    //   });
+    // }
   }
 
   /**
@@ -340,16 +340,16 @@ export class InteractorServer {
       this.logger.debug(`Resolved internal module name: ${moduleName} for ${moduleData.moduleName} (${moduleData.id})`);
       
       // Check if module is registered in the registry
-      if (!moduleRegistry.has(moduleData.moduleName)) {
-        this.logger.error(`Module not registered in registry: ${moduleData.moduleName} (${moduleData.id})`);
+      if (!moduleRegistry.has(moduleName)) {
+        this.logger.error(`Module not registered in registry: ${moduleName} (${moduleData.id})`);
         return null;
       }
       
-      this.logger.debug(`Module found in registry: ${moduleData.moduleName} (${moduleData.id})`);
+      this.logger.debug(`Module found in registry: ${moduleName} (${moduleData.id})`);
       
       // Create instance using the module registry
       this.logger.debug(`Creating new instance of ${moduleData.moduleName} with ID ${moduleData.id}`, { config: moduleData.config });
-      const instance = await moduleRegistry.create(moduleData.moduleName, moduleData.config || {}, moduleData.id);
+      const instance = await moduleRegistry.create(moduleName, moduleData.config || {}, moduleData.id);
       
       this.logger.debug(`Created instance of ${moduleName} (${moduleData.moduleName}, ID: ${moduleData.id})`);
       
@@ -581,35 +581,87 @@ export class InteractorServer {
     // Update module instance configuration (specific endpoint)
     this.app.put('/api/modules/instances/:id/config', async (req, res) => {
       try {
+        this.logger.info(`[CONFIG UPDATE] Received PUT request for module ${req.params.id}`);
+        this.logger.debug(`[CONFIG UPDATE] Request body:`, req.body);
+        
         const moduleInstances = this.stateManager.getModuleInstances();
         const moduleInstance = moduleInstances.find(m => m.id === req.params.id);
         
         if (!moduleInstance) {
+          this.logger.error(`[CONFIG UPDATE] Module instance not found: ${req.params.id}`);
           return res.status(404).json({ success: false, error: 'Module instance not found' });
         }
         
+        this.logger.info(`[CONFIG UPDATE] Found module instance: ${moduleInstance.moduleName} (${moduleInstance.id})`);
+        this.logger.debug(`[CONFIG UPDATE] Current config:`, moduleInstance.config);
+        
         // Update module configuration
         if (req.body.config) {
-          moduleInstance.config = { ...moduleInstance.config, ...req.body.config };
+          this.logger.info(`[CONFIG UPDATE] Processing config update for ${req.params.id}`);
+          this.logger.debug(`[CONFIG UPDATE] Incoming config:`, req.body.config);
           
-                          // Note: Module instances are managed by StateManager, not ModuleLoader
-                // The configuration update is handled through the state update mechanism
+          // Extract the actual config from the nested structure
+          let actualConfig = req.body.config;
+          
+          // If the config contains the module ID as a key, extract that nested config
+          if (req.params.id in req.body.config) {
+            this.logger.debug(`[CONFIG UPDATE] Found nested config structure, extracting from key: ${req.params.id}`);
+            actualConfig = req.body.config[req.params.id];
+            this.logger.debug(`[CONFIG UPDATE] Extracted config:`, actualConfig);
+          }
+          
+          // Merge with existing config, avoiding nested structures
+          const oldConfig = { ...moduleInstance.config };
+          moduleInstance.config = { ...moduleInstance.config, ...actualConfig };
+          
+          // Remove any nested module ID keys that might have been created
+          if (req.params.id in moduleInstance.config) {
+            this.logger.debug(`[CONFIG UPDATE] Removing nested module ID key: ${req.params.id}`);
+            delete moduleInstance.config[req.params.id];
+          }
+          
+          this.logger.info(`[CONFIG UPDATE] Config merged successfully`);
+          this.logger.debug(`[CONFIG UPDATE] Old config:`, oldConfig);
+          this.logger.debug(`[CONFIG UPDATE] New config:`, moduleInstance.config);
+          
+          // Update the live module instance if it exists
+          const liveInstance = this.moduleInstances.get(req.params.id);
+          if (liveInstance && typeof liveInstance.updateConfig === 'function') {
+            this.logger.info(`[CONFIG UPDATE] Updating live module instance for ${req.params.id}`);
+            try {
+              await liveInstance.updateConfig(actualConfig);
+              this.logger.info(`[CONFIG UPDATE] Successfully updated live module instance configuration for ${req.params.id}`);
+            } catch (updateError) {
+              this.logger.error(`[CONFIG UPDATE] Failed to update live module instance configuration for ${req.params.id}:`, updateError);
+            }
+          } else {
+            this.logger.warn(`[CONFIG UPDATE] No live instance found or updateConfig method not available for ${req.params.id}`);
+            this.logger.debug(`[CONFIG UPDATE] Live instance exists: ${!!liveInstance}`);
+            this.logger.debug(`[CONFIG UPDATE] Has updateConfig method: ${liveInstance && typeof liveInstance.updateConfig === 'function'}`);
+          }
+        } else {
+          this.logger.warn(`[CONFIG UPDATE] No config provided in request body for ${req.params.id}`);
         }
         
         moduleInstance.lastUpdate = Date.now();
         
+        this.logger.info(`[CONFIG UPDATE] Saving updated state to file for ${req.params.id}`);
         // Update state
         await this.stateManager.replaceState({ modules: moduleInstances });
+        this.logger.info(`[CONFIG UPDATE] State saved successfully for ${req.params.id}`);
         
         // Broadcast state update
+        this.logger.info(`[CONFIG UPDATE] Broadcasting state update for ${req.params.id}`);
         this.broadcastStateUpdate();
         
+        this.logger.info(`[CONFIG UPDATE] Configuration update completed successfully for ${req.params.id}`);
         return res.json({ 
           success: true, 
           message: 'Module configuration updated successfully',
           data: moduleInstance
         });
       } catch (error) {
+        this.logger.error(`[CONFIG UPDATE] Failed to update module configuration for ${req.params.id}:`, error);
         return res.status(500).json({ success: false, error: String(error) });
       }
     });
@@ -655,8 +707,13 @@ export class InteractorServer {
     // Register entire interaction map (atomic update)
     this.app.post('/api/interactions/register', async (req, res) => {
       try {
+        this.logger.info(`[INTERACTION REG] Received interaction registration request`);
+        this.logger.debug(`[INTERACTION REG] Request body:`, req.body);
+        
         const interactionMap: InteractionConfig[] = req.body.interactions || [];
         const originClientId: string | undefined = (req.get('X-Client-Id') as string) || req.body.clientId;
+        
+        this.logger.info(`[INTERACTION REG] Processing ${interactionMap.length} interactions`);
         
         // Replace entire interaction state
         await this.stateManager.replaceState({ interactions: interactionMap });
@@ -676,23 +733,40 @@ export class InteractorServer {
         
         // Create module instances for all modules in interactions
         const moduleInstances: any[] = [];
+        const existingModuleInstances = this.stateManager.getModuleInstances();
+        
+        this.logger.info(`[INTERACTION REG] Processing ${interactionMap.reduce((sum, i) => sum + i.modules.length, 0)} modules`);
+        
         interactionMap.forEach(interaction => {
           interaction.modules.forEach(moduleInstance => {
+            this.logger.debug(`[INTERACTION REG] Processing module: ${moduleInstance.moduleName} (${moduleInstance.id})`);
+            this.logger.debug(`[INTERACTION REG] Module config:`, moduleInstance.config);
+            
+            // Check if this module already exists and preserve its status
+            const existingInstance = existingModuleInstances.find(m => m.id === moduleInstance.id);
+            const currentStatus = existingInstance ? existingInstance.status : 'stopped';
+            
+            this.logger.debug(`[INTERACTION REG] Existing instance found: ${!!existingInstance}`);
+            this.logger.debug(`[INTERACTION REG] Current status: ${currentStatus}`);
+            
             // Create a module instance with state
             const instance = {
               id: moduleInstance.id,
               moduleName: moduleInstance.moduleName,
               config: moduleInstance.config,
-              status: 'stopped',
-              messageCount: 0,
-              currentFrame: undefined,
-              frameCount: 0,
+              status: currentStatus, // Preserve existing status
+              messageCount: existingInstance ? existingInstance.messageCount : 0,
+              currentFrame: existingInstance ? existingInstance.currentFrame : undefined,
+              frameCount: existingInstance ? existingInstance.frameCount : 0,
               lastUpdate: Date.now()
             };
             moduleInstances.push(instance);
+            
+            this.logger.debug(`[INTERACTION REG] Created instance config:`, instance.config);
           });
         });
         
+        this.logger.info(`[INTERACTION REG] Saving ${moduleInstances.length} module instances to state`);
         // Store module instances in state
         await this.stateManager.replaceState({ 
           interactions: interactionMap,
@@ -702,32 +776,36 @@ export class InteractorServer {
         // Create live module instances for inputs and outputs; start inputs if appropriate
         for (const moduleInstance of moduleInstances) {
           try {
+            this.logger.debug(`[INTERACTION REG] Processing live instance for: ${moduleInstance.moduleName} (${moduleInstance.id})`);
+            
             let liveInstance = this.moduleInstances.get(moduleInstance.id);
             if (!liveInstance) {
-              this.logger.info(`Creating live instance for ${moduleInstance.moduleName} (${moduleInstance.id}) during interaction registration.`);
+              this.logger.info(`[INTERACTION REG] Creating live instance for ${moduleInstance.moduleName} (${moduleInstance.id}) during interaction registration.`);
               liveInstance = await this.createModuleInstance(moduleInstance);
               if (liveInstance) {
-                this.logger.info(`Successfully created live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
+                this.logger.info(`[INTERACTION REG] Successfully created live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
                 const displayName = this.getModuleNameFromManifest(moduleInstance.moduleName);
                 const internalName = this.getInternalModuleName(displayName);
                 // Start inputs automatically (e.g., time_input)
                 if (displayName === 'Time Input' || internalName === 'time_input') {
                   try {
                     await liveInstance.start();
-                    this.logger.info(`Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
+                    this.logger.info(`[INTERACTION REG] Started live module instance for ${moduleInstance.moduleName} (${moduleInstance.id})`);
                     moduleInstance.status = 'running';
                   } catch (startError) {
-                    this.logger.error(`Failed to start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: startError.message, stack: startError.stack });
+                    this.logger.error(`[INTERACTION REG] Failed to start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: startError.message, stack: startError.stack });
                   }
                 }
               } else {
-                this.logger.error(`Failed to create live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
+                this.logger.error(`[INTERACTION REG] Failed to create live instance for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
               }
             } else {
-              this.logger.info(`Live instance already exists for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
+              this.logger.info(`[INTERACTION REG] Live instance already exists for ${moduleInstance.moduleName} (${moduleInstance.id}).`);
+              // DO NOT update existing live instances with saved state - preserve their current configuration
+              this.logger.info(`[INTERACTION REG] Preserving existing live module instance configuration for ${moduleInstance.moduleName} (${moduleInstance.id})`);
             }
           } catch (error) {
-            this.logger.error(`Failed to create/start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: error.message, stack: error.stack });
+            this.logger.error(`[INTERACTION REG] Failed to create/start live module instance for ${moduleInstance.moduleName} (${moduleInstance.id}):`, { message: error.message, stack: error.stack });
           }
         }
         
@@ -735,7 +813,7 @@ export class InteractorServer {
         this.setupTriggerEventListeners();
         
         // Broadcast state update to all clients with originClientId (echo suppression friendly)
-        this.logger.info('Register completed, broadcasting state_update', 'InteractorServer', { originClientId: originClientId || 'none' });
+        this.logger.info('[INTERACTION REG] Register completed, broadcasting state_update', 'InteractorServer', { originClientId: originClientId || 'none' });
         this.broadcastStateUpdate(originClientId);
         
         res.json({ 
@@ -745,7 +823,7 @@ export class InteractorServer {
           moduleInstances: moduleInstances.length
         });
       } catch (error) {
-        this.logger.error(`Failed to register interactions:`, { message: error.message, stack: error.stack });
+        this.logger.error(`[INTERACTION REG] Failed to register interactions:`, { message: error.message, stack: error.stack });
         res.status(400).json({ success: false, error: String(error) });
       }
     });
@@ -1519,3 +1597,4 @@ if (require.main === module) {
 }
 
 export default InteractorServer;
+

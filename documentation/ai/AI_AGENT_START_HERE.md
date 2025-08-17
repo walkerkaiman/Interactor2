@@ -10,6 +10,127 @@ This document provides essential information for AI agents working on the Intera
 4. **Maintain backward compatibility** - Changes should not break existing functionality
 5. **Use TypeScript strictly** - No `any` types unless absolutely necessary
 
+## Current Architecture Overview (Updated 2025-08-16)
+
+### State JSON Structure
+
+The backend hosts the complete application state at `http://localhost:3001/api/state` with the following structure:
+
+```json
+{
+  "timestamp": "2025-08-16T23:55:03.453Z",
+  "interactions": [
+    {
+      "id": "interaction-1755386192542",
+      "name": "New Interaction",
+      "modules": [
+        {
+          "id": "Time Input-1755386356386",
+          "moduleName": "Time Input",
+          "position": {"x": 91.36, "y": 184.14},
+          "config": {
+            "enabled": true,
+            "mode": "metronome",
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 5000,
+            "apiEnabled": false,
+            // ... unified config with all possible properties
+          },
+          "enabled": true,
+          "lastUpdate": 1755386383638
+        }
+      ],
+      "routes": [
+        {
+          "id": "r_1755386376923",
+          "source": "Time Input-1755386356386",
+          "target": "Audio Output-1755386374741",
+          "event": "trigger"
+        }
+      ],
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Key Points:**
+- **No runtime data in state JSON**: Runtime data (current time, countdown) is only sent via WebSocket
+- **Unified configuration structure**: All modules use the same flat configuration structure with default values
+- **State persistence**: Only saved when "Register" button is pressed, not on every config change
+
+### Combined Runtime Updates
+
+The backend sends synchronized runtime updates via WebSocket every second using a combined message format:
+
+```json
+{
+  "type": "module_runtime_update",
+  "data": {
+    "moduleId": "combined",
+    "runtimeData": {
+      "system": {
+        "currentTime": "2025-08-16T23:55:03.453Z"
+      },
+      "Time Input-1755386356386": {
+        "countdown": "1s to next",
+        "currentTime": "2025-08-16T23:55:02.445Z"
+      }
+    },
+    "newChanges": false
+  }
+}
+```
+
+**Key Features:**
+- **Single message**: All runtime data (system + modules) sent in one WebSocket message
+- **Synchronized timing**: Updates sent every second, synchronized across all modules
+- **Change detection**: `newChanges` flag indicates when frontend should re-fetch state JSON
+- **No desync**: Current time and countdown always come from the same message
+
+### Frontend State Management
+
+The frontend uses a sophisticated state management system:
+
+1. **useStateSync**: Manages local state vs backend state synchronization
+2. **useRuntimeData**: Handles real-time WebSocket updates
+3. **useBackendSync**: Establishes WebSocket connection and processes messages
+4. **ConfigParser**: Extracts module-specific settings from unified state JSON
+
+**State Flow:**
+1. Frontend fetches initial state from `/api/state`
+2. WebSocket provides real-time runtime updates
+3. When `newChanges: true`, frontend re-fetches state JSON
+4. Local changes are tracked until "Register" is pressed
+
+### Module Configuration Architecture
+
+**Unified Configuration Structure:**
+All modules use a single flat configuration structure that includes all possible properties:
+
+```typescript
+interface UnifiedModuleConfig {
+  // Time Input properties
+  mode: 'clock' | 'metronome';
+  targetTime: string;
+  millisecondDelay: number;
+  
+  // Audio Output properties
+  deviceId: string;
+  sampleRate: number;
+  channels: number;
+  format: string;
+  volume: number;
+  
+  // ... all other module properties with defaults
+}
+```
+
+**Configuration Processing:**
+- **Backend**: `ConfigNormalizer` ensures consistent structure
+- **Frontend**: `ConfigParser` extracts relevant properties per module
+- **Module Name Mapping**: Handles display names vs internal folder names
+
 ## Recent Lessons Learned
 
 ### State Synchronization and Race Conditions (2025-01-27)

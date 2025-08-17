@@ -295,7 +295,12 @@ export abstract class ModuleBase extends EventEmitter implements IModuleBase {
       // Add any other configuration fields that should be excluded
     };
 
-    this.logger?.debug(`Emitting runtime state update for ${this.name}:`, stateUpdate);
+    this.logger?.debug(`Emitting runtime state update for ${this.name} (${this.id}):`, {
+      moduleName: this.name,
+      moduleId: this.id,
+      runtimeDataKeys: Object.keys(runtimeData),
+      timestamp: new Date().toISOString()
+    });
     
     // Emit runtime state update event for targeted updates
     this.emit('runtimeStateUpdate', runtimeData);

@@ -13,7 +13,8 @@ import PerformancePage from './components/PerformancePage';
 import ConsolePage from './components/ConsolePage';
 import { apiService } from './api';
 import { useBackendSync } from './state/useBackendSync';
-import { useUnregisteredChanges } from './state/useUnregisteredChanges';
+import { useStateSync } from './hooks/useStateSync';
+import { useRuntimeData } from './hooks/useRuntimeData';
 
 
 import { 
@@ -29,8 +30,31 @@ import { InteractionConfig } from '@interactor/shared';
 import styles from './App.module.css';
 
 function App() {
-  // Backend sync
-  const { modules, interactions: backendInteractions, settings, refresh } = useBackendSync();
+  // WebSocket connection and backend sync
+  const { modules, loading: wsLoading, error: wsError } = useBackendSync();
+
+  // State synchronization with backend
+  const { 
+    backendState, 
+    localState, 
+    hasChanges, 
+    registerChanges, 
+    updateLocalState, 
+    getDifferences,
+    fetchStateIfNeeded
+  } = useStateSync({
+    onStateUpdate: (state) => {
+      // State updated silently
+    }
+  });
+
+  // Runtime data for real-time updates with change detection
+  const { } = useRuntimeData((newChanges: boolean) => {
+    if (newChanges) {
+      fetchStateIfNeeded(newChanges);
+    }
+  });
+
   // Persistent client id for origin filtering
   useEffect(() => {
     try {
@@ -43,19 +67,18 @@ function App() {
     } catch {}
   }, []);
   
-  // Local interactions state for unregistered changes
-  const [localInteractions, setLocalInteractions] = useState<InteractionConfig[]>([]);
-  
-  // The canvas renders exactly what we intend to register: local draft if present, else backend
-  const interactions = useMemo(() => (localInteractions.length > 0 ? localInteractions : backendInteractions), [backendInteractions, localInteractions]);
-  
-  // Unregistered changes management
-  const { hasChanges, clearAllChanges, applyChangesToInteractions } = useUnregisteredChanges();
+  // Use local state if available, otherwise use backend state
+  const interactions = useMemo(() => {
+    return (localState && localState.length > 0) ? localState : (backendState?.interactions || []);
+  }, [localState, backendState]);
   
   // Registration state
   const [isRegistering, setIsRegistering] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastSuccess, setLastSuccess] = useState<string | null>(null);
+  
+  // Settings state
+  const [settings, setSettings] = useState<Record<string, any>>({});
   
 
 
@@ -108,29 +131,15 @@ function App() {
     setLastSuccess(null);
 
     try {
-      // Apply unregistered changes to interactions before registering
-      const interactionsWithChanges = applyChangesToInteractions(interactions);
-      // Keep the current draft visible to avoid flicker while backend refresh completes
-      setLocalInteractions(interactionsWithChanges);
-      const clientId = (() => {
-        try { return localStorage.getItem('interactorClientId') || undefined; } catch { return undefined; }
-      })();
-      await apiService.registerInteractions(interactionsWithChanges, clientId);
-      // Refresh structural state from backend, then clear local draft only if backend is non-empty
-      const refreshed = await refresh();
-      if ((refreshed?.interactions?.length || 0) > 0) {
-        clearAllChanges();
-        setLocalInteractions([]);
-      } else {
-        console.warn('Refresh returned empty interactions; preserving local draft to avoid flicker');
-      }
+      // Send the current local state to the backend
+      await registerChanges(interactions);
       setLastSuccess('Interactions registered successfully!');
     } catch (error) {
       setLastError(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegistering(false);
     }
-  }, [interactions, applyChangesToInteractions, clearAllChanges, refresh]);
+  }, [interactions, registerChanges]);
 
   // Handle node selection
   const handleNodeSelect = useCallback((nodeId: string | null) => {
@@ -156,8 +165,8 @@ function App() {
 
   // Handle interactions updates (for new modules)
   const handleInteractionsUpdate = useCallback((updatedInteractions: InteractionConfig[]) => {
-    setLocalInteractions(updatedInteractions);
-  }, []);
+    updateLocalState(updatedInteractions);
+  }, [updateLocalState]);
 
   // Clear notifications
   const clearNotification = useCallback(() => {

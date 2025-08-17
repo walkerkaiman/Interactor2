@@ -1,5 +1,38 @@
 # AI Quick Reference
 
+## Current State Management (Updated 2025-08-16)
+
+### State JSON Endpoint
+- **URL**: `http://localhost:3001/api/state`
+- **Purpose**: Complete application state (no runtime data)
+- **Structure**: Interactions with unified module configurations
+- **Persistence**: Only saved when "Register" button is pressed
+
+### Combined Runtime Updates
+- **WebSocket Message Type**: `module_runtime_update`
+- **Module ID**: `"combined"` (contains all runtime data)
+- **Frequency**: Every 1 second, synchronized
+- **Content**: System current time + all module runtime data
+- **Change Detection**: `newChanges` flag for state re-fetch
+
+### Frontend State Hooks
+```typescript
+// State synchronization
+const { backendState, localState, hasChanges, registerChanges } = useStateSync();
+
+// Real-time runtime data
+const { getCountdown, getCurrentTime } = useRuntimeData();
+
+// WebSocket connection
+const { modules, interactions } = useBackendSync();
+```
+
+### Configuration Architecture
+- **Unified Structure**: All modules use same flat config with defaults
+- **Backend**: `ConfigNormalizer` ensures consistency
+- **Frontend**: `ConfigParser` extracts module-specific properties
+- **Name Mapping**: Display names ↔ internal folder names
+
 ## Module Development
 
 ### File Structure

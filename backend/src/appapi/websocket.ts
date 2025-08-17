@@ -35,11 +35,12 @@ export function setupWebSocket(server: HttpServer): WebSocketServer {
   // Bridge app events → WebSocket broadcast
   const broadcast = (data: any) => {
     const msg = JSON.stringify(data);
+    logger.debug(`Broadcasting WebSocket message: ${msg}`);
     wss.clients.forEach(client => { if (client.readyState === 1) client.send(msg); });
   };
 
   interactorApp.on('state_update', (data) => broadcast({ type: 'state_update', data }));
-  interactorApp.on('module_runtime_update', ({ moduleId, runtimeData }) => broadcast({ type: 'module_runtime_update', data: { moduleId, runtimeData } }));
+  interactorApp.on('module_runtime_update', ({ moduleId, runtimeData, newChanges }) => broadcast({ type: 'module_runtime_update', data: { moduleId, runtimeData, newChanges } }));
   interactorApp.on('trigger_event', ({ moduleId, type }) => broadcast({ type: 'trigger_event', data: { moduleId, type } }));
 
   return wss;

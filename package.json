@@ -1,0 +1,27 @@
+{
+  "name": "interactor",
+  "version": "1.0.0",
+  "description": "Interactor - Modular Audio/Visual Interaction System",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm run install:backend && npm run install:frontend && npm run install:shared",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:shared": "cd shared && npm install",
+    "start": "npm run dev",
+    "state": "echo \"Opening state endpoint at http://localhost:3001/api/state\" && start http://localhost:3001/api/state"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "audio",
+    "visual",
+    "interaction",
+    "modular"
+  ],
+  "author": "Interactor Team",
+  "license": "MIT"
+}

@@ -5,6 +5,7 @@ import { ModuleLoader } from '../core/ModuleLoader';
 import { StateManager } from '../core/StateManager';
 import { moduleRegistry } from './ModuleRegistry';
 import { InteractionConfig, ModuleInstance } from '@interactor/shared';
+import { configNormalizer, UnifiedModuleConfig } from '../core/ConfigNormalizer';
 
 export class InteractorApp extends EventEmitter {
   private static instance: InteractorApp;
@@ -13,6 +14,14 @@ export class InteractorApp extends EventEmitter {
   private moduleLoader: ModuleLoader;
   private stateManager: StateManager;
   private moduleInstances: Map<string, any> = new Map();
+  
+  // Runtime update throttling
+  private runtimeUpdateBuffer: Map<string, any> = new Map();
+  private runtimeUpdateTimer: NodeJS.Timeout | null = null;
+  private readonly RUNTIME_UPDATE_INTERVAL = 1000; // 1 second
+  
+  // State change tracking
+  private hasInteractionChanges: boolean = false;
 
   private constructor() {
     super();
@@ -20,6 +29,14 @@ export class InteractorApp extends EventEmitter {
     this.messageRouter = MessageRouter.getInstance();
     this.moduleLoader = ModuleLoader.getInstance();
     this.stateManager = StateManager.getInstance();
+    
+    // Start periodic runtime updates to ensure frontend always receives messages
+    // this.startPeriodicRuntimeUpdates(); // Removed - now handled by flushRuntimeUpdates
+    
+    // Ensure runtime updates are sent periodically even when no modules are active
+    setInterval(() => {
+      this.flushRuntimeUpdates();
+    }, this.RUNTIME_UPDATE_INTERVAL);
   }
 
   public static getInstance(): InteractorApp {
@@ -57,12 +74,14 @@ export class InteractorApp extends EventEmitter {
 
   public async createModuleInstance(moduleData: any): Promise<any> {
     const { id, moduleName, config } = moduleData;
+    this.logger.info(`Creating module instance: ${moduleName} with ID: ${id}`);
     const manifest = this.moduleLoader.getManifest(moduleName) || this.moduleLoader.getModule(moduleName as any);
     const displayName = manifest?.name || moduleName;
     const moduleInstance = moduleRegistry.has(displayName)
       ? await moduleRegistry.create(displayName, config, id)
       : await this.createModuleInstanceFallback(displayName, config, id);
 
+    this.logger.info(`Created module instance with final ID: ${moduleInstance.id}`);
     moduleInstance.setLogger(this.logger);
 
     moduleInstance.on('stateUpdate', (stateData: any) => {
@@ -80,8 +99,9 @@ export class InteractorApp extends EventEmitter {
           if ((runtimeData as any)[field] !== undefined) (stateModuleInstance as any)[field] = (runtimeData as any)[field];
         });
         stateModuleInstance.lastUpdate = Date.now();
-        // Emit runtime update to frontend (NO state saving for runtime data)
-        this.emit('module_runtime_update', { moduleId: moduleInstance.id, runtimeData });
+        
+        // Buffer runtime updates and emit them throttled
+        this.bufferRuntimeUpdate(moduleInstance.id, runtimeData);
       }
     });
     moduleInstance.on('trigger', (triggerEvent: any) => {
@@ -122,12 +142,12 @@ export class InteractorApp extends EventEmitter {
     runtimeFields.forEach(field => { if (stateData[field] !== undefined) (moduleInstance as any)[field] = stateData[field]; });
     (moduleInstance as any).lastUpdate = Date.now();
     
+    // DO NOT save state here - state should only be saved when register button is pressed
     // Only save state if this is a configuration change, not a runtime update
-    const hasConfigChanges = Object.keys(stateData).some(key => !runtimeFields.includes(key));
-    
-    if (hasConfigChanges) {
-      await this.stateManager.replaceState({ modules });
-    }
+    // const hasConfigChanges = Object.keys(stateData).some(key => !runtimeFields.includes(key));
+    // if (hasConfigChanges) {
+    //   await this.stateManager.replaceState({ modules });
+    // }
     
     this.emitStateUpdate();
   }
@@ -138,7 +158,10 @@ export class InteractorApp extends EventEmitter {
     if (!moduleInstance) return;
     (moduleInstance as any).config = configData.newConfig;
     (moduleInstance as any).lastUpdate = Date.now();
-    await this.stateManager.replaceState({ modules });
+    
+    // DO NOT save state here - state should only be saved when register button is pressed
+    // await this.stateManager.replaceState({ modules });
+    
     this.emitStateUpdate();
   }
 
@@ -195,43 +218,148 @@ export class InteractorApp extends EventEmitter {
     if (updated) await this.stateManager.replaceState({ interactions });
   }
 
-  public async registerInteractions(interactions: InteractionConfig[], originClientId?: string): Promise<{ moduleInstances: ModuleInstance[] }>{
-    const messageRouter = MessageRouter.getInstance();
-    messageRouter.clearRoutes();
-    interactions.forEach(interaction => {
+  // Get current complete state
+  public async getCurrentState(): Promise<any> {
+    const state = this.stateManager.getState();
+    
+    return {
+      timestamp: new Date().toISOString(),
+      interactions: state.interactions || [],
+      // Runtime data is only sent via WebSocket, not in the state endpoint
+    };
+  }
+
+  public async registerInteractions(interactions: InteractionConfig[], originClientId?: string): Promise<any> {
+    this.logger.info(`[REGISTER] Received registration request`, 'InteractorApp', {
+      interactionsCount: interactions.length,
+      originClientId,
+      firstInteraction: interactions[0] ? {
+        modulesCount: interactions[0].modules?.length || 0,
+        firstModule: interactions[0].modules?.[0] ? {
+          id: interactions[0].modules[0].id,
+          moduleName: interactions[0].modules[0].moduleName,
+          config: JSON.stringify(interactions[0].modules[0].config)
+        } : null
+      } : null
+    });
+
+    // Clear all existing routes
+    this.messageRouter.clearRoutes();
+
+    // Process interactions and normalize configurations
+    const instances: ModuleInstance[] = [];
+    const normalizedInteractions = interactions.map(interaction => ({
+      ...interaction,
+      modules: interaction.modules?.map(module => {
+        // Clean any nested configurations first
+        const cleanedConfig = configNormalizer.cleanNestedConfig(module.config);
+        
+        // Normalize the configuration to unified structure
+        const normalizedConfig = configNormalizer.normalizeConfig(module.moduleName, cleanedConfig);
+        
+        return {
+          ...module,
+          config: normalizedConfig // Use unified config structure
+        };
+      }) || []
+    }));
+    
+    normalizedInteractions.forEach(interaction => {
+      // Add routes for this interaction
       interaction.routes?.forEach(route => {
-        const ensured = { ...route } as any;
-        if (!ensured.id) ensured.id = `route_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        messageRouter.addRoute(ensured);
+        const routeId = route.id || `r_${Date.now()}`;
+        this.messageRouter.addRoute({ id: routeId, source: route.source, target: route.target, event: route.event });
       });
-    });
-    const instances: any[] = [];
-    interactions.forEach(interaction => {
-      interaction.modules.forEach(moduleInstance => {
-        instances.push({
-          id: moduleInstance.id,
-          moduleName: moduleInstance.moduleName,
-          config: moduleInstance.config,
+
+      // Process modules and create instances
+      interaction.modules?.forEach(module => {
+        // Create module instance with normalized config
+        const instance: ModuleInstance = {
+          id: module.id,
+          moduleName: module.moduleName,
+          config: module.config, // Already normalized above
           status: 'stopped',
-          messageCount: 0,
-          currentFrame: undefined,
-          frameCount: 0,
           lastUpdate: Date.now()
-        });
+        };
+        
+        instances.push(instance);
       });
     });
-    await this.stateManager.replaceState({ interactions, modules: instances });
+    
+    await this.stateManager.replaceState({ interactions: normalizedInteractions, modules: instances });
+    
+    // Mark that interactions have changed
+    this.hasInteractionChanges = true;
+    
+    // Process each module instance - update existing or create new
+    this.logger.info(`Current live instances: ${Array.from(this.moduleInstances.keys()).join(', ')}`);
     for (const inst of instances) {
       try {
-        const live = await this.createModuleInstance(inst);
-        if (live?.start) await live.start();
+        const existingLive = this.moduleInstances.get(inst.id);
+        
+        if (existingLive) {
+          // Update existing live instance with new configuration
+          this.logger.info(`Updating existing live instance for ${inst.moduleName} (${inst.id}) with new config`);
+          // Extract module-specific config for the live instance
+          const moduleSpecificConfig = configNormalizer.extractModuleConfig(inst.moduleName, inst.config as UnifiedModuleConfig);
+          await existingLive.updateConfig(moduleSpecificConfig);
+        } else {
+          // Create new live instance
+          this.logger.info(`Creating new live instance for ${inst.moduleName} (${inst.id}) - no existing instance found`);
+          // Extract module-specific config for the live instance
+          const moduleSpecificConfig = configNormalizer.extractModuleConfig(inst.moduleName, inst.config as UnifiedModuleConfig);
+          const live = await this.createModuleInstance({ ...inst, config: moduleSpecificConfig });
+          if (live?.start) await live.start();
+        }
       } catch (err) {
-        this.logger.error(`Failed to start live module instance for ${inst.moduleName} (${inst.id}):`, err as any);
+        this.logger.error(`Failed to process module instance for ${inst.moduleName} (${inst.id}):`, err as any);
       }
     }
+    
     this.setupTriggerEventListeners();
     this.emitStateUpdate(originClientId);
     return { moduleInstances: instances };
+  }
+
+  private bufferRuntimeUpdate(moduleId: string, runtimeData: any): void {
+    // Buffer the runtime update
+    this.runtimeUpdateBuffer.set(moduleId, runtimeData);
+    
+    // Start the timer if it's not already running
+    if (!this.runtimeUpdateTimer) {
+      this.runtimeUpdateTimer = setTimeout(() => {
+        this.flushRuntimeUpdates();
+      }, this.RUNTIME_UPDATE_INTERVAL);
+    }
+  }
+
+  private flushRuntimeUpdates(): void {
+    // Clear the timer
+    this.runtimeUpdateTimer = null;
+    
+    // Combine all runtime data into a single update
+    const combinedRuntimeData: Record<string, any> = {};
+    
+    // Add module updates
+    this.runtimeUpdateBuffer.forEach((runtimeData, moduleId) => {
+      combinedRuntimeData[moduleId] = runtimeData;
+    });
+    
+    // Always add system current time
+    combinedRuntimeData.system = { currentTime: new Date().toISOString() };
+    
+    // Send a single combined runtime update
+    this.emit('module_runtime_update', { 
+      moduleId: 'combined', 
+      runtimeData: combinedRuntimeData,
+      newChanges: this.hasInteractionChanges 
+    });
+    
+    // Clear the buffer
+    this.runtimeUpdateBuffer.clear();
+    
+    // Reset the changes flag
+    this.hasInteractionChanges = false;
   }
 }
 

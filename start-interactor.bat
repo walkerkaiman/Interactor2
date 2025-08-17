@@ -62,11 +62,16 @@ echo.
 REM Open browser to frontend
 start http://localhost:3000
 
+REM Wait a moment then open state endpoint in new tab
+timeout /t 2 /nobreak >nul
+start http://localhost:3001/api/state
+
 echo.
 echo Interactor is starting up!
 echo.
 echo Backend: http://localhost:3001
 echo Frontend: http://localhost:3000
+echo State JSON: http://localhost:3001/api/state
 echo.
 echo Both servers are running in separate windows.
 echo Close those windows to stop the servers.

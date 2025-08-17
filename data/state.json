@@ -1,34 +1,24 @@
 {
   "interactions": [
     {
-      "id": "interaction-1755358320962",
+      "id": "interaction-1755388823797",
       "name": "New Interaction",
       "modules": [
         {
-          "id": "Time Input-1755358506879",
+          "id": "Time Input-1755388823797",
           "moduleName": "Time Input",
           "position": {
-            "x": -311.52098553063496,
-            "y": 317.00689943310687
+            "x": -25.000000000000057,
+            "y": 204.765625
           },
           "config": {
             "enabled": true,
+            "lastUpdate": 1755389588735,
             "mode": "metronome",
-            "millisecondDelay": 4000,
-            "apiEnabled": false
-          },
-          "enabled": true,
-          "lastUpdate": 1755358506879
-        },
-        {
-          "id": "Audio Output-1755358509233",
-          "moduleName": "Audio Output",
-          "position": {
-            "x": 333.5880842078834,
-            "y": 312.566027727014
-          },
-          "config": {
-            "enabled": true,
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 5000,
+            "apiEnabled": false,
+            "apiEndpoint": "",
             "deviceId": "default",
             "sampleRate": 44100,
             "channels": 2,
@@ -48,17 +38,173 @@
               ".ogg",
               ".m4a",
               ".flac"
-            ]
+            ],
+            "universe": 1,
+            "brightness": 1,
+            "protocol": {
+              "type": "artnet",
+              "host": "127.0.0.1",
+              "port": 6454,
+              "baudRate": 57600
+            },
+            "port": 8000,
+            "address": "/osc",
+            "addressPattern": "/osc/*",
+            "targetHost": "127.0.0.1",
+            "targetPort": 8000,
+            "httpPort": 3003,
+            "httpPath": "/trigger",
+            "threshold": 0.5,
+            "logicOperator": ">",
+            "url": "http://localhost:3004",
+            "method": "POST",
+            "headers": {},
+            "serialPort": "COM1",
+            "baudRate": 9600,
+            "sACNUniverse": 1,
+            "frameMode": "trigger"
           },
           "enabled": true,
-          "lastUpdate": 1755358509233
+          "lastUpdate": 1755388823797
+        },
+        {
+          "id": "Audio Output-1755388832115",
+          "moduleName": "Audio Output",
+          "position": {
+            "x": 509.57434917749856,
+            "y": 206.4806449607537
+          },
+          "config": {
+            "enabled": true,
+            "lastUpdate": 1755389588735,
+            "mode": "clock",
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 1000,
+            "apiEnabled": false,
+            "apiEndpoint": "",
+            "deviceId": "default",
+            "sampleRate": 44100,
+            "channels": 2,
+            "format": "wav",
+            "volume": 1,
+            "bufferSize": 4096,
+            "loop": false,
+            "fadeInDuration": 0,
+            "fadeOutDuration": 0,
+            "enableFileUpload": true,
+            "uploadPort": 4000,
+            "uploadHost": "0.0.0.0",
+            "maxFileSize": 52428800,
+            "allowedExtensions": [
+              ".wav",
+              ".mp3",
+              ".ogg",
+              ".m4a",
+              ".flac"
+            ],
+            "universe": 1,
+            "brightness": 1,
+            "protocol": {
+              "type": "artnet",
+              "host": "127.0.0.1",
+              "port": 6454,
+              "baudRate": 57600
+            },
+            "port": 8000,
+            "address": "/osc",
+            "addressPattern": "/osc/*",
+            "targetHost": "127.0.0.1",
+            "targetPort": 8000,
+            "httpPort": 3003,
+            "httpPath": "/trigger",
+            "threshold": 0.5,
+            "logicOperator": ">",
+            "url": "http://localhost:3004",
+            "method": "POST",
+            "headers": {},
+            "serialPort": "COM1",
+            "baudRate": 9600,
+            "sACNUniverse": 1,
+            "frameMode": "trigger"
+          },
+          "enabled": true,
+          "lastUpdate": 1755388832115
+        },
+        {
+          "id": "Time Input-1755389561132",
+          "moduleName": "Time Input",
+          "position": {
+            "x": -61.42182922410768,
+            "y": 737.4992436426222
+          },
+          "config": {
+            "enabled": true,
+            "lastUpdate": 1755389588735,
+            "mode": "metronome",
+            "targetTime": "12:00 PM",
+            "millisecondDelay": 4000,
+            "apiEnabled": false,
+            "apiEndpoint": "",
+            "deviceId": "default",
+            "sampleRate": 44100,
+            "channels": 2,
+            "format": "wav",
+            "volume": 1,
+            "bufferSize": 4096,
+            "loop": false,
+            "fadeInDuration": 0,
+            "fadeOutDuration": 0,
+            "enableFileUpload": true,
+            "uploadPort": 4000,
+            "uploadHost": "0.0.0.0",
+            "maxFileSize": 52428800,
+            "allowedExtensions": [
+              ".wav",
+              ".mp3",
+              ".ogg",
+              ".m4a",
+              ".flac"
+            ],
+            "universe": 1,
+            "brightness": 1,
+            "protocol": {
+              "type": "artnet",
+              "host": "127.0.0.1",
+              "port": 6454,
+              "baudRate": 57600
+            },
+            "port": 8000,
+            "address": "/osc",
+            "addressPattern": "/osc/*",
+            "targetHost": "127.0.0.1",
+            "targetPort": 8000,
+            "httpPort": 3003,
+            "httpPath": "/trigger",
+            "threshold": 0.5,
+            "logicOperator": ">",
+            "url": "http://localhost:3004",
+            "method": "POST",
+            "headers": {},
+            "serialPort": "COM1",
+            "baudRate": 9600,
+            "sACNUniverse": 1,
+            "frameMode": "trigger"
+          },
+          "enabled": true,
+          "lastUpdate": 1755389561132
         }
       ],
       "routes": [
         {
-          "id": "r_1755358513172",
-          "source": "Time Input-1755358506879",
-          "target": "Audio Output-1755358509233",
+          "id": "r_1755388835305",
+          "source": "Time Input-1755388823797",
+          "target": "Audio Output-1755388832115",
+          "event": "trigger"
+        },
+        {
+          "id": "r_1755389566512",
+          "source": "Time Input-1755389561132",
+          "target": "Audio Output-1755388832115",
           "event": "trigger"
         }
       ],
@@ -67,20 +213,16 @@
   ],
   "modules": [
     {
-      "id": "aa1bf72d-c262-43d1-801e-58263d213abf",
-      "moduleName": "time_input",
-      "status": "stopped",
-      "messageCount": 0,
-      "frameCount": 0,
-      "lastUpdate": 1755361924834,
-      "currentTime": "",
-      "countdown": "27m 55s"
-    },
-    {
-      "id": "Audio Output-1755358509233",
-      "moduleName": "Audio Output",
+      "id": "Time Input-1755388823797",
+      "moduleName": "Time Input",
       "config": {
         "enabled": true,
+        "lastUpdate": 1755389588735,
+        "mode": "metronome",
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 5000,
+        "apiEnabled": false,
+        "apiEndpoint": "",
         "deviceId": "default",
         "sampleRate": 44100,
         "channels": 2,
@@ -100,12 +242,152 @@
           ".ogg",
           ".m4a",
           ".flac"
-        ]
+        ],
+        "universe": 1,
+        "brightness": 1,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454,
+          "baudRate": 57600
+        },
+        "port": 8000,
+        "address": "/osc",
+        "addressPattern": "/osc/*",
+        "targetHost": "127.0.0.1",
+        "targetPort": 8000,
+        "httpPort": 3003,
+        "httpPath": "/trigger",
+        "threshold": 0.5,
+        "logicOperator": ">",
+        "url": "http://localhost:3004",
+        "method": "POST",
+        "headers": {},
+        "serialPort": "COM1",
+        "baudRate": 9600,
+        "sACNUniverse": 1,
+        "frameMode": "trigger"
       },
       "status": "stopped",
-      "messageCount": 0,
-      "frameCount": 0,
-      "lastUpdate": 1755358989713
+      "lastUpdate": 1755389588735
+    },
+    {
+      "id": "Audio Output-1755388832115",
+      "moduleName": "Audio Output",
+      "config": {
+        "enabled": true,
+        "lastUpdate": 1755389588735,
+        "mode": "clock",
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 1000,
+        "apiEnabled": false,
+        "apiEndpoint": "",
+        "deviceId": "default",
+        "sampleRate": 44100,
+        "channels": 2,
+        "format": "wav",
+        "volume": 1,
+        "bufferSize": 4096,
+        "loop": false,
+        "fadeInDuration": 0,
+        "fadeOutDuration": 0,
+        "enableFileUpload": true,
+        "uploadPort": 4000,
+        "uploadHost": "0.0.0.0",
+        "maxFileSize": 52428800,
+        "allowedExtensions": [
+          ".wav",
+          ".mp3",
+          ".ogg",
+          ".m4a",
+          ".flac"
+        ],
+        "universe": 1,
+        "brightness": 1,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454,
+          "baudRate": 57600
+        },
+        "port": 8000,
+        "address": "/osc",
+        "addressPattern": "/osc/*",
+        "targetHost": "127.0.0.1",
+        "targetPort": 8000,
+        "httpPort": 3003,
+        "httpPath": "/trigger",
+        "threshold": 0.5,
+        "logicOperator": ">",
+        "url": "http://localhost:3004",
+        "method": "POST",
+        "headers": {},
+        "serialPort": "COM1",
+        "baudRate": 9600,
+        "sACNUniverse": 1,
+        "frameMode": "trigger"
+      },
+      "status": "stopped",
+      "lastUpdate": 1755389588735
+    },
+    {
+      "id": "Time Input-1755389561132",
+      "moduleName": "Time Input",
+      "config": {
+        "enabled": true,
+        "lastUpdate": 1755389588735,
+        "mode": "metronome",
+        "targetTime": "12:00 PM",
+        "millisecondDelay": 4000,
+        "apiEnabled": false,
+        "apiEndpoint": "",
+        "deviceId": "default",
+        "sampleRate": 44100,
+        "channels": 2,
+        "format": "wav",
+        "volume": 1,
+        "bufferSize": 4096,
+        "loop": false,
+        "fadeInDuration": 0,
+        "fadeOutDuration": 0,
+        "enableFileUpload": true,
+        "uploadPort": 4000,
+        "uploadHost": "0.0.0.0",
+        "maxFileSize": 52428800,
+        "allowedExtensions": [
+          ".wav",
+          ".mp3",
+          ".ogg",
+          ".m4a",
+          ".flac"
+        ],
+        "universe": 1,
+        "brightness": 1,
+        "protocol": {
+          "type": "artnet",
+          "host": "127.0.0.1",
+          "port": 6454,
+          "baudRate": 57600
+        },
+        "port": 8000,
+        "address": "/osc",
+        "addressPattern": "/osc/*",
+        "targetHost": "127.0.0.1",
+        "targetPort": 8000,
+        "httpPort": 3003,
+        "httpPath": "/trigger",
+        "threshold": 0.5,
+        "logicOperator": ">",
+        "url": "http://localhost:3004",
+        "method": "POST",
+        "headers": {},
+        "serialPort": "COM1",
+        "baudRate": 9600,
+        "sACNUniverse": 1,
+        "frameMode": "trigger"
+      },
+      "status": "stopped",
+      "lastUpdate": 1755389588735
     }
   ],
   "routes": [],

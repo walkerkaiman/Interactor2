@@ -20,9 +20,9 @@ import { useFlowBuilder } from '../graph/useFlowBuilder';
 import { useUnregisteredChanges } from '../state/useUnregisteredChanges';
 import seedConfigFromManifest from '../graph/utils/seedConfigFromManifest';
 import { apiService } from '../api';
+import { useRuntimeData } from '../hooks/useRuntimeData';
 
 import styles from './NodeEditor.module.css';
-import { useModuleRuntime } from '../hooks/useModuleRuntime';
 
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
@@ -49,7 +49,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   onInteractionsUpdate,
 }) => {
   // Unregistered-changes signals only; display uses the draft passed via props
-  const { markStructuralChange } = useUnregisteredChanges();
+  const { markStructuralChange, getMergedConfig } = useUnregisteredChanges();
   const interactionsWithChanges = interactions;
   
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect: flowBuilderConnect, onEdgesDelete: flowBuilderEdgesDelete } = useFlowBuilder(
@@ -62,13 +62,29 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     },
     {
       onConfigChange: async (moduleId: string, configDeltaOrFull: any) => {
-        try {
-          // Immediately send config change to backend
-          await apiService.updateModuleConfig(moduleId, configDeltaOrFull);
-          // Backend will notify all clients via WebSocket, so we don't need to update local state
-        } catch (error) {
-          console.error('Failed to update module config:', error);
-          // Optionally show error to user
+        // DO NOT send config changes to backend immediately
+        // Changes are stored in local state and only sent when register button is pressed
+        console.log('[NodeEditor] Config change stored locally:', { moduleId, configDeltaOrFull });
+        
+        // Update local interactions with the new configuration
+        const updatedInteractions = interactions.map(interaction => ({
+          ...interaction,
+          modules: interaction.modules?.map(module => {
+            if (module.id === moduleId) {
+              // Merge the config delta with existing config
+              const updatedConfig = { ...module.config, ...configDeltaOrFull };
+              return {
+                ...module,
+                config: updatedConfig
+              };
+            }
+            return module;
+          }) || []
+        }));
+        
+        // Call the interaction update handler to update local state
+        if (onInteractionsUpdate) {
+          onInteractionsUpdate(updatedInteractions);
         }
       },
       onStructuralChange: () => markStructuralChange()
@@ -237,10 +253,11 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     [flowBuilderEdgesDelete, markStructuralChange]
   );
 
-  // Current Time from first Time Input (runtimeBus), fallback to local clock
-  const firstTimeNode = nodes.find(n => n.type === 'timeInput');
-  const timeRuntime = useModuleRuntime(firstTimeNode?.id || '', ['currentTime']);
-  const headerCurrentTime = timeRuntime.currentTime || new Date().toLocaleTimeString();
+  // Current Time from system runtime updates, fallback to local clock
+  const { getCurrentTime } = useRuntimeData();
+  const systemCurrentTime = getCurrentTime('system');
+  const headerCurrentTime = systemCurrentTime ? new Date(systemCurrentTime).toLocaleTimeString() : new Date().toLocaleTimeString();
+  
 
   return (
     <div className={styles.nodeEditor}>

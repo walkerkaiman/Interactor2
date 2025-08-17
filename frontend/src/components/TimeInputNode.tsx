@@ -1,8 +1,8 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { apiService } from '../api';
 import { createModuleNode } from './BaseModuleNode';
 import { useNodeConfig } from '../hooks/useNodeConfig';
-import { useModuleRuntime } from '../hooks/useModuleRuntime';
+import { useRuntimeData } from '../hooks/useRuntimeData';
 import styles from './CustomNode.module.css';
 
 /**
@@ -30,29 +30,29 @@ function CountdownDisplay({ countdown }: { countdown: string }) {
   );
 }
 
-function TimeConfig({ instance, updateConfig }: { instance: any; updateConfig: (key: string, value: any) => void }) {
-  // Use useNodeConfig for configuration values to ensure proper sync with backend and local drafts
-  const [mode, setMode] = useNodeConfig<string>(instance, 'mode', 'clock', undefined, updateConfig);
-  const [targetTime, setTargetTime] = useNodeConfig<string>(instance, 'targetTime', '12:00 PM', undefined, updateConfig);
-  const [millisecondDelay, setMillisecondDelay] = useNodeConfig<number>(instance, 'millisecondDelay', 1000, undefined, updateConfig);
+const TimeConfig = memo(({ instance, updateConfig }: { instance: any; updateConfig: (key: string, value: any) => void }) => {
+  // Extract values from the instance config
+  const mode = instance?.config?.mode || 'clock';
+  const targetTime = instance?.config?.targetTime || '12:00 PM';
+  const millisecondDelay = instance?.config?.millisecondDelay || 1000;
   
-  // Use useModuleRuntime for real-time runtime values that come from WebSocket updates
-  const runtimeData = useModuleRuntime(instance.id, ['countdown']);
-  const countdown = runtimeData.countdown || '';
+  // Use useRuntimeData for real-time runtime values that come from WebSocket updates
+  const { getCountdown } = useRuntimeData();
+  const countdown = getCountdown(instance.id);
 
-  const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMode = e.target.value as 'clock' | 'metronome';
-    setMode(newMode);
-  };
+    updateConfig('mode', newMode);
+  }, [updateConfig, instance?.id]);
 
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTargetTime(e.target.value);
-  };
+  const handleTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    updateConfig('targetTime', e.target.value);
+  }, [updateConfig]);
 
-  const handleDelayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDelayChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newDelay = parseInt(e.target.value) || 1000;
-    setMillisecondDelay(newDelay);
-  };
+    updateConfig('millisecondDelay', newDelay);
+  }, [updateConfig]);
 
   return (
     <>
@@ -121,7 +121,9 @@ function TimeConfig({ instance, updateConfig }: { instance: any; updateConfig: (
       )}
     </>
   );
-}
+});
+
+TimeConfig.displayName = 'TimeConfig';
 
 const TimeInputNodeConfig = {
   enablePulseAnimation: false,
@@ -134,7 +136,8 @@ const TimeInputNodeConfig = {
   validators: {
     millisecondDelay: (value: any) => Math.max(100, Math.min(60000, Number(value) || 1000))
   },
-  instanceDataKeys: ['countdown'],
+  // Remove instanceDataKeys since we're using useRuntimeData directly in TimeConfig
+  instanceDataKeys: [],
   onManualTrigger: async (nodeId: string) => {
     await apiService.triggerModule(nodeId, { type: 'manualTrigger' });
   },

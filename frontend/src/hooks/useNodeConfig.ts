@@ -1,108 +1,72 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useUnregisteredChanges } from '../state/useUnregisteredChanges';
+import { useState, useEffect, useCallback } from 'react';
+import { configParser, UnifiedModuleConfig } from '../core/ConfigParser';
 
-/**
- * Custom hook for managing node configuration state
- * Provides consistent configuration management across all node components
- */
-export function useNodeConfig<T>(
-  instance: any,
-  key: string,
-  defaultValue: T,
-  validator?: (value: any) => T,
-  onConfigChange?: (instanceId: string, config: any) => void
-): [T, (value: T) => void] {
-  const config = instance?.config || {};
-  const initialValue = config[key] !== undefined ? config[key] : defaultValue;
-  
-  const [state, setState] = useState<T>(initialValue);
-  const [localChanges, setLocalChanges] = useState<Set<string>>(new Set());
-  const lastBackendValue = useRef<T>(initialValue);
-  
-  // Get unregistered changes manager
-  const { 
-    getMergedConfig, 
-    updateConfigChange, 
- 
-    hasConfigChange 
-  } = useUnregisteredChanges();
+interface UseNodeConfigOptions {
+  moduleName: string;
+  instance: any;
+  onConfigChange: (config: any) => void;
+  manifest?: any;
+}
 
+export function useNodeConfig({ moduleName, instance, onConfigChange, manifest }: UseNodeConfigOptions) {
+  const [config, setConfig] = useState<any>({});
 
-
-
-
-  // Update local UI state when backend config changes
-  useEffect(() => {
-    if (!instance?.config) return;
-    const backendValue = instance.config[key] !== undefined ? instance.config[key] : defaultValue;
-
-    if (!localChanges.has(key)) {
-      // No local changes, update from backend
-      const finalValue = validator ? validator(backendValue) : backendValue;
-      if (finalValue !== state) {
-        setState(finalValue);
-      }
-    } else {
-      // Local change exists - check if backend now matches our local value (change was processed)
-      if (backendValue === state) {
-        // Backend now matches our local value, clear the local change
-        setLocalChanges(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(key);
-          return newSet;
-        });
-        console.log(`Local change for ${key} has been confirmed by backend, clearing local change`);
-      } else if (backendValue !== lastBackendValue.current) {
-        // Backend value changed but doesn't match our local value - log for debugging
-        console.log(`Backend value for ${key} changed from ${String(lastBackendValue.current)} to ${String(backendValue)}, but local value is ${String(state)}`);
-      }
+  // Clean and extract module-specific configuration from unified config
+  const cleanConfigData = useCallback((rawConfig: any): any => {
+    // If no config provided, get defaults for this module
+    if (!rawConfig || Object.keys(rawConfig).length === 0) {
+      console.log('[useNodeConfig] No config provided, using defaults for:', moduleName);
+      return configParser.getDefaultConfig(moduleName, manifest);
     }
     
-    // Track last raw backend value
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    lastBackendValue.current = backendValue as T;
-  }, [instance?.config, key, defaultValue, validator, localChanges, state]);
+    // First clean any nested structures
+    const cleaned = configParser.cleanConfig(rawConfig);
+    
+    // Then extract module-specific configuration
+    return configParser.extractModuleConfig(moduleName, cleaned as UnifiedModuleConfig, manifest);
+  }, [moduleName, manifest]);
 
-  const updateState = useCallback((value: T) => {
-    setState(value);
+  // Get initial value for a specific key
+  const getInitialValue = useCallback((key: string) => {
+    if (!instance?.config) return undefined;
+    
+    const moduleConfig = cleanConfigData(instance.config);
+    return moduleConfig[key];
+  }, [instance?.config, cleanConfigData]);
 
-    // Mark this key as locally modified
-    setLocalChanges(prev => new Set([...prev, key]));
+  // Update configuration
+  const updateConfig = useCallback((key: string, value: any) => {
+    console.log('[useNodeConfig] updateConfig called:', { key, value, moduleName, instanceId: instance?.id });
+    
+    // Get the current clean config from the instance
+    const currentConfig = cleanConfigData(instance?.config || {});
+    console.log('[useNodeConfig] current config:', currentConfig);
+    
+    // Create updated config with the new value
+    const updatedConfig = { ...currentConfig, [key]: value };
+    console.log('[useNodeConfig] updated config:', updatedConfig);
+    
+    // Set the local state
+    setConfig(updatedConfig);
+    
+    // Send the updated config to the parent (don't clean it again, it's already module-specific)
+    console.log('[useNodeConfig] calling onConfigChange with:', updatedConfig);
+    onConfigChange(updatedConfig);
+  }, [instance?.config, cleanConfigData, onConfigChange, moduleName]);
 
-    if (instance?.id) {
-      // Store only the delta in the unregistered changes memory
-      updateConfigChange(instance.id, { [key]: value } as any);
-
-      // Compute the full merged config for the parent/upstream (draft = backend + all local deltas + this change)
-      const currentLocalDraftConfig = getMergedConfig(instance.id, instance.config || {});
-      const fullUpdatedConfig = { ...currentLocalDraftConfig, [key]: value };
-
-      // Notify parent component of config change with the full merged config
-      if (onConfigChange) {
-        onConfigChange(instance.id, fullUpdatedConfig);
-      }
-    }
-  }, [instance, onConfigChange, key, updateConfigChange, getMergedConfig]);
-
-  // Reset local changes when instance changes (new module loaded)
+  // Watch for backend config changes
   useEffect(() => {
-    if (instance?.id) {
-      setLocalChanges(new Set());
+    if (instance?.config) {
+      const moduleConfig = cleanConfigData(instance.config);
+      setConfig(moduleConfig);
     }
-  }, [instance?.id]);
+  }, [instance?.config, cleanConfigData]);
 
-  // Clear unregistered changes when module is registered
-  useEffect(() => {
-    if (instance?.id && !hasConfigChange(instance.id)) {
-      // Module has been registered, clear any local changes
-      setLocalChanges(new Set());
-    }
-  }, [instance?.id, hasConfigChange]);
-
-
-
-  return [state, updateState];
+  return {
+    config,
+    updateConfig,
+    getInitialValue
+  };
 }
 
 /**
