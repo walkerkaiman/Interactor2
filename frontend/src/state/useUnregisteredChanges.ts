@@ -29,18 +29,11 @@ export function useUnregisteredChanges() {
 
   // Force re-render when state changes
   const triggerUpdate = useCallback(() => {
-    console.log('[triggerUpdate] Called, current state:', {
-      hasChanges: stateRef.current.hasChanges,
-      configChangesSize: stateRef.current.configChanges.size,
-      structuralChange: stateRef.current.structuralChange
-    });
     setUpdateTrigger(prev => prev + 1);
   }, []);
 
   // Update config change
   const updateConfigChange = useCallback((moduleId: string, config: Record<string, any>) => {
-    console.log(`[updateConfigChange] Called for module ${moduleId}:`, config);
-    
     // Merge with any existing unregistered config for this module (store only deltas)
     const existing = stateRef.current.configChanges.get(moduleId);
     const mergedConfig = {
@@ -57,14 +50,6 @@ export function useUnregisteredChanges() {
     stateRef.current.configChanges.set(moduleId, change);
     stateRef.current.hasChanges = stateRef.current.structuralChange || stateRef.current.configChanges.size > 0;
     triggerUpdate();
-
-    console.log(`[updateConfigChange] Stored change for module ${moduleId}:`, {
-      existing: existing?.config,
-      newConfig: config,
-      mergedConfig,
-      hasChanges: stateRef.current.hasChanges,
-      totalChanges: stateRef.current.configChanges.size
-    });
   }, [triggerUpdate]);
 
   // Remove config change
@@ -72,8 +57,6 @@ export function useUnregisteredChanges() {
     stateRef.current.configChanges.delete(moduleId);
     stateRef.current.hasChanges = stateRef.current.structuralChange || stateRef.current.configChanges.size > 0;
     triggerUpdate();
-    
-    console.log(`Removed unregistered config change for module ${moduleId}`);
   }, [triggerUpdate]);
 
   // Clear all changes
@@ -82,8 +65,6 @@ export function useUnregisteredChanges() {
     stateRef.current.structuralChange = false;
     stateRef.current.hasChanges = false;
     triggerUpdate();
-    
-    console.log('Cleared all unregistered changes');
   }, [triggerUpdate]);
 
   // Get config change for a specific module
@@ -115,7 +96,6 @@ export function useUnregisteredChanges() {
   // Apply all changes to interactions (for registration) - SIMPLIFIED
   // This is no longer used since we send the current state directly
   const applyChangesToInteractions = useCallback((interactions: any[]): any[] => {
-    console.log('[applyChangesToInteractions] DEPRECATED - sending current state directly');
     return interactions;
   }, []);
 
@@ -128,14 +108,7 @@ export function useUnregisteredChanges() {
 
   return {
     // State
-    hasChanges: (() => {
-      const hasChanges = stateRef.current.hasChanges;
-      console.log('[useUnregisteredChanges] hasChanges accessed:', hasChanges, {
-        configChangesSize: stateRef.current.configChanges.size,
-        structuralChange: stateRef.current.structuralChange
-      });
-      return hasChanges;
-    })(),
+    hasChanges: stateRef.current.hasChanges,
     configChanges: stateRef.current.configChanges,
     
     // Actions

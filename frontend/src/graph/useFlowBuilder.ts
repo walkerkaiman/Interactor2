@@ -111,35 +111,29 @@ export function useFlowBuilder(
   }, [modules, interactions, setNodes, setEdges]);
 
   // Add a new route on connect, preserving sourceHandle as event
-  const onConnect = useCallback((conn: Connection) => {
-    if (!conn.source || !conn.target || !conn.sourceHandle) return;
+  const onConnect = useCallback((params: Connection) => {
     const newRoute = {
-      id: `r_${Date.now()}`,
-      source: conn.source,
-      target: conn.target,
-      event: String(conn.sourceHandle)
-    } as any;
+      source: params.source!,
+      event: params.sourceHandle!,
+      target: params.target!,
+      action: params.targetHandle!
+    };
 
-    const updated = interactions.length > 0
-      ? interactions.map(intx => ({
-          ...intx,
-          routes: [...(intx.routes || []), newRoute]
-        }))
-      : [{ id: `interaction-${Date.now()}`, name: 'New Interaction', modules: [], routes: [newRoute], enabled: true } as any];
+    const updatedInteractions = interactions.map(interaction => ({
+      ...interaction,
+      routes: [...(interaction.routes || []), newRoute]
+    }));
 
-    console.log('useFlowBuilder: onConnect → newRoute', newRoute);
-    onInteractionsChange(updated);
+    onInteractionsChange(updatedInteractions);
   }, [interactions, onInteractionsChange]);
 
   // Handle edge deletion
   const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
-    console.log('useFlowBuilder: Deleting edges:', edgesToDelete);
     
     // Remove edges from the current state
     setEdges(currentEdges => {
       const edgeIdsToDelete = new Set(edgesToDelete.map(edge => edge.id));
       const filteredEdges = currentEdges.filter(edge => !edgeIdsToDelete.has(edge.id));
-      console.log('useFlowBuilder: Edges after deletion:', filteredEdges);
       return filteredEdges;
     });
     
@@ -153,7 +147,6 @@ export function useFlowBuilder(
       }) || []
     }));
     
-    console.log('useFlowBuilder: Updated interactions after edge deletion:', updatedInteractions);
     onInteractionsChange(updatedInteractions);
   }, [setEdges, interactions, onInteractionsChange]);
 

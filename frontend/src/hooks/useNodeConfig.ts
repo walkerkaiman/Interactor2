@@ -1,115 +1,63 @@
 import { useState, useEffect, useCallback } from 'react';
-import { configParser, UnifiedModuleConfig } from '../core/ConfigParser';
+import { ConfigParser } from '../core/ConfigParser';
 
-interface UseNodeConfigOptions {
-  moduleName: string;
-  instance: any;
-  onConfigChange: (config: any) => void;
-  manifest?: any;
-}
+const configParser = new ConfigParser();
 
-export function useNodeConfig({ moduleName, instance, onConfigChange, manifest }: UseNodeConfigOptions) {
-  const [config, setConfig] = useState<any>({});
+export function useNodeConfig(
+  instance: any,
+  key: string,
+  defaultValue: any,
+  validator?: (value: any) => any,
+  onConfigChange?: (config: any) => void
+) {
+  const moduleName = instance?.moduleName || instance?.name || 'unknown';
+  const manifest = instance?.manifest;
 
-  // Clean and extract module-specific configuration from unified config
+  // Clean config data from instance
   const cleanConfigData = useCallback((rawConfig: any): any => {
-    // If no config provided, get defaults for this module
     if (!rawConfig || Object.keys(rawConfig).length === 0) {
-      console.log('[useNodeConfig] No config provided, using defaults for:', moduleName);
       return configParser.getDefaultConfig(moduleName, manifest);
     }
-    
-    // First clean any nested structures
     const cleaned = configParser.cleanConfig(rawConfig);
-    
-    // Then extract module-specific configuration
-    return configParser.extractModuleConfig(moduleName, cleaned as UnifiedModuleConfig, manifest);
+    return configParser.extractModuleConfig(moduleName, cleaned, manifest);
   }, [moduleName, manifest]);
 
-  // Get initial value for a specific key
-  const getInitialValue = useCallback((key: string) => {
-    if (!instance?.config) return undefined;
-    
-    const moduleConfig = cleanConfigData(instance.config);
-    return moduleConfig[key];
-  }, [instance?.config, cleanConfigData]);
+  // Get initial value
+  const [value, setValue] = useState(() => {
+    const config = cleanConfigData(instance?.config);
+    return config[key] ?? defaultValue;
+  });
+
+  // Update value when instance config changes
+  useEffect(() => {
+    const config = cleanConfigData(instance?.config);
+    const newValue = config[key] ?? defaultValue;
+    setValue(newValue);
+  }, [instance?.config, key, defaultValue, cleanConfigData]);
 
   // Update configuration
-  const updateConfig = useCallback((key: string, value: any) => {
-    console.log('[useNodeConfig] updateConfig called:', { key, value, moduleName, instanceId: instance?.id });
-    
-    // Get the current clean config from the instance
+  const updateConfig = useCallback((newValue: any) => {
     const currentConfig = cleanConfigData(instance?.config || {});
-    console.log('[useNodeConfig] current config:', currentConfig);
-    
-    // Create updated config with the new value
-    const updatedConfig = { ...currentConfig, [key]: value };
-    console.log('[useNodeConfig] updated config:', updatedConfig);
-    
-    // Set the local state
-    setConfig(updatedConfig);
-    
-    // Send the updated config to the parent (don't clean it again, it's already module-specific)
-    console.log('[useNodeConfig] calling onConfigChange with:', updatedConfig);
-    onConfigChange(updatedConfig);
-  }, [instance?.config, cleanConfigData, onConfigChange, moduleName]);
+    const updatedConfig = { ...currentConfig, [key]: newValue };
+    setValue(newValue);
+    onConfigChange?.(updatedConfig);
+  }, [instance?.config, cleanConfigData, onConfigChange, key]);
 
-  // Watch for backend config changes
-  useEffect(() => {
-    if (instance?.config) {
-      const moduleConfig = cleanConfigData(instance.config);
-      setConfig(moduleConfig);
-    }
-  }, [instance?.config, cleanConfigData]);
-
-  return {
-    config,
-    updateConfig,
-    getInitialValue
-  };
+  return [value, updateConfig] as const;
 }
 
-/**
- * Custom hook for getting real-time data from instance (for WebSocket updates)
- */
-export function useInstanceData<T>(instance: any, key: string, defaultValue: T): T {
-  const [value, setValue] = useState<T>(defaultValue);
+export function useInstanceData(instance: any, key: string, defaultValue: any) {
+  const [value, setValue] = useState(() => {
+    return instance?.[key] ?? defaultValue;
+  });
 
+  // Update value when instance data changes
   useEffect(() => {
-    console.log(`useInstanceData called for key "${key}":`, {
-      instance,
-      instanceId: instance?.id,
-      instanceKeys: instance ? Object.keys(instance) : [],
-      hasKey: instance ? key in instance : false,
-      instanceValue: instance ? instance[key] : undefined,
-      defaultValue,
-      currentValue: value
-    });
-    
-    if (instance) {
-      const newValue = instance[key] !== undefined 
-        ? instance[key] 
-        : defaultValue;
-      
-      console.log(`useInstanceData update for key "${key}":`, {
-        key,
-        oldValue: value,
-        newValue,
-        instance,
-        instanceKeys: Object.keys(instance),
-        hasKey: key in instance,
-        instanceValue: instance[key],
-        willUpdate: newValue !== value
-      });
-      
-      if (newValue !== value) {
-        console.log(`Setting new value for "${key}": ${value} -> ${newValue}`);
-        setValue(newValue);
-      } else {
-        console.log(`No update needed for "${key}": ${value}`);
-      }
+    const newValue = instance?.[key] ?? defaultValue;
+    if (newValue !== value) {
+      setValue(newValue);
     }
-  }, [instance, key, defaultValue, value]);
+  }, [instance?.[key], defaultValue, value]);
 
   return value;
 } 

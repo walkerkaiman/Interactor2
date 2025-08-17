@@ -17,6 +17,12 @@ export function useStateSync(options: StateSyncOptions = {}) {
   const [localState, setLocalState] = useState<any[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const lastStateRef = useRef<BackendState | null>(null);
+  const optionsRef = useRef(options);
+
+  // Update options ref when options change
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   // Fetch current state from backend
   const fetchState = useCallback(async () => {
@@ -28,13 +34,13 @@ export function useStateSync(options: StateSyncOptions = {}) {
         setLocalState(state.interactions);
       }
       
-      options.onStateUpdate?.(state);
+      optionsRef.current.onStateUpdate?.(state);
       return state;
     } catch (error) {
       console.error('Failed to fetch state:', error);
       return null;
     }
-  }, [options.onStateUpdate]);
+  }, []);
 
   // Fetch state only when new changes are detected
   const fetchStateIfNeeded = useCallback(async (newChanges: boolean) => {
@@ -103,7 +109,7 @@ export function useStateSync(options: StateSyncOptions = {}) {
   // Initialize state on mount only
   useEffect(() => {
     fetchState();
-  }, []); // Remove fetchState dependency to prevent infinite loop
+  }, []); // Empty dependency array, only run once
 
   return {
     backendState,

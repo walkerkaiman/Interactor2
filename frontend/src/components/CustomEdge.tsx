@@ -1,7 +1,5 @@
-import React, { memo } from 'react';
-import { EdgeLabelRenderer, getBezierPath } from 'reactflow';
-import { FrontendEdgeData } from '../types';
-
+import React from 'react';
+import { getBezierPath, EdgeLabelRenderer } from 'reactflow';
 import styles from './CustomEdge.module.css';
 
 interface CustomEdgeProps {
@@ -12,9 +10,10 @@ interface CustomEdgeProps {
   targetY: number;
   sourcePosition: any;
   targetPosition: any;
-  style?: any;
-  data?: FrontendEdgeData;
+  data?: any;
   selected?: boolean;
+  animated?: boolean;
+  highlighted?: boolean;
   markerEnd?: string;
 }
 
@@ -26,20 +25,12 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   targetY,
   sourcePosition,
   targetPosition,
-  style = {},
   data,
   selected = false,
+  animated = false,
+  highlighted = false,
   markerEnd,
 }) => {
-  console.log(`CustomEdge rendering for ${id}:`, {
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    data,
-    style
-  });
-
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -74,14 +65,6 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   }
   
   const className = edgeClasses.join(' ');
-  
-  console.log(`CustomEdge ${id} classes:`, {
-    edgeClasses,
-    className,
-    edgePath,
-    isRegistered: data?.isRegistered,
-    event: data?.route?.event
-  });
   
   // Generate label text based on event type
   const getLabelText = () => {
@@ -148,4 +131,4 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   );
 };
 
-export default memo(CustomEdge); 
+export default CustomEdge; 

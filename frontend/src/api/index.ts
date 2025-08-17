@@ -97,18 +97,17 @@ class ApiService {
 
   // Get current state from backend
   async getState(): Promise<any> {
-    const response = await this.request<ApiResponse<any>>('/state');
-    return response.data || {};
+    const response = await this.request<any>('/state');
+    // The /state endpoint returns the state directly, not wrapped in ApiResponse
+    return response;
   }
 
   // Update module configuration
   async updateModuleConfig(moduleId: string, config: any): Promise<void> {
-    console.log('[FRONTEND API] updateModuleConfig called:', { moduleId, config });
     await this.request(`/modules/instances/${moduleId}/config`, {
       method: 'PUT',
       body: JSON.stringify({ config }),
     });
-    console.log('[FRONTEND API] updateModuleConfig completed for:', moduleId);
   }
 
   // Sync interactions with modules (explicit sync)

@@ -18,10 +18,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onToggleSettings,
   onToggleTrigger,
   sidebarOpen,
-  hasUnregisteredChanges,
+  hasUnregisteredChanges
 }) => {
-  console.log('Toolbar render:', { hasUnregisteredChanges });
-  
   return (
     <div className={styles.toolbar}>
       <div className={styles.left}>

@@ -64,7 +64,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       onConfigChange: async (moduleId: string, configDeltaOrFull: any) => {
         // DO NOT send config changes to backend immediately
         // Changes are stored in local state and only sent when register button is pressed
-        console.log('[NodeEditor] Config change stored locally:', { moduleId, configDeltaOrFull });
         
         // Update local interactions with the new configuration
         const updatedInteractions = interactions.map(interaction => ({
@@ -103,7 +102,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   // Handle node deletion
   const handleDeleteNode = useCallback((nodeId: string) => {
     // TODO: implement deletion through useFlowBuilder
-    console.log('Delete node:', nodeId);
   }, []);
 
 
@@ -202,7 +200,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 
   // Handle node position changes
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    console.log('Node drag stop (update position):', node.id, node.position);
     const updated = interactions.map((interaction) => ({
       ...interaction,
       modules: (interaction.modules || []).map((m: any) => m.id === node.id ? { ...m, position: node.position } : m)
@@ -226,7 +223,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       if (onInteractionsUpdate) {
         onInteractionsUpdate(updated);
       }
-      console.log('Pane drop disconnect (removed routes for handle):', draggedHandle);
+
       markStructuralChange();
       setDraggedHandle(null);
     }
@@ -236,7 +233,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   const onConnect = useCallback(
     (params: Connection) => {
       // TODO: implement connect through useFlowBuilder
-      console.log('Connect (adding route):', params);
       flowBuilderConnect(params);
       markStructuralChange();
     },
@@ -246,7 +242,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   // Handle edge deletion
   const onEdgesDelete = useCallback(
     (edgesToDelete: any[]) => {
-      console.log('Deleting edges:', edgesToDelete);
       flowBuilderEdgesDelete(edgesToDelete);
       markStructuralChange();
     },

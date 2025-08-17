@@ -174,19 +174,6 @@ export function buildHttpRoutes(): express.Router {
     const interactions: InteractionConfig[] = req.body.interactions || [];
     const originClientId: string | undefined = (req.get('X-Client-Id') as string) || req.body.clientId;
     
-    console.log('[REGISTER] Received registration request:', {
-      interactionsCount: interactions.length,
-      originClientId,
-      firstInteraction: interactions[0] ? {
-        modulesCount: interactions[0].modules?.length,
-        firstModule: interactions[0].modules?.[0] ? {
-          id: interactions[0].modules[0].id,
-          moduleName: interactions[0].modules[0].moduleName,
-          config: JSON.stringify(interactions[0].modules[0].config)
-        } : null
-      } : null
-    });
-    
     const { moduleInstances } = await interactorApp.registerInteractions(interactions, originClientId);
     res.json({ success: true, message: 'Interaction map registered successfully', count: interactions.length, moduleInstances: moduleInstances.length });
   }));

@@ -100,38 +100,46 @@ export function useBackendSync(): BackendSyncState {
   const connect = useCallback(() => {
     const wsUrl = (import.meta as any).env?.VITE_WS_URL ?? 'ws://localhost:3001';
     
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setState(prev => ({ ...prev, loading: false, error: null }));
-      reconnectAttemptsRef.current = 0;
-    };
+      ws.onopen = () => {
+        setState(prev => ({ ...prev, loading: false, error: null }));
+        reconnectAttemptsRef.current = 0;
+      };
 
-    ws.onmessage = (evt) => {
-      try {
-        const msg = JSON.parse(evt.data);
-        handleWebSocketMessage(msg);
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
-    };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          handleWebSocketMessage(msg);
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
+        }
+      };
 
-    ws.onerror = (event) => {
-      console.error('WebSocket error:', event);
-    };
+      ws.onerror = (event) => {
+        // Only log error details in development
+        if ((import.meta as any).env?.DEV) {
+          console.error('WebSocket connection error:', event);
+        }
+      };
 
-    ws.onclose = (event) => {
-      setState(prev => ({ ...prev, loading: true }));
-      
-      // Attempt to reconnect
-      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          reconnectAttemptsRef.current++;
-          connect();
-        }, reconnectDelay * Math.pow(2, reconnectAttemptsRef.current));
-      }
-    };
+      ws.onclose = (event) => {
+        setState(prev => ({ ...prev, loading: true }));
+        
+        // Attempt to reconnect
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current++;
+            connect();
+          }, reconnectDelay * Math.pow(2, reconnectAttemptsRef.current));
+        }
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      setState(prev => ({ ...prev, error: 'Failed to connect to WebSocket' }));
+    }
   }, [handleWebSocketMessage]);
 
   // Initialize WebSocket connection and fetch modules

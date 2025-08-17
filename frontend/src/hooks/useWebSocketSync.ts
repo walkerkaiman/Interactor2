@@ -31,7 +31,6 @@ export function useWebSocketSync({
       const ws = new WebSocket(url);
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = null;
@@ -71,15 +70,15 @@ export function useWebSocketSync({
               break;
               
             default:
-              console.log('Unknown WebSocket message type:', message.type);
+              // console.log('Unknown WebSocket message type:', message.type);
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          // console.error('Error parsing WebSocket message:', error);
         }
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        // console.log('WebSocket disconnected');
         wsRef.current = null;
         
         // Attempt reconnect after 1 second
@@ -89,12 +88,12 @@ export function useWebSocketSync({
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        // console.error('WebSocket error:', error);
       };
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
+      // console.error('Failed to create WebSocket connection:', error);
     }
   }, [url, onInteractionsUpdate, onModuleUpdate, onTriggerEvent]);
 
